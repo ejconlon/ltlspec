@@ -9,6 +9,8 @@ import Data.Bifunctor (Bifunctor (..))
 import Data.Bitraversable (Bitraversable (..))
 import Data.HashMap.Strict (HashMap)
 import qualified Data.HashMap.Strict as HashMap
+import Data.HashSet (HashSet)
+import qualified Data.HashSet as HashSet
 import Data.Hashable (Hashable)
 import GHC.Generics (Generic)
 
@@ -100,6 +102,12 @@ instance Traversable Prop where
     onR = fmap Prop . onF . unProp
     onF = bitraverse onR f
 
+-- | Find all the unique atoms in the proposition
+propAtoms :: (Eq p, Hashable p) => Prop p -> HashSet p
+propAtoms r0 = onR r0 HashSet.empty where
+  onR r s = onF s (unProp r)
+  onF = bifoldr onR HashSet.insert
+
 -- | When we evaluate a proposition at a certain time step, we either
 -- satisfy it, falsify it, or are left with another prop to evaluate
 -- on the next timestep.
@@ -183,6 +191,20 @@ evalProp f = go where
         PropResTrue -> PropResTrue
         PropResFalse -> foldOrs acc xs
         PropResNext r -> foldOrs (r:acc) xs
+
+-- | Evaluate the prop at every timestep until true/false or there are no more inputs.
+-- Also returns the number of timesteps evaluated.
+foldProp :: (a -> p -> Bool) -> Prop p -> [a] -> (Int, PropRes p)
+foldProp f = go 0 where
+  go i p xs =
+    case xs of
+      [] -> (i, PropResNext p)
+      y:ys ->
+        let i' = i + 1
+            r = evalProp (f y) p
+        in case r of
+          PropResNext p' -> go i' p' ys
+          _ -> (i', r)
 
 -- | We label each node in our graph with a 'GraphId'.
 newtype GraphId = GraphId { unGraphId :: Int }
