@@ -1,3 +1,4 @@
+-- | Linear Temporal Logic (LTL) propositions and functions for manipulating or evaluating them.
 module Ltlspec where
 
 import Control.Applicative (liftA2)
@@ -10,6 +11,8 @@ import qualified Data.Map.Strict as Map
 
 -- | An LTL proposition, with the recursion factored out.
 -- For a proposition that looks like a tree, see 'Prop'.
+-- For a proposition that looks like a graph, see 'GraphProp'.
+-- Both use this datatype as the underlying shape.
 data PropF r p =
     PropAtom !p
   | PropTrue
@@ -18,13 +21,14 @@ data PropF r p =
   | PropNot r
   | PropUntil r r  -- ^ 'PropUntil r1 r2' means 'eventually r2' and at least until 'r2' holds, 'r1' always holds.
                    -- If neither holds, it falsifies the proposition. When 'r2' holds, it satisfies the proposition.
-  -- | PropRelease r r
+  -- | PropRelease r r  -- ^ TODO
   | PropAlways r
   | PropEventually r
   | PropAnd [r]
   | PropOr [r]
   deriving stock (Eq, Ord, Show, Functor, Foldable, Traversable)
 
+-- We can map over all the 'r' and 'p' holes in a 'PropF'.
 instance Bifunctor PropF where
   bimap f g = \case
     PropAtom p -> PropAtom (g p)
@@ -39,6 +43,7 @@ instance Bifunctor PropF where
     PropAnd rs -> PropAnd (fmap f rs)
     PropOr rs -> PropOr (fmap f rs)
 
+-- We can fold over all the 'r' and 'p' holes in a 'PropF'.
 instance Bifoldable PropF where
   bifoldr f g z = \case
     PropAtom p -> g p z
@@ -53,6 +58,7 @@ instance Bifoldable PropF where
     PropAnd rs -> foldr f z rs
     PropOr rs -> foldr f z rs
 
+-- We can traverse over all the 'r' and 'p' holes in a 'PropF'.
 instance Bitraversable PropF where
   bitraverse f g = \case
     PropAtom p -> fmap PropAtom (g p)
@@ -67,6 +73,7 @@ instance Bitraversable PropF where
     PropAnd rs -> fmap PropAnd (traverse f rs)
     PropOr rs -> fmap PropOr (traverse f rs)
 
+-- | An LTL proposition as a tree. Note that there
 newtype Prop p = Prop { unProp :: PropF (Prop p) p }
   deriving stock (Eq, Ord, Show)
 
@@ -85,6 +92,9 @@ instance Traversable Prop where
     onR = fmap Prop . onF . unProp
     onF = bitraverse onR f
 
+-- | When we evaluate a proposition at a certain time step, we either
+-- satisfy it, falsify it, or are left with another prop to evaluate
+-- on the next timestep.
 data PropRes p =
     PropResTrue
   | PropResFalse
@@ -97,6 +107,8 @@ propResNot = \case
   PropResFalse -> PropResTrue
   PropResNext r -> PropResNext (Prop (PropNot r))
 
+-- | Evaluate the proposition at the current timestep with the given evaluation function.
+-- (See also evalGraph.)
 evalProp :: (p -> Bool) -> Prop p -> PropRes p
 evalProp f = go where
   go p0@(Prop f0) =
@@ -163,32 +175,45 @@ evalProp f = go where
         PropResFalse -> foldOrs acc xs
         PropResNext r -> foldOrs (r:acc) xs
 
+-- | We label each node in our graph with a 'GraphId'.
 newtype GraphId = GraphId { unGraphId :: Int }
   deriving newtype (Eq, Ord, Show, Num, Enum, Bounded)
 
+-- | A restricted proposition that has no recursive structures - it can
+-- only refer to other graph nodes. (See 'Graph' the whole structure.)
 newtype GraphProp p = GraphProp { unGraphProp :: PropF GraphId p }
   deriving stock (Eq, Ord, Show, Functor, Foldable, Traversable)
 
+-- | Intermediate state for building a 'Graph'.
 data GraphState p = GraphState
   { graphStateNodes :: !(Map GraphId (GraphProp p))
   , graphStateNext :: !GraphId
   } deriving stock (Eq, Ord, Show, Functor, Foldable, Traversable)
 
+-- | Initial state for building a 'Graph'.
 emptyGraphState :: GraphState p
 emptyGraphState = GraphState Map.empty 0
 
+-- | An LTL proposition as a graph. Note that if it isn't a DAG
+-- you're going to have a very bad time evaluating it!
 data Graph p = Graph
   { graphState :: !(GraphState p)
   , graphRoot :: !GraphId
   } deriving stock (Eq, Ord, Show, Functor, Foldable, Traversable)
 
 propToGraphStep :: Prop p -> State (GraphState p) GraphId
-propToGraphStep = undefined
+propToGraphStep = error "TODO"
 
+-- | Turn the given tree-structured proposition into a graph.
+-- Should satisfy `evalGraph f (propToGraph p) == fmap propToGraph (evalProp f p)`.
+-- That is to say, for propositions that are naturally tree-structured, we
+-- get the same result evaluating them in tree or graph form.
 propToGraph :: Prop p -> Graph p
 propToGraph p =
   let (root, st) = runState (propToGraphStep p) emptyGraphState
   in Graph st root
 
+-- | Evaluate the proposition at the current timestep with the given evaluation function.
+-- (See also 'evalProp'.)
 evalGraph :: (p -> Bool) -> Graph p -> Either Bool (Graph p)
-evalGraph = undefined
+evalGraph = error "TODO"
