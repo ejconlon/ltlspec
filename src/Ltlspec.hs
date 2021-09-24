@@ -2,17 +2,24 @@
 module Ltlspec where
 
 import Control.Applicative (liftA2)
-import Control.Monad.State (State, runState)
+import Control.DeepSeq (NFData)
+import Control.Monad.State.Strict (State, runState)
 import Data.Bifoldable (Bifoldable (..))
 import Data.Bifunctor (Bifunctor (..))
 import Data.Bitraversable (Bitraversable (..))
-import Data.Map.Strict (Map)
-import qualified Data.Map.Strict as Map
+import Data.HashMap.Strict (HashMap)
+import qualified Data.HashMap.Strict as HashMap
+import Data.Hashable (Hashable)
+import GHC.Generics (Generic)
 
 -- | An LTL proposition, with the recursion factored out.
 -- For a proposition that looks like a tree, see 'Prop'.
 -- For a proposition that looks like a graph, see 'GraphProp'.
 -- Both use this datatype as the underlying shape.
+-- For tree-shaped props, the 'r' holes are more tree-shaped props.
+-- In both cases, the 'p' holes indexes predicates at each timestep
+-- (that is to say they will be fed into a fresh predicate of type
+-- 'p -> Bool' computed from the event that timestep).
 data PropF r p =
     PropAtom !p
   | PropTrue
@@ -26,7 +33,8 @@ data PropF r p =
   | PropEventually r
   | PropAnd [r]
   | PropOr [r]
-  deriving stock (Eq, Ord, Show, Functor, Foldable, Traversable)
+  deriving stock (Eq, Ord, Show, Functor, Foldable, Traversable, Generic)
+  deriving anyclass (Hashable, NFData)
 
 -- We can map over all the 'r' and 'p' holes in a 'PropF'.
 instance Bifunctor PropF where
@@ -73,9 +81,9 @@ instance Bitraversable PropF where
     PropAnd rs -> fmap PropAnd (traverse f rs)
     PropOr rs -> fmap PropOr (traverse f rs)
 
--- | An LTL proposition as a tree. Note that there
+-- | An LTL proposition as a tree.
 newtype Prop p = Prop { unProp :: PropF (Prop p) p }
-  deriving stock (Eq, Ord, Show)
+  deriving newtype (Eq, Ord, Show, Hashable, NFData)
 
 instance Functor Prop where
   fmap f = onR where
@@ -99,7 +107,8 @@ data PropRes p =
     PropResTrue
   | PropResFalse
   | PropResNext !(Prop p)
-  deriving stock (Eq, Show, Functor, Foldable, Traversable)
+  deriving stock (Eq, Show, Functor, Foldable, Traversable, Generic)
+  deriving anyclass (Hashable, NFData)
 
 propResNot :: PropRes p -> PropRes p
 propResNot = \case
@@ -177,29 +186,32 @@ evalProp f = go where
 
 -- | We label each node in our graph with a 'GraphId'.
 newtype GraphId = GraphId { unGraphId :: Int }
-  deriving newtype (Eq, Ord, Show, Num, Enum, Bounded)
+  deriving newtype (Eq, Ord, Show, Num, Enum, Bounded, Hashable, NFData)
 
 -- | A restricted proposition that has no recursive structures - it can
 -- only refer to other graph nodes. (See 'Graph' the whole structure.)
 newtype GraphProp p = GraphProp { unGraphProp :: PropF GraphId p }
-  deriving stock (Eq, Ord, Show, Functor, Foldable, Traversable)
+  deriving newtype (Eq, Ord, Show, Functor, Foldable, Hashable, NFData)
+  deriving stock (Traversable)
 
 -- | Intermediate state for building a 'Graph'.
 data GraphState p = GraphState
-  { graphStateNodes :: !(Map GraphId (GraphProp p))
+  { graphStateNodes :: !(HashMap GraphId (GraphProp p))
   , graphStateNext :: !GraphId
-  } deriving stock (Eq, Ord, Show, Functor, Foldable, Traversable)
+  } deriving stock (Eq, Ord, Show, Functor, Foldable, Traversable, Generic)
+    deriving anyclass (NFData)
 
 -- | Initial state for building a 'Graph'.
 emptyGraphState :: GraphState p
-emptyGraphState = GraphState Map.empty 0
+emptyGraphState = GraphState HashMap.empty 0
 
 -- | An LTL proposition as a graph. Note that if it isn't a DAG
 -- you're going to have a very bad time evaluating it!
 data Graph p = Graph
   { graphState :: !(GraphState p)
   , graphRoot :: !GraphId
-  } deriving stock (Eq, Ord, Show, Functor, Foldable, Traversable)
+  } deriving stock (Eq, Ord, Show, Functor, Foldable, Traversable, Generic)
+    deriving anyclass (NFData)
 
 propToGraphStep :: Prop p -> State (GraphState p) GraphId
 propToGraphStep = error "TODO"
