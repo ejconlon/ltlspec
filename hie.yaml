@@ -1,0 +1,7 @@
+cradle:
+  stack:
+    - path: "./src"
+      component: "ltlspec:lib"
+
+    - path: "./test"
+      component: "ltlspec:test:ltlspec-test"

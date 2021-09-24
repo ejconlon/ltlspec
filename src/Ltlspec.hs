@@ -5,10 +5,7 @@ import Data.Bifoldable (Bifoldable (..))
 import Data.Bifunctor (Bifunctor (..))
 import Data.Bitraversable (Bitraversable (..))
 import Data.Map.Strict (Map)
-import qualified Data.Map.Strict as Map
-
-exe :: IO ()
-exe = putStrLn "hello, world"
+-- import qualified Data.Map.Strict as Map
 
 data PropF r p =
     PropAtom !p
@@ -66,10 +63,15 @@ instance Functor Prop where
     onR = Prop . onF . unProp
     onF = bimap onR f
 
--- instance Foldable Prop where
---   foldr f = onR where
---     onR z = Prop . onF z . unProp
---     onF = bifoldr onR onF
+instance Foldable Prop where
+  foldr f z0 r0 = onR r0 z0 where
+    onR = onF . unProp
+    onF x1 z1 = bifoldr onR f z1 x1
+
+instance Traversable Prop where
+  traverse f = onR where
+    onR = fmap Prop . onF . unProp
+    onF = bitraverse onR f
 
 evalProp :: (p -> Bool) -> Prop p -> Either Bool (Prop p)
 evalProp f = onR where
@@ -91,63 +93,45 @@ newtype GraphId = GraphId { unGraphId :: Int }
 data GraphPropF r p =
     GraphPropRef !GraphId
   | GraphPropForm !(PropF r p)
-  deriving stock (Eq, Ord, Show)
+  deriving stock (Eq, Ord, Show, Functor, Foldable, Traversable)
+
+instance Bifunctor GraphPropF where
+  bimap f g = \case
+    GraphPropRef i -> GraphPropRef i
+    GraphPropForm j -> GraphPropForm (bimap f g j)
+
+instance Bifoldable GraphPropF where
+  bifoldr f g z = \case
+    GraphPropRef _ -> z
+    GraphPropForm j -> bifoldr f g z j
+
+instance Bitraversable GraphPropF where
+  bitraverse f g = \case
+    GraphPropRef i -> pure (GraphPropRef i)
+    GraphPropForm j -> fmap GraphPropForm (bitraverse f g j)
 
 newtype GraphProp p = GraphProp { unGraphProp :: GraphPropF (GraphProp p) p }
   deriving stock (Eq, Ord, Show)
 
+instance Functor GraphProp where
+  fmap f = onR where
+    onR = GraphProp . onF . unGraphProp
+    onF = bimap onR f
+
+instance Foldable GraphProp where
+  foldr f z0 r0 = onR r0 z0 where
+    onR = onF . unGraphProp
+    onF x1 z1 = bifoldr onR f z1 x1
+
+instance Traversable GraphProp where
+  traverse f = onR where
+    onR = fmap GraphProp . onF . unGraphProp
+    onF = bitraverse onR f
+
 data Graph p = Graph
   { graphNodes :: !(Map GraphId (GraphProp p))
   , graphRoot :: !GraphId
-  } deriving stock (Eq, Ord, Show)
+  } deriving stock (Eq, Ord, Show, Functor, Foldable, Traversable)
 
 evalGraph :: (p -> Bool) -> Graph p -> Either Bool (Graph p)
 evalGraph = undefined
-
--- simplifyProp :: Prop a -> Prop a
--- simplifyProp = undefined
-
--- bottomUpF :: (b -> a) -> (r -> s) -> TP r a -> TP s b
--- bottomUpF f g = go where
---   go = \case
---     TPAtom (Predicate a)
---     TPTrue
---     TPFalse
---     TPNext (TP a)
---     TPNot (TP a)
---     TPUntil (TP a) (TP a)
---     TPRelease (TP a) (TP a)
---     TPAnd tps -> TPfmap g tps
---     TPOr tps ->
-
-
--- instance Contravariant TP where
---   contramap f = go where
---     go = \case
---       TPAtom (Predicate a)
---       TPTrue
---       TPFalse
---       TPNext (TP a)
---       TPNot (TP a)
---       TPUntil (TP a) (TP a)
---       TPRelease (TP a) (TP a)
---       TPAnd tps -> fmap go tps
---       TPOr  ->
-
-
-
--- data LTL a
--- = StateProp (Prop a) |TT
--- |FF
--- |X(LTLa)
--- | Not (LTL a) |U(LTLa)(LTLa) |R(LTLa)(LTLa)
--- | (LTL a) :/\: (LTL a) | (LTL a) :\/: (LTL a)
--- -- atomic proposition
--- -- True
--- -- False
--- -- NeXt
--- -- Negation
--- -- Until
--- -- Release
--- -- And
--- -- Or
