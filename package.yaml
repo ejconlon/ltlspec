@@ -1,20 +1,21 @@
 name:                ltlspec
 version:             0.1.0
-github:              "githubuser/ltlspec"
+github:              "ejconlon/ltlspec"
 license:             BSD3
-author:              "Author name here"
-maintainer:          "example@example.com"
-copyright:           "(c) 2021 Author name here"
+author:              "Eric Conlon"
+maintainer:          "ejconlon@gmail.com"
+copyright:           "(c) 2021 Eric Conlon"
 # category:            Undefined
 # synopsis:            Undefined
 
 extra-source-files:
 - README.md
 
-description: Please see the README on GitHub at <https://github.com/githubuser/ltlspec#readme>
+description: Please see the README on GitHub at <https://github.com/ejconlon/ltlspec#readme>
 
 dependencies:
 - base >= 4.12 && < 5
+- containers
 
 default-extensions:
 - BangPatterns
@@ -57,17 +58,6 @@ ghc-options:
 
 library:
   source-dirs: src
-
-executables:
-  ltlspec-exe:
-    main:                Main.hs
-    source-dirs:         exe
-    ghc-options:
-    - -threaded
-    - -rtsopts
-    - -with-rtsopts=-N
-    dependencies:
-    - ltlspec
 
 tests:
   ltlspec-test:

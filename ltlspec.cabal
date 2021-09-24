@@ -6,12 +6,12 @@ cabal-version: 1.12
 
 name:           ltlspec
 version:        0.1.0
-description:    Please see the README on GitHub at <https://github.com/githubuser/ltlspec#readme>
-homepage:       https://github.com/githubuser/ltlspec#readme
-bug-reports:    https://github.com/githubuser/ltlspec/issues
-author:         Author name here
-maintainer:     example@example.com
-copyright:      (c) 2021 Author name here
+description:    Please see the README on GitHub at <https://github.com/ejconlon/ltlspec#readme>
+homepage:       https://github.com/ejconlon/ltlspec#readme
+bug-reports:    https://github.com/ejconlon/ltlspec/issues
+author:         Eric Conlon
+maintainer:     ejconlon@gmail.com
+copyright:      (c) 2021 Eric Conlon
 license:        BSD3
 license-file:   LICENSE
 build-type:     Simple
@@ -20,7 +20,7 @@ extra-source-files:
 
 source-repository head
   type: git
-  location: https://github.com/githubuser/ltlspec
+  location: https://github.com/ejconlon/ltlspec
 
 library
   exposed-modules:
@@ -58,44 +58,7 @@ library
   ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wincomplete-uni-patterns -Wpartial-fields -Wredundant-constraints -fno-warn-unused-top-binds -fwrite-ide-info -hiedir=.hie
   build-depends:
       base >=4.12 && <5
-  default-language: Haskell2010
-
-executable ltlspec-exe
-  main-is: Main.hs
-  other-modules:
-      Paths_ltlspec
-  hs-source-dirs:
-      exe
-  default-extensions:
-      BangPatterns
-      ConstraintKinds
-      DeriveAnyClass
-      DeriveFunctor
-      DeriveFoldable
-      DeriveGeneric
-      DeriveTraversable
-      DerivingStrategies
-      DerivingVia
-      FlexibleContexts
-      FlexibleInstances
-      FunctionalDependencies
-      GADTs
-      GeneralizedNewtypeDeriving
-      LambdaCase
-      KindSignatures
-      MultiParamTypeClasses
-      Rank2Types
-      ScopedTypeVariables
-      StandaloneDeriving
-      TemplateHaskell
-      TupleSections
-      TypeApplications
-      TypeOperators
-      TypeFamilies
-  ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wincomplete-uni-patterns -Wpartial-fields -Wredundant-constraints -fno-warn-unused-top-binds -fwrite-ide-info -hiedir=.hie -threaded -rtsopts -with-rtsopts=-N
-  build-depends:
-      base >=4.12 && <5
-    , ltlspec
+    , containers
   default-language: Haskell2010
 
 test-suite ltlspec-test
@@ -134,6 +97,7 @@ test-suite ltlspec-test
   ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wincomplete-uni-patterns -Wpartial-fields -Wredundant-constraints -fno-warn-unused-top-binds -fwrite-ide-info -hiedir=.hie -threaded -rtsopts -with-rtsopts=-N
   build-depends:
       base >=4.12 && <5
+    , containers
     , ltlspec
     , tasty
     , tasty-hunit
