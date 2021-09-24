@@ -82,7 +82,12 @@ evalProp f = onR where
     PropFalse -> Left False
     PropNext r -> Right (unProp r)
     PropNot r -> either (Left . not) (Right . PropNot) (onR r)
-    PropUntil r1 r2 -> undefined
+    PropUntil r1 r2 ->
+      let e1 = onR r1
+      in case e1 of
+        Left True -> Right (unProp r2)
+        Left False -> Left False
+        Right r1' -> Right (PropUntil r1' r2)
     PropRelease r1 r2 -> undefined
     PropAnd rs -> undefined
     PropOr rs -> undefined
