@@ -3,8 +3,8 @@ module Ltlspec where
 
 import Control.Applicative (liftA2)
 import Control.DeepSeq (NFData)
-import Control.Monad (ap)
-import Control.Monad.State.Strict (State, runState)
+import Control.Monad ((>=>), ap)
+import Control.Monad.State.Strict (State, execState, modify', runState)
 import Data.Bifoldable (Bifoldable (..))
 import Data.Bifunctor (Bifunctor (..))
 import Data.Bitraversable (Bitraversable (..))
@@ -13,6 +13,8 @@ import qualified Data.HashMap.Strict as HashMap
 import Data.HashSet (HashSet)
 import qualified Data.HashSet as HashSet
 import Data.Hashable (Hashable)
+import Data.Monoid (Sum (..))
+import Data.Semigroup (Max (..))
 import GHC.Generics (Generic)
 
 -- | An LTL proposition, with the recursion factored out.
@@ -159,21 +161,32 @@ propBind f = onR where
     PropAndF rs -> PropAndF (fmap onR rs)
     PropOrF rs -> PropAndF (fmap onR rs)
 
-propBottomUp :: (PropF x p -> x) -> Prop p -> x
-propBottomUp f = onR where
+propFoldUp :: (PropF x p -> x) -> Prop p -> x
+propFoldUp f = onR where
   onR = f . onF . unProp
+  onF = first onR
+
+propFoldUpM :: Monad m => (PropF x p -> m x) -> Prop p -> m x
+propFoldUpM f = onR where
+  onR = onF . unProp >=> f
   onF = \case
-    PropAtomF p -> PropAtomF p
-    PropTrueF -> PropTrueF
-    PropFalseF -> PropFalseF
-    PropNextF r -> PropNextF (onR r)
-    PropNotF r -> PropNotF (onR r)
-    PropUntilF r1 r2 -> PropUntilF (onR r1) (onR r2)
-    -- PropReleaseF r1 r2 -> undefined
-    PropAlwaysF r -> PropAlwaysF (onR r)
-    PropEventuallyF r -> PropEventuallyF (onR r)
-    PropAndF rs -> PropAndF (fmap onR rs)
-    PropOrF rs -> PropAndF (fmap onR rs)
+    PropAtomF p -> pure (PropAtomF p)
+    PropTrueF -> pure PropTrueF
+    PropFalseF -> pure PropFalseF
+    PropNextF r -> fmap PropNextF (onR r)
+    PropNotF r -> fmap PropNotF (onR r)
+    PropUntilF r1 r2 -> liftA2 PropUntilF (onR r1) (onR r2)
+    -- -- PropReleaseF r1 r2 -> undefined
+    PropAlwaysF r -> fmap PropAlwaysF (onR r)
+    PropEventuallyF r -> fmap PropEventuallyF (onR r)
+    PropAndF rs -> fmap PropAndF (traverse onR rs)
+    PropOrF rs -> fmap PropAndF (traverse onR rs)
+
+propSize :: Prop a -> Int
+propSize = getSum . propFoldUp ((Sum 1 <>) . bifoldMap id mempty)
+
+propDepth :: Prop a -> Int
+propDepth = getMax . propFoldUp (succ . bifoldMap id mempty)
 
 -- | Find all the unique atoms in the proposition
 propAtoms :: (Eq p, Hashable p) => Prop p -> HashSet p
@@ -357,3 +370,7 @@ graphEval = error "TODO"
 
 -- graphFold :: (a -> p -> Bool) -> Graph p -> [a] -> (Int, PropRes p)
 -- graphFold f = go 0 where
+
+-- graphSize :: Graph p -> Int
+-- graphDepth :: Graph p -> Int
+-- graphCollect :: Graph p -> (HashSet p, Graph p)
