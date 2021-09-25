@@ -1,10 +1,23 @@
--- | Linear Temporal Logic (LTL) propositions and functions for manipulating or evaluating them.
+-- | Linear Temporal Logic (LTL) propositions and functions for manipulating and evaluating them.
+--
+-- These definitions may seem a little strange: Our representation of LTL propositions, 'Prop',
+-- is defined as a fixpoint of another type, 'PropF' (mnemonic 'F' for 'Functor'; in this case, a
+-- structure with holes). This 'PropF' has holes for the recursive parts of 'Prop' and holes for the
+-- leaf atoms. We define 'Bifunctor', 'Bifoldable', and 'Bitraversable' for this type so we can
+-- easily modify and consume the contents of these holes. Why go through the trouble in the first
+-- place? The payoff is being able to use 'PropF' later on in the graph representation 'Graph' so
+-- we can exploit structural sharing and avoid size blowup as we evaluate the proposition.
+--
+-- To reduce noise at definition sites, we define pattern synonyms for all proposition constructors.
+-- For example, instead of 'Prop (PropNotF (Prop PropFalseF))' you can write 'PropNot PropFalse'.
+-- It is a little clumsy to import them ('import LtlSpec (pattern PropNot, pattern PropFalse))'), but
+-- that's how it goes.
 module Ltlspec where
 
 import Control.Applicative (liftA2)
 import Control.DeepSeq (NFData)
-import Control.Monad ((>=>), ap)
-import Control.Monad.State.Strict (State, execState, modify', runState)
+import Control.Monad (ap, (>=>))
+import Control.Monad.State.Strict (State, runState)
 import Data.Bifoldable (Bifoldable (..))
 import Data.Bifunctor (Bifunctor (..))
 import Data.Bitraversable (Bitraversable (..))
@@ -22,26 +35,41 @@ import GHC.Generics (Generic)
 -- For a proposition that looks like a graph, see 'GraphProp'.
 -- Both use this datatype as the underlying shape.
 -- For tree-shaped props, the 'r' holes are more tree-shaped props.
--- In both cases, the 'p' holes indexes predicates at each timestep
--- (that is to say they will be fed into a fresh predicate of type
--- 'p -> Bool' computed from the event that timestep).
+-- For graph-shaped props, the 'r' holes are node ids.
+-- In both cases, the 'p' holes are atoms.
+--
+-- TODO(ejconlon) Remove all ctors not necessary for Negation Normal Form
+-- (always, eventually, release), add helpers to construct equivalents, and
+-- add function to normalize. Required for translation to Buchi automaton.
 data PropF r p =
     PropAtomF !p
+  -- ^ An atomic prop - use this to embed predicates from your domain
   | PropTrueF
+  -- ^ The constrant True
   | PropFalseF
+  -- ^ The constant False
   | PropNextF r
+  -- ^ A prop that holds the next timestamp
   | PropNotF r
-  | PropUntilF r r  -- ^ 'PropUntil r1 r2' means 'eventually r2' and at least until 'r2' holds, 'r1' always holds.
-                   -- If neither holds, it falsifies the proposition. When 'r2' holds, it satisfies the proposition.
-  -- | PropReleaseF r r  -- ^ TODO
+  -- ^ Logical negation of the prop
+  | PropUntilF r r
+  -- ^ 'PropUntil r1 r2' means 'eventually r2' and at least until 'r2' holds, 'r1' always holds.
+  -- If neither holds, the prop is false. When 'r2' holds, the prop is true.
+  | PropReleaseF r r
+  -- ^ 'PropRelease r1 r2' means 'always r2' until and including when 'r1' holds.
+  -- If neither holds, the prop is false. When 'r1' and 'r2' hold, the prop is true.
   | PropAlwaysF r
+  -- ^ A prop that holds at every timestep. If it is ever false, the prop is false.
   | PropEventuallyF r
+  -- ^ A prop that will hold at some timestep. If it is ever true, the prop is true.
   | PropAndF [r]
+  -- ^ Logical AND of several props (empty is true)
   | PropOrF [r]
+  -- ^ Logical OR of several props (empty is false)
   deriving stock (Eq, Ord, Show, Functor, Foldable, Traversable, Generic)
   deriving anyclass (Hashable, NFData)
 
--- We can map over all the 'r' and 'p' holes in a 'PropF'.
+-- | We can map over all the 'r' and 'p' holes in a 'PropF'.
 instance Bifunctor PropF where
   bimap f g = \case
     PropAtomF p -> PropAtomF (g p)
@@ -50,13 +78,13 @@ instance Bifunctor PropF where
     PropNextF r -> PropNextF (f r)
     PropNotF r -> PropNotF (f r)
     PropUntilF r1 r2 -> PropUntilF (f r1) (f r2)
-    -- PropReleaseF r1 r2 -> PropReleaseF (f r1) (f r2)
+    PropReleaseF r1 r2 -> PropReleaseF (f r1) (f r2)
     PropAlwaysF r -> PropAlwaysF (f r)
     PropEventuallyF r -> PropEventuallyF (f r)
     PropAndF rs -> PropAndF (fmap f rs)
     PropOrF rs -> PropOrF (fmap f rs)
 
--- We can fold over all the 'r' and 'p' holes in a 'PropF'.
+-- | We can fold over all the 'r' and 'p' holes in a 'PropF'.
 instance Bifoldable PropF where
   bifoldr f g z = \case
     PropAtomF p -> g p z
@@ -65,13 +93,13 @@ instance Bifoldable PropF where
     PropNextF r -> f r z
     PropNotF r -> f r z
     PropUntilF r1 r2 -> f r1 (f r2 z)
-    -- PropReleaseF r1 r2 -> f r1 (f r2 z)
+    PropReleaseF r1 r2 -> f r1 (f r2 z)
     PropAlwaysF r -> f r z
     PropEventuallyF r -> f r z
     PropAndF rs -> foldr f z rs
     PropOrF rs -> foldr f z rs
 
--- We can traverse over all the 'r' and 'p' holes in a 'PropF'.
+-- | We can traverse over all the 'r' and 'p' holes in a 'PropF'.
 instance Bitraversable PropF where
   bitraverse f g = \case
     PropAtomF p -> fmap PropAtomF (g p)
@@ -80,7 +108,7 @@ instance Bitraversable PropF where
     PropNextF r -> fmap PropNextF (f r)
     PropNotF r -> fmap PropNotF (f r)
     PropUntilF r1 r2 -> liftA2 PropUntilF (f r1) (f r2)
-    -- PropReleaseF r1 r2 -> liftA2 PropReleaseF (f r1) (f r2)
+    PropReleaseF r1 r2 -> liftA2 PropReleaseF (f r1) (f r2)
     PropAlwaysF r -> fmap PropAlwaysF (f r)
     PropEventuallyF r -> fmap PropEventuallyF (f r)
     PropAndF rs -> fmap PropAndF (traverse f rs)
@@ -145,6 +173,7 @@ instance Monad Prop where
   return = pure
   p >>= f = propBind f p
 
+-- | Substitution of atoms in a 'Prop' is a monadic bind.
 propBind :: (p -> Prop q) -> Prop p -> Prop q
 propBind f = onR where
   onR = Prop . onF . unProp
@@ -155,17 +184,19 @@ propBind f = onR where
     PropNextF r -> PropNextF (onR r)
     PropNotF r -> PropNotF (onR r)
     PropUntilF r1 r2 -> PropUntilF (onR r1) (onR r2)
-    -- PropReleaseF r1 r2 -> undefined
+    PropReleaseF r1 r2 -> PropReleaseF (onR r1) (onR r2)
     PropAlwaysF r -> PropAlwaysF (onR r)
     PropEventuallyF r -> PropEventuallyF (onR r)
     PropAndF rs -> PropAndF (fmap onR rs)
     PropOrF rs -> PropAndF (fmap onR rs)
 
+-- | Fold a 'Prop' from the bottom up.
 propFoldUp :: (PropF x p -> x) -> Prop p -> x
 propFoldUp f = onR where
   onR = f . onF . unProp
   onF = first onR
 
+-- Fold a 'Prop' from the bottom up, with effects.
 propFoldUpM :: Monad m => (PropF x p -> m x) -> Prop p -> m x
 propFoldUpM f = onR where
   onR = onF . unProp >=> f
@@ -176,19 +207,21 @@ propFoldUpM f = onR where
     PropNextF r -> fmap PropNextF (onR r)
     PropNotF r -> fmap PropNotF (onR r)
     PropUntilF r1 r2 -> liftA2 PropUntilF (onR r1) (onR r2)
-    -- -- PropReleaseF r1 r2 -> undefined
+    PropReleaseF r1 r2 -> liftA2 PropReleaseF (onR r1) (onR r2)
     PropAlwaysF r -> fmap PropAlwaysF (onR r)
     PropEventuallyF r -> fmap PropEventuallyF (onR r)
     PropAndF rs -> fmap PropAndF (traverse onR rs)
     PropOrF rs -> fmap PropAndF (traverse onR rs)
 
+-- | The size of the 'Prop' (number of constructors)
 propSize :: Prop a -> Int
 propSize = getSum . propFoldUp ((Sum 1 <>) . bifoldMap id mempty)
 
+-- | The depth of the 'Prop' (max length from root to leaf)
 propDepth :: Prop a -> Int
 propDepth = getMax . propFoldUp (succ . bifoldMap id mempty)
 
--- | Find all the unique atoms in the proposition
+-- | Gathers all the unique atoms in the proposition
 propAtoms :: (Eq p, Hashable p) => Prop p -> HashSet p
 propAtoms r0 = onR r0 HashSet.empty where
   onR r s = onF s (unProp r)
@@ -204,6 +237,7 @@ data PropRes p =
   deriving stock (Eq, Show, Functor, Foldable, Traversable, Generic)
   deriving anyclass (Hashable, NFData)
 
+-- | Negates the result
 propResNot :: PropRes p -> PropRes p
 propResNot = \case
   PropResTrue -> PropResFalse
@@ -244,7 +278,7 @@ propEval f = go where
               PropResTrue -> PropResNext (Prop (PropOrF [r2', p0]))
               -- If r1 advances, we follow similar logic
               PropResNext r1' -> PropResNext (Prop (PropOrF [r2', Prop (PropAndF [r1', p0])]))
-      -- PropRelease _ _ -> error "TODO"
+      PropReleaseF _ _ -> error "TODO"
       PropAlwaysF r ->
         case go r of
           PropResTrue -> PropResNext p0
