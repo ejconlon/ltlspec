@@ -47,6 +47,7 @@ library
       LambdaCase
       KindSignatures
       MultiParamTypeClasses
+      PatternSynonyms
       Rank2Types
       ScopedTypeVariables
       StandaloneDeriving
@@ -90,6 +91,7 @@ test-suite ltlspec-test
       LambdaCase
       KindSignatures
       MultiParamTypeClasses
+      PatternSynonyms
       Rank2Types
       ScopedTypeVariables
       StandaloneDeriving

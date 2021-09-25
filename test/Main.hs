@@ -3,7 +3,7 @@ module Main (main) where
 import Data.Foldable (toList)
 import Data.Hashable (Hashable)
 import GHC.Generics (Generic)
-import Ltlspec (Prop (..), PropF (..), PropRes (..), evalProp, foldProp, propAtoms)
+import Ltlspec (Prop, PropRes (..), evalProp, foldProp, pattern PropAtom, pattern PropEventually, propAtoms)
 import Test.Tasty (TestTree, defaultMain, testGroup)
 import Test.Tasty.HUnit (testCase, (@?=))
 
@@ -18,7 +18,7 @@ type PredProp a = Prop (EqPred a)
 type PredPropRes a = PropRes (EqPred a)
 
 mkEventuallyPredProp :: a -> PredProp a
-mkEventuallyPredProp a = Prop (PropEventually (Prop (PropAtom (EqPred a))))
+mkEventuallyPredProp a = PropEventually (PropAtom (EqPred a))
 
 evalPredProp :: Eq a => a -> PredProp a -> PredPropRes a
 evalPredProp val = evalProp (mkEqPred val)
