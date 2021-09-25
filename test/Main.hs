@@ -20,35 +20,33 @@ idTrans = ConstrainedTrans id
 propertyTrans :: ConstrainedTrans Show Gen (PropertyT IO)
 propertyTrans = ConstrainedTrans forAll
 
-data CheckPhase =
+data CheckPhase s a =
     CheckPhaseStart
-  | CheckPhaseNext !Int
-  | CheckPhaseAct !Int
-  | CheckPhaseEnd !Int
-  deriving stock (Eq, Ord, Show)
+  | CheckPhaseAct !Int ![a] !s !a
+  | CheckPhaseEnd !Int ![a]
+  deriving (Eq, Show)
 
 data Kase g m s a = Kase
   { kaseMkStart :: g s
-  , kaseMkNext :: Int -> s -> g (Maybe (a, s))
-  , kaseCheck :: CheckPhase -> s -> m ()
-  , kaseAct :: Int -> s -> a -> m s
+  , kaseMkNext :: s -> g (Maybe a)
+  , kaseAct :: s -> a -> m s
+  , kaseCheck :: CheckPhase s a -> s -> m ()
   }
 
-runKaseGeneric :: (Monad m, c s, c (Maybe (a, s))) => ConstrainedTrans c g m -> Kase g m s a -> m ()
-runKaseGeneric trans (Kase mkStart mkNext check act) = go where
+runKaseGeneric :: (Monad m, c s, c (Maybe a)) => ConstrainedTrans c g m -> Kase g m s a -> m ()
+runKaseGeneric trans (Kase mkStart mkNext act check) = go where
   go = do
     start <- unConstrainedTrans trans mkStart
     check CheckPhaseStart start
-    loop 0 start
-  loop !i !state = do
-    step <- unConstrainedTrans trans (mkNext i state)
-    case step of
-      Nothing -> check (CheckPhaseEnd i) state
-      Just (next, state') -> do
-        check (CheckPhaseNext i) state'
-        state'' <- act i state' next
-        check (CheckPhaseAct i) state''
-        loop (i + 1) state''
+    loop 0 [] start
+  loop !i !hist !state = do
+    mayNext <- unConstrainedTrans trans (mkNext state)
+    case mayNext of
+      Nothing -> check (CheckPhaseEnd i hist) state
+      Just next -> do
+        state' <- act state next
+        check (CheckPhaseAct i hist state next) state'
+        loop (i + 1) (next:hist) state'
 
 runKase :: Monad m => Kase m m s a -> m ()
 runKase = runKaseGeneric idTrans
