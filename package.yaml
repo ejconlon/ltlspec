@@ -74,5 +74,8 @@ tests:
     - -with-rtsopts=-N
     dependencies:
     - ltlspec
+    - hedgehog
     - tasty
+    - tasty-hedgehog
     - tasty-hunit
+    - unliftio-core

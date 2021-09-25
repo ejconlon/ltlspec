@@ -106,9 +106,12 @@ test-suite ltlspec-test
     , containers
     , deepseq
     , hashable
+    , hedgehog
     , ltlspec
     , mtl
     , tasty
+    , tasty-hedgehog
     , tasty-hunit
+    , unliftio-core
     , unordered-containers
   default-language: Haskell2010

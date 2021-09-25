@@ -3,9 +3,11 @@ module Main (main) where
 import Data.Foldable (toList)
 import Data.Hashable (Hashable)
 import GHC.Generics (Generic)
+import Hedgehog (Gen, Property, PropertyT, forAll, property)
 import Ltlspec (Prop, PropRes (..), evalProp, foldProp, pattern PropAtom, pattern PropEventually, propAtoms)
-import Test.Tasty (TestTree, defaultMain, testGroup)
+import Test.Tasty (TestName, TestTree, defaultMain, testGroup)
 import Test.Tasty.HUnit (testCase, (@?=))
+import Test.Tasty.Hedgehog (testProperty)
 
 newtype EqPred a = EqPred a
   deriving stock (Eq, Show, Generic)
@@ -25,6 +27,61 @@ evalPredProp val = evalProp (mkEqPred val)
 
 foldPredProp :: Eq a => PredProp a -> [a] -> (Int, PredPropRes a)
 foldPredProp = foldProp mkEqPred
+
+class Unconstrained a
+instance Unconstrained a
+
+newtype ConstrainedTrans c g m = ConstrainedTrans { unConstrainedTrans :: forall x. c x => g x -> m x }
+
+idTrans :: ConstrainedTrans Unconstrained m m
+idTrans = ConstrainedTrans id
+
+propertyTrans :: ConstrainedTrans Show Gen (PropertyT IO)
+propertyTrans = ConstrainedTrans forAll
+
+data CheckPhase =
+    CheckPhaseStart
+  | CheckPhaseNext !Int
+  | CheckPhaseAct !Int
+  deriving stock (Eq, Ord, Show)
+
+data Kase g m s a = Kase
+  { kaseMkStart :: g s
+  , kaseMkNext :: Int -> s -> g (Maybe (a, s))
+  , kaseCheck :: CheckPhase -> s -> m ()
+  , kaseAct :: Int -> s -> a -> m s
+  }
+
+runKaseGeneric :: (Monad m, c s, c (Maybe (a, s))) => ConstrainedTrans c g m -> Kase g m s a -> m ()
+runKaseGeneric trans (Kase mkStart mkNext check act) = go where
+  go = do
+    start <- unConstrainedTrans trans mkStart
+    check CheckPhaseStart start
+    loop 0 start
+  loop !i !state = do
+    step <- unConstrainedTrans trans (mkNext i state)
+    case step of
+      Nothing -> pure ()
+      Just (next, state') -> do
+        check (CheckPhaseNext i) state'
+        state'' <- act i state' next
+        check (CheckPhaseAct i) state''
+        loop (i + 1) state''
+
+runKase :: Monad m => Kase m m s a -> m ()
+runKase = runKaseGeneric idTrans
+
+runKaseProperty :: (Show s, Show a) => Kase Gen (PropertyT IO) s a -> PropertyT IO ()
+runKaseProperty = runKaseGeneric propertyTrans
+
+kaseProperty :: (Show s, Show a) => Kase Gen (PropertyT IO) s a -> Property
+kaseProperty = property . runKaseProperty
+
+testKaseProperty :: (Show s, Show a) => TestName -> Kase Gen (PropertyT IO) s a -> TestTree
+testKaseProperty name = testProperty name . kaseProperty
+
+testKaseUnit :: TestName -> Kase IO IO s a -> TestTree
+testKaseUnit name = testCase name . runKase
 
 testSimple :: TestTree
 testSimple = testCase "simple" $ do
