@@ -1,5 +1,9 @@
 include Makefile.base
 
-.PHONY: exe
-exe: build
-	stack exec -- ltlspec-exe
+.PHONY: gendocs
+gendocs:
+	pdflatex -output-directory=docs -halt-on-error docs/ltlspec-proposal.tex
+
+.PHONY: cleandocs
+cleandocs:
+	rm -f docs/*.{aux,fdb_latexmk,fls,log,pdf}

@@ -2,6 +2,12 @@
 /.stack-work
 /dist
 /dist-newstyle
+/docs/*.aux
+/docs/*.fdb_latexmk
+/docs/*.fls
+/docs/*.log
+/docs/*.synctex.gz
+/docs/*.pdf
 *~
 *.swo
 *.swp
