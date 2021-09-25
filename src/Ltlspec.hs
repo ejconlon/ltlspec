@@ -216,23 +216,53 @@ newtype GraphProp p = GraphProp { unGraphProp :: PropF GraphId p }
   deriving newtype (Eq, Ord, Show, Functor, Foldable, Hashable, NFData)
   deriving stock (Traversable)
 
+-- | Map that maintains unique key-value pairs
+data UniqueMap k v = UniqueMap
+  { uniqueMapFwd :: !(HashMap k v)
+  , uniqueMapBwd :: !(HashMap v k)
+  , uniqueMapSrc :: !k
+  } deriving stock (Eq, Ord, Show, Generic)
+    deriving anyclass (NFData)
+
+emptyUniqueMap :: Enum k => UniqueMap k v
+emptyUniqueMap = UniqueMap HashMap.empty HashMap.empty (toEnum 0)
+
+uniqueMapInsert :: (Enum k, Eq k, Hashable k, Eq v, Hashable v) => v -> UniqueMap k v -> (k, UniqueMap k v)
+uniqueMapInsert val umap@(UniqueMap fwd bwd src) =
+  case HashMap.lookup val bwd of
+    Just key -> (key, umap)
+    Nothing ->
+      let fwd' = HashMap.insert src val fwd
+          bwd' = HashMap.insert val src bwd
+          src' = succ src
+      in (src, UniqueMap fwd' bwd' src')
+
+uniqueMapLookup :: (Eq k, Hashable k) => k -> UniqueMap k v -> Maybe v
+uniqueMapLookup k = HashMap.lookup k . uniqueMapFwd
+
+-- | Garbage collect from roots
+uniqueMapCollect :: (Eq k, Hashable k, Eq v, Hashable v) => (v -> [k]) -> [k] -> (HashSet k, UniqueMap k v)
+uniqueMapCollect = go HashSet.empty where
+  go = error "TODO"
+
 -- | Intermediate state for building a 'Graph'.
+-- TODO put in a map the other way of GraphProp to GraphId
 data GraphState p = GraphState
-  { graphStateNodes :: !(HashMap GraphId (GraphProp p))
+  { graphStateNodes :: !(UniqueMap GraphId (GraphProp p))
   , graphStateNext :: !GraphId
-  } deriving stock (Eq, Ord, Show, Functor, Foldable, Traversable, Generic)
+  } deriving stock (Eq, Ord, Show, Generic)
     deriving anyclass (NFData)
 
 -- | Initial state for building a 'Graph'.
 emptyGraphState :: GraphState p
-emptyGraphState = GraphState HashMap.empty 0
+emptyGraphState = GraphState emptyUniqueMap 0
 
 -- | An LTL proposition as a graph. Note that if it isn't a DAG
 -- you're going to have a very bad time evaluating it!
 data Graph p = Graph
   { graphState :: !(GraphState p)
   , graphRoot :: !GraphId
-  } deriving stock (Eq, Ord, Show, Functor, Foldable, Traversable, Generic)
+  } deriving stock (Eq, Ord, Show, Generic)
     deriving anyclass (NFData)
 
 propToGraphStep :: Prop p -> State (GraphState p) GraphId
