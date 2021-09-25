@@ -4,7 +4,7 @@ import Data.Foldable (toList)
 import Data.Hashable (Hashable)
 import GHC.Generics (Generic)
 import Hedgehog (Gen, Property, PropertyT, forAll, property)
-import Ltlspec (Prop, PropRes (..), pattern PropAtom, pattern PropEventually, propAtoms, propEval, propFold)
+import Ltlspec (Prop, PropRes (..), pattern PropAtom, propAlways, propAtoms, propEval, propEventually, propFold)
 import Test.Tasty (TestName, TestTree, defaultMain, testGroup)
 import Test.Tasty.HUnit (testCase, (@?=))
 import Test.Tasty.Hedgehog (testProperty)
@@ -104,12 +104,22 @@ ordPredPropEval val = propEval (ordPredEval val)
 ordPredPropFold :: Ord a => OrdPredProp a -> [a] -> (Int, OrdPredPropRes a)
 ordPredPropFold = propFold ordPredEval
 
-testSimple :: TestTree
-testSimple = testCase "simple" $ do
-  let prop = PropEventually (PropAtom (OrdPred CompEQ 'e'))
+testEventually :: TestTree
+testEventually = testCase "eventually" $ do
+  let prop = propEventually (PropAtom (OrdPred CompEQ 'e'))
   toList (propAtoms prop) @?= [OrdPred CompEQ 'e']
   ordPredPropEval 'a' prop @?= PropResNext prop
   ordPredPropFold prop "abcdefg" @?= (5, PropResTrue)
 
+testAlways :: TestTree
+testAlways = testCase "always" $ do
+  let prop = propAlways (PropAtom (OrdPred CompLT 'z'))
+  toList (propAtoms prop) @?= [OrdPred CompLT 'z']
+  ordPredPropEval 'a' prop @?= PropResNext prop
+  ordPredPropFold prop "abcdefg" @?= (7, PropResNext prop)
+
+testProp :: TestTree
+testProp = testGroup "Prop" [testEventually, testAlways]
+
 main :: IO ()
-main = defaultMain (testGroup "Ltlspec" [testSimple])
+main = defaultMain (testGroup "Ltlspec" [testProp])

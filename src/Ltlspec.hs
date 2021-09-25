@@ -39,7 +39,7 @@ import GHC.Generics (Generic)
 -- In both cases, the 'p' holes are atoms.
 --
 -- TODO(ejconlon) Remove all ctors not necessary for Negation Normal Form
--- (always, eventually, release), add helpers to construct equivalents, and
+-- (always, eventually), add helpers to construct equivalents, and
 -- add function to normalize. Required for translation to Buchi automaton.
 data PropF r p =
     PropAtomF !p
@@ -48,24 +48,20 @@ data PropF r p =
   -- ^ The constrant True
   | PropFalseF
   -- ^ The constant False
-  | PropNextF r
-  -- ^ A prop that holds the next timestamp
   | PropNotF r
   -- ^ Logical negation of the prop
-  | PropUntilF r r
-  -- ^ 'PropUntil r1 r2' means 'eventually r2' and at least until 'r2' holds, 'r1' always holds.
-  -- If neither holds, the prop is false. When 'r2' holds, the prop is true.
-  | PropReleaseF r r
-  -- ^ 'PropRelease r1 r2' means 'always r2' until and including when 'r1' holds.
-  -- If neither holds, the prop is false. When 'r1' and 'r2' hold, the prop is true.
-  | PropAlwaysF r
-  -- ^ A prop that holds at every timestep. If it is ever false, the prop is false.
-  | PropEventuallyF r
-  -- ^ A prop that will hold at some timestep. If it is ever true, the prop is true.
   | PropAndF [r]
   -- ^ Logical AND of several props (empty is true)
   | PropOrF [r]
   -- ^ Logical OR of several props (empty is false)
+  | PropNextF r
+  -- ^ A prop that holds the next timestamp
+  | PropUntilF r r
+  -- ^ 'PropUntil r1 r2' means 'eventually r2' and at least until 'r2' holds, 'r1' always holds.
+  -- If both are false, the prop is false. When 'r2' holds, the prop is true.
+  | PropReleaseF r r
+  -- ^ 'PropRelease r1 r2' means 'always r2' until and including when 'r1' holds.
+  -- If 'r2' is false, the prop is false. When 'r1' and 'r2' hold, the prop is true.
   deriving stock (Eq, Ord, Show, Functor, Foldable, Traversable, Generic)
   deriving anyclass (Hashable, NFData)
 
@@ -75,14 +71,12 @@ instance Bifunctor PropF where
     PropAtomF p -> PropAtomF (g p)
     PropTrueF -> PropTrueF
     PropFalseF -> PropFalseF
-    PropNextF r -> PropNextF (f r)
     PropNotF r -> PropNotF (f r)
-    PropUntilF r1 r2 -> PropUntilF (f r1) (f r2)
-    PropReleaseF r1 r2 -> PropReleaseF (f r1) (f r2)
-    PropAlwaysF r -> PropAlwaysF (f r)
-    PropEventuallyF r -> PropEventuallyF (f r)
     PropAndF rs -> PropAndF (fmap f rs)
     PropOrF rs -> PropOrF (fmap f rs)
+    PropNextF r -> PropNextF (f r)
+    PropUntilF r1 r2 -> PropUntilF (f r1) (f r2)
+    PropReleaseF r1 r2 -> PropReleaseF (f r1) (f r2)
 
 -- | We can fold over all the 'r' and 'p' holes in a 'PropF'.
 instance Bifoldable PropF where
@@ -90,14 +84,12 @@ instance Bifoldable PropF where
     PropAtomF p -> g p z
     PropTrueF -> z
     PropFalseF -> z
-    PropNextF r -> f r z
     PropNotF r -> f r z
-    PropUntilF r1 r2 -> f r1 (f r2 z)
-    PropReleaseF r1 r2 -> f r1 (f r2 z)
-    PropAlwaysF r -> f r z
-    PropEventuallyF r -> f r z
     PropAndF rs -> foldr f z rs
     PropOrF rs -> foldr f z rs
+    PropNextF r -> f r z
+    PropUntilF r1 r2 -> f r1 (f r2 z)
+    PropReleaseF r1 r2 -> f r1 (f r2 z)
 
 -- | We can traverse over all the 'r' and 'p' holes in a 'PropF'.
 instance Bitraversable PropF where
@@ -105,14 +97,12 @@ instance Bitraversable PropF where
     PropAtomF p -> fmap PropAtomF (g p)
     PropTrueF -> pure PropTrueF
     PropFalseF -> pure PropFalseF
-    PropNextF r -> fmap PropNextF (f r)
     PropNotF r -> fmap PropNotF (f r)
-    PropUntilF r1 r2 -> liftA2 PropUntilF (f r1) (f r2)
-    PropReleaseF r1 r2 -> liftA2 PropReleaseF (f r1) (f r2)
-    PropAlwaysF r -> fmap PropAlwaysF (f r)
-    PropEventuallyF r -> fmap PropEventuallyF (f r)
     PropAndF rs -> fmap PropAndF (traverse f rs)
     PropOrF rs -> fmap PropOrF (traverse f rs)
+    PropNextF r -> fmap PropNextF (f r)
+    PropUntilF r1 r2 -> liftA2 PropUntilF (f r1) (f r2)
+    PropReleaseF r1 r2 -> liftA2 PropReleaseF (f r1) (f r2)
 
 -- | An LTL proposition as a tree.
 newtype Prop p = Prop { unProp :: PropF (Prop p) p }
@@ -127,20 +117,8 @@ pattern PropTrue = Prop PropTrueF
 pattern PropFalse :: Prop p
 pattern PropFalse = Prop PropFalseF
 
-pattern PropNext :: Prop p -> Prop p
-pattern PropNext r = Prop (PropNextF r)
-
 pattern PropNot :: Prop p -> Prop p
 pattern PropNot r = Prop (PropNotF r)
-
-pattern PropUntil :: Prop p -> Prop p -> Prop p
-pattern PropUntil r1 r2 = Prop (PropUntilF r1 r2)
-
-pattern PropAlways :: Prop p -> Prop p
-pattern PropAlways r = Prop (PropAlwaysF r)
-
-pattern PropEventually :: Prop p -> Prop p
-pattern PropEventually r = Prop (PropEventuallyF r)
 
 pattern PropAnd :: [Prop p] -> Prop p
 pattern PropAnd rs = Prop (PropAndF rs)
@@ -148,7 +126,16 @@ pattern PropAnd rs = Prop (PropAndF rs)
 pattern PropOr :: [Prop p] -> Prop p
 pattern PropOr rs = Prop (PropOrF rs)
 
-{-# COMPLETE PropAtom, PropTrue, PropFalse, PropNext, PropNot, PropUntil, PropAlways, PropEventually, PropAnd, PropOr #-}
+pattern PropNext :: Prop p -> Prop p
+pattern PropNext r = Prop (PropNextF r)
+
+pattern PropUntil :: Prop p -> Prop p -> Prop p
+pattern PropUntil r1 r2 = Prop (PropUntilF r1 r2)
+
+pattern PropRelease :: Prop p -> Prop p -> Prop p
+pattern PropRelease r1 r2 = Prop (PropReleaseF r1 r2)
+
+{-# COMPLETE PropAtom, PropTrue, PropFalse, PropNot, PropAnd, PropOr, PropNext, PropUntil, PropRelease #-}
 
 instance Functor Prop where
   fmap f = onR where
@@ -181,14 +168,12 @@ propBind f = onR where
     PropAtomF p -> unProp (f p)
     PropTrueF -> PropTrueF
     PropFalseF -> PropFalseF
-    PropNextF r -> PropNextF (onR r)
     PropNotF r -> PropNotF (onR r)
-    PropUntilF r1 r2 -> PropUntilF (onR r1) (onR r2)
-    PropReleaseF r1 r2 -> PropReleaseF (onR r1) (onR r2)
-    PropAlwaysF r -> PropAlwaysF (onR r)
-    PropEventuallyF r -> PropEventuallyF (onR r)
     PropAndF rs -> PropAndF (fmap onR rs)
     PropOrF rs -> PropAndF (fmap onR rs)
+    PropNextF r -> PropNextF (onR r)
+    PropUntilF r1 r2 -> PropUntilF (onR r1) (onR r2)
+    PropReleaseF r1 r2 -> PropReleaseF (onR r1) (onR r2)
 
 -- | Fold a 'Prop' from the bottom up.
 propFoldUp :: (PropF x p -> x) -> Prop p -> x
@@ -204,14 +189,28 @@ propFoldUpM f = onR where
     PropAtomF p -> pure (PropAtomF p)
     PropTrueF -> pure PropTrueF
     PropFalseF -> pure PropFalseF
-    PropNextF r -> fmap PropNextF (onR r)
     PropNotF r -> fmap PropNotF (onR r)
-    PropUntilF r1 r2 -> liftA2 PropUntilF (onR r1) (onR r2)
-    PropReleaseF r1 r2 -> liftA2 PropReleaseF (onR r1) (onR r2)
-    PropAlwaysF r -> fmap PropAlwaysF (onR r)
-    PropEventuallyF r -> fmap PropEventuallyF (onR r)
     PropAndF rs -> fmap PropAndF (traverse onR rs)
     PropOrF rs -> fmap PropAndF (traverse onR rs)
+    PropNextF r -> fmap PropNextF (onR r)
+    PropUntilF r1 r2 -> liftA2 PropUntilF (onR r1) (onR r2)
+    PropReleaseF r1 r2 -> liftA2 PropReleaseF (onR r1) (onR r2)
+
+-- | A prop that holds at every timestep. If it is ever false, the prop is false.
+propAlways :: Prop p -> Prop p
+propAlways = PropRelease PropFalse
+
+-- | A prop that will hold at some timestep. If it is ever true, the prop is true.
+propEventually :: Prop p -> Prop p
+propEventually = PropUntil PropTrue
+
+-- | Propositional implication: r1 -> r2
+propIf :: Prop p -> Prop p -> Prop p
+propIf r1 r2 = PropOr [PropNot r1, r2]
+
+-- | Bidiriectional propositional implication: r1 <-> r2
+propIff :: Prop p -> Prop p -> Prop p
+propIff r1 r2 = PropAnd [propIf r1 r2, propIf r2 r1]
 
 -- | The size of the 'Prop' (number of constructors)
 propSize :: Prop a -> Int
@@ -253,9 +252,11 @@ propEval f = go where
       PropAtomF p -> if f p then PropResTrue else PropResFalse
       PropTrueF -> PropResTrue
       PropFalseF -> PropResFalse
-      PropNextF r -> PropResNext r
       PropNotF r -> propResNot (go r)
-      -- "Until" logic from "Runtime Verification of Concurrent Haskell Programs" s3.2, p7.
+      PropAndF rs -> foldAnds [] rs
+      PropOrF rs -> foldOrs [] rs
+      PropNextF r -> PropResNext r
+      -- See "Until" logic from "Runtime Verification of Concurrent Haskell Programs" s3.2, p7.
       PropUntilF r1 r2 ->
         case go r2 of
           -- Once r2 holds, the proposition is satisfied
@@ -278,19 +279,25 @@ propEval f = go where
               PropResTrue -> PropResNext (Prop (PropOrF [r2', p0]))
               -- If r1 advances, we follow similar logic
               PropResNext r1' -> PropResNext (Prop (PropOrF [r2', Prop (PropAndF [r1', p0])]))
-      PropReleaseF _ _ -> error "TODO"
-      PropAlwaysF r ->
-        case go r of
-          PropResTrue -> PropResNext p0
+      PropReleaseF r1 r2 ->
+        case go r2 of
+          -- If r2 does not hold, the proposition is falsified
           PropResFalse -> PropResFalse
-          PropResNext r' -> PropResNext (Prop (PropAndF [r', p0]))
-      PropEventuallyF r ->
-        case go r of
-          PropResTrue -> PropResTrue
-          PropResFalse -> PropResNext p0
-          PropResNext r' -> PropResNext (Prop (PropOrF [r', p0]))
-      PropAndF rs -> foldAnds [] rs
-      PropOrF rs -> foldOrs [] rs
+          -- If r2 holds,
+          PropResTrue ->
+            case go r1 of
+              -- If r1 does not hold, we are still in the release
+              PropResFalse -> PropResNext p0
+              -- If r1 holds, the proposition is satisfied
+              PropResTrue -> PropResTrue
+              -- If r1 advances, we need to satisfy the new prop and the existing release prop
+              PropResNext r1' -> error "TODO" -- PropResNext (Prop (PropAndF [r1', p0]))
+          -- If r2 advances,
+          PropResNext r2' ->
+            case go r1 of
+              PropResFalse -> error "TODO"
+              PropResTrue -> error "TODO"
+              PropResNext r1' -> error "TODO"
   foldAnds acc = \case
     [] ->
       case acc of
@@ -361,9 +368,9 @@ uniqueMapLookup :: (Eq k, Hashable k) => k -> UniqueMap k v -> Maybe v
 uniqueMapLookup k = HashMap.lookup k . uniqueMapFwd
 
 -- | Garbage collect from roots
-uniqueMapCollect :: (Eq k, Hashable k, Eq v, Hashable v) => (v -> [k]) -> [k] -> (HashSet k, UniqueMap k v)
-uniqueMapCollect = go HashSet.empty where
-  go = error "TODO"
+-- uniqueMapCollect :: (Eq k, Hashable k, Eq v, Hashable v) => (v -> [k]) -> [k] -> (HashSet k, UniqueMap k v)
+-- uniqueMapCollect = go HashSet.empty where
+--   go = error "TODO"
 
 -- | Intermediate state for building a 'Graph'.
 -- TODO put in a map the other way of GraphProp to GraphId
