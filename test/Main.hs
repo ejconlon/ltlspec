@@ -3,7 +3,7 @@ module Main (main) where
 import Data.Foldable (toList)
 import Data.Hashable (Hashable)
 import GHC.Generics (Generic)
-import Ltlspec (Prop (..), PropF (..), PropRes (..), evalProp, foldProp)
+import Ltlspec (Prop (..), PropF (..), PropRes (..), evalProp, foldProp, propAtoms)
 import Test.Tasty (TestTree, defaultMain, testGroup)
 import Test.Tasty.HUnit (testCase, (@?=))
 
