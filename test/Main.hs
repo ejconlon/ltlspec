@@ -24,6 +24,7 @@ data CheckPhase =
     CheckPhaseStart
   | CheckPhaseNext !Int
   | CheckPhaseAct !Int
+  | CheckPhaseEnd !Int
   deriving stock (Eq, Ord, Show)
 
 data Kase g m s a = Kase
@@ -42,7 +43,7 @@ runKaseGeneric trans (Kase mkStart mkNext check act) = go where
   loop !i !state = do
     step <- unConstrainedTrans trans (mkNext i state)
     case step of
-      Nothing -> pure ()
+      Nothing -> check (CheckPhaseEnd i) state
       Just (next, state') -> do
         check (CheckPhaseNext i) state'
         state'' <- act i state' next
@@ -107,10 +108,10 @@ ordPredPropFold = propFold ordPredEval
 
 testSimple :: TestTree
 testSimple = testCase "simple" $ do
-    let prop = PropEventually (PropAtom (OrdPred CompEQ 'e'))
-    toList (propAtoms prop) @?= [OrdPred CompEQ 'e']
-    ordPredPropEval 'a' prop @?= PropResNext prop
-    ordPredPropFold prop "abcdefg" @?= (5, PropResTrue)
+  let prop = PropEventually (PropAtom (OrdPred CompEQ 'e'))
+  toList (propAtoms prop) @?= [OrdPred CompEQ 'e']
+  ordPredPropEval 'a' prop @?= PropResNext prop
+  ordPredPropFold prop "abcdefg" @?= (5, PropResTrue)
 
 main :: IO ()
 main = defaultMain (testGroup "Ltlspec" [testSimple])
