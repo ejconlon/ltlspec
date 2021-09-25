@@ -3,6 +3,7 @@ module Ltlspec where
 
 import Control.Applicative (liftA2)
 import Control.DeepSeq (NFData)
+import Control.Monad (ap)
 import Control.Monad.State.Strict (State, runState)
 import Data.Bifoldable (Bifoldable (..))
 import Data.Bifunctor (Bifunctor (..))
@@ -134,6 +135,30 @@ instance Traversable Prop where
     onR = fmap Prop . onF . unProp
     onF = bitraverse onR f
 
+instance Applicative Prop where
+  pure = PropAtom
+  (<*>) = ap
+
+instance Monad Prop where
+  return = pure
+  p >>= f = propBind f p
+
+propBind :: (p -> Prop q) -> Prop p -> Prop q
+propBind f = onR where
+  onR = Prop . onF . unProp
+  onF = \case
+    PropAtomF p -> unProp (f p)
+    PropTrueF -> PropTrueF
+    PropFalseF -> PropFalseF
+    PropNextF r -> PropNextF (onR r)
+    PropNotF r -> PropNotF (onR r)
+    PropUntilF r1 r2 -> PropUntilF (onR r1) (onR r2)
+    -- PropReleaseF r1 r2 -> undefined
+    PropAlwaysF r -> PropAlwaysF (onR r)
+    PropEventuallyF r -> PropEventuallyF (onR r)
+    PropAndF rs -> PropAndF (fmap onR rs)
+    PropOrF rs -> PropAndF (fmap onR rs)
+
 propBottomUp :: (PropF x p -> x) -> Prop p -> x
 propBottomUp f = onR where
   onR = f . onF . unProp
@@ -173,9 +198,9 @@ propResNot = \case
   PropResNext r -> PropResNext (Prop (PropNotF r))
 
 -- | Evaluate the proposition at the current timestep with the given evaluation function.
--- (See also evalGraph.)
-evalProp :: (p -> Bool) -> Prop p -> PropRes p
-evalProp f = go where
+-- (See also graphEval.)
+propEval :: (p -> Bool) -> Prop p -> PropRes p
+propEval f = go where
   go p0@(Prop f0) =
     case f0 of
       PropAtomF p -> if f p then PropResTrue else PropResFalse
@@ -242,14 +267,14 @@ evalProp f = go where
 
 -- | Evaluate the prop at every timestep until true/false or there are no more inputs.
 -- Also returns the number of timesteps evaluated.
-foldProp :: (a -> p -> Bool) -> Prop p -> [a] -> (Int, PropRes p)
-foldProp f = go 0 where
+propFold :: (a -> p -> Bool) -> Prop p -> [a] -> (Int, PropRes p)
+propFold f = go 0 where
   go i p xs =
     case xs of
       [] -> (i, PropResNext p)
       y:ys ->
         let i' = i + 1
-            r = evalProp (f y) p
+            r = propEval (f y) p
         in case r of
           PropResNext p' -> go i' p' ys
           _ -> (i', r)
@@ -326,6 +351,9 @@ propToGraph p =
   in Graph st root
 
 -- | Evaluate the proposition at the current timestep with the given evaluation function.
--- (See also 'evalProp'.)
-evalGraph :: (p -> Bool) -> Graph p -> Either Bool (Graph p)
-evalGraph = error "TODO"
+-- (See also 'propEval'.)
+graphEval :: (p -> Bool) -> Graph p -> Either Bool (Graph p)
+graphEval = error "TODO"
+
+-- graphFold :: (a -> p -> Bool) -> Graph p -> [a] -> (Int, PropRes p)
+-- graphFold f = go 0 where

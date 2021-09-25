@@ -4,29 +4,10 @@ import Data.Foldable (toList)
 import Data.Hashable (Hashable)
 import GHC.Generics (Generic)
 import Hedgehog (Gen, Property, PropertyT, forAll, property)
-import Ltlspec (Prop, PropRes (..), evalProp, foldProp, pattern PropAtom, pattern PropEventually, propAtoms)
+import Ltlspec (Prop, PropRes (..), pattern PropAtom, pattern PropEventually, propAtoms, propEval, propFold)
 import Test.Tasty (TestName, TestTree, defaultMain, testGroup)
 import Test.Tasty.HUnit (testCase, (@?=))
 import Test.Tasty.Hedgehog (testProperty)
-
-newtype EqPred a = EqPred a
-  deriving stock (Eq, Show, Generic)
-  deriving anyclass (Hashable)
-
-mkEqPred :: Eq a => a -> EqPred a -> Bool
-mkEqPred val (EqPred x) = x == val
-
-type PredProp a = Prop (EqPred a)
-type PredPropRes a = PropRes (EqPred a)
-
-mkEventuallyPredProp :: a -> PredProp a
-mkEventuallyPredProp a = PropEventually (PropAtom (EqPred a))
-
-evalPredProp :: Eq a => a -> PredProp a -> PredPropRes a
-evalPredProp val = evalProp (mkEqPred val)
-
-foldPredProp :: Eq a => PredProp a -> [a] -> (Int, PredPropRes a)
-foldPredProp = foldProp mkEqPred
 
 class Unconstrained a
 instance Unconstrained a
@@ -83,12 +64,53 @@ testKaseProperty name = testProperty name . kaseProperty
 testKaseUnit :: TestName -> Kase IO IO s a -> TestTree
 testKaseUnit name = testCase name . runKase
 
+data Comp = CompLT | CompLTE | CompEQ | CompNEQ | CompGTE | CompGT
+  deriving stock (Eq, Ord, Show, Enum, Bounded, Generic)
+  deriving anyclass (Hashable)
+
+compNot :: Comp -> Comp
+compNot = \case
+  CompLT -> CompGTE
+  CompLTE -> CompGT
+  CompEQ -> CompNEQ
+  CompNEQ -> CompEQ
+  CompGTE -> CompLT
+  CompGT -> CompLTE
+
+data OrdPred a = OrdPred
+  { ordPredComp :: !Comp
+  , ordPredRef :: !a
+  } deriving stock (Eq, Ord, Show, Generic)
+    deriving anyclass (Hashable)
+
+ordPredNot :: OrdPred a -> OrdPred a
+ordPredNot (OrdPred c a) = OrdPred (compNot c) a
+
+ordPredEval :: Ord a => a -> OrdPred a -> Bool
+ordPredEval val (OrdPred comp ref) =
+  case comp of
+    CompLT -> val < ref
+    CompLTE -> val <= ref
+    CompEQ -> val == ref
+    CompNEQ -> val /= ref
+    CompGTE -> val >= ref
+    CompGT -> val > ref
+
+type OrdPredProp a = Prop (OrdPred a)
+type OrdPredPropRes a = PropRes (OrdPred a)
+
+ordPredPropEval :: Ord a => a -> OrdPredProp a -> OrdPredPropRes a
+ordPredPropEval val = propEval (ordPredEval val)
+
+ordPredPropFold :: Ord a => OrdPredProp a -> [a] -> (Int, OrdPredPropRes a)
+ordPredPropFold = propFold ordPredEval
+
 testSimple :: TestTree
 testSimple = testCase "simple" $ do
-    let prop = mkEventuallyPredProp 'e'
-    toList (propAtoms prop) @?= [EqPred 'e']
-    evalPredProp 'a' prop @?= PropResNext prop
-    foldPredProp prop "abcdefg" @?= (5, PropResTrue)
+    let prop = PropEventually (PropAtom (OrdPred CompEQ 'e'))
+    toList (propAtoms prop) @?= [OrdPred CompEQ 'e']
+    ordPredPropEval 'a' prop @?= PropResNext prop
+    ordPredPropFold prop "abcdefg" @?= (5, PropResTrue)
 
 main :: IO ()
 main = defaultMain (testGroup "Ltlspec" [testSimple])
