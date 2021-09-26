@@ -96,7 +96,7 @@ ordPredEval val (OrdPred comp ref) =
     CompGT -> val > ref
 
 type OrdPredProp a = Prop (OrdPred a)
-type OrdPredPropRes a = PropRes (OrdPred a)
+type OrdPredPropRes a = PropRes (OrdPredProp a)
 
 ordPredPropEval :: Ord a => a -> OrdPredProp a -> OrdPredPropRes a
 ordPredPropEval val = propEval (ordPredEval val)

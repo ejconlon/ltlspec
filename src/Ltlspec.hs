@@ -17,7 +17,7 @@ module Ltlspec where
 import Control.Applicative (liftA2)
 import Control.DeepSeq (NFData)
 import Control.Monad (ap, (>=>))
-import Control.Monad.State.Strict (State, runState, state)
+import Control.Monad.State.Strict (State, evalState, get, runState, state)
 import Data.Bifoldable (Bifoldable (..))
 import Data.Bifunctor (Bifunctor (..))
 import Data.Bitraversable (Bitraversable (..))
@@ -241,15 +241,15 @@ propAtoms r0 = onR r0 HashSet.empty where
 -- | When we evaluate a proposition at a certain time step, we either
 -- satisfy it, falsify it, or are left with another prop to evaluate
 -- on the next timestep.
-data PropRes p =
+data PropRes x =
     PropResTrue
   | PropResFalse
-  | PropResNext !(Prop p)
+  | PropResNext !x
   deriving stock (Eq, Show, Functor, Foldable, Traversable, Generic)
   deriving anyclass (Hashable, NFData)
 
 -- | Negates the result
-propResNot :: PropRes p -> PropRes p
+propResNot :: PropRes (Prop p) -> PropRes (Prop p)
 propResNot = \case
   PropResTrue -> PropResFalse
   PropResFalse -> PropResTrue
@@ -257,7 +257,7 @@ propResNot = \case
 
 -- | Evaluate the proposition at the current timestep with the given evaluation function.
 -- (See also graphEval.)
-propEval :: (p -> Bool) -> Prop p -> PropRes p
+propEval :: (p -> Bool) -> Prop p -> PropRes (Prop p)
 propEval f = go where
   go p0@(Prop f0) =
     case f0 of
@@ -333,7 +333,7 @@ propEval f = go where
 
 -- | Evaluate the prop at every timestep until true/false or there are no more inputs.
 -- Also returns the number of timesteps evaluated.
-propFold :: (a -> p -> Bool) -> Prop p -> [a] -> (Int, PropRes p)
+propFold :: (a -> p -> Bool) -> Prop p -> [a] -> (Int, PropRes (Prop p))
 propFold f = go 0 where
   go i p xs =
     case xs of
@@ -435,8 +435,11 @@ data Graph p = Graph
   } deriving stock (Eq, Ord, Show, Generic)
     deriving anyclass (NFData)
 
+graphInsert :: (Eq p, Hashable p) => GraphProp p -> State (GraphState p) GraphId
+graphInsert = state . uniqueMapInsert
+
 propToGraphStep :: (Eq p, Hashable p) => Prop p -> State (GraphState p) GraphId
-propToGraphStep = propFoldUpM (state . uniqueMapInsert . GraphProp)
+propToGraphStep = propFoldUpM (graphInsert . GraphProp)
 
 -- | Turn the given tree-structured proposition into a graph.
 -- Should satisfy `evalGraph f (propToGraph p) == fmap propToGraph (evalProp f p)`.
@@ -447,34 +450,62 @@ propToGraph p =
   let (root, st) = runState (propToGraphStep p) emptyGraphState
   in Graph st root
 
-data GraphRes =
+data GraphRes x =
     GraphResTrue
   | GraphResFalse
-  | GraphResNext !GraphId
+  | GraphResNext !x
   | GraphResMissing !GraphId
-  deriving stock (Eq, Ord, Show, Generic)
+  deriving stock (Eq, Ord, Show, Functor, Foldable, Traversable, Generic)
   deriving anyclass (Hashable, NFData)
 
-graphEvalStep :: (Eq p, Hashable p) => (p -> Bool) -> GraphProp p -> State (GraphState p) GraphRes
-graphEvalStep f p = state $ \st ->
-  error "TODO"
+graphResEnrich :: GraphState p -> GraphRes GraphId -> GraphRes (Graph p)
+graphResEnrich st = \case
+  GraphResTrue -> GraphResTrue
+  GraphResFalse -> GraphResFalse
+  GraphResNext root -> GraphResNext (Graph st root)
+  GraphResMissing i -> GraphResMissing i
+
+graphEvalStep :: (Eq p, Hashable p) => (p -> Bool) -> GraphId -> State (GraphState p) (GraphRes GraphId)
+graphEvalStep f = go where
+  go id0 = do
+    st <- get
+    case uniqueMapLookup id0 st of
+      Nothing -> pure (GraphResMissing id0)
+      Just p0 ->
+        case unGraphProp p0 of
+          PropAtomF p -> pure (if f p then GraphResTrue else GraphResFalse)
+          PropTrueF -> pure GraphResTrue
+          PropFalseF -> pure GraphResFalse
+          PropNotF r -> do
+            res <- go r
+            case res of
+              GraphResTrue -> pure GraphResFalse
+              GraphResFalse -> pure GraphResTrue
+              GraphResNext i -> fmap GraphResNext (graphInsert (GraphProp (PropNotF i)))
+              GraphResMissing _ -> pure res
+          PropNextF r -> pure (GraphResNext r)
+          _ -> error "TODO"
 
 -- | Evaluate the proposition at the current timestep with the given evaluation function.
 -- (See also 'propEval'.)
-graphEval :: (Eq p, Hashable p) => (p -> Bool) -> Graph p -> (GraphRes, Graph p)
-graphEval f g@(Graph st root) =
-  case uniqueMapLookup root st of
-    Nothing -> (GraphResMissing root, g)
-    Just p ->
-      let (res, st') = runState (graphEvalStep f p) st
-          root' =
-            case res of
-              GraphResNext nextRoot -> nextRoot
-              _ -> root
-      in (res, Graph st' root')
+graphEval :: (Eq p, Hashable p) => (p -> Bool) -> Graph p -> GraphRes (Graph p)
+graphEval f (Graph st root) =
+  let (res, st') = runState (graphEvalStep f root) st
+  in graphResEnrich st' res
 
--- graphFold :: (a -> p -> Bool) -> Graph p -> [a] -> (Int, PropRes p)
--- graphFold f = go 0 where
+graphFold :: (Eq p, Hashable p) => (a -> p -> Bool) -> Graph p -> [a] -> (Int, GraphRes (Graph p))
+graphFold f g@(Graph st0 root) zs = evalState (go 0 root zs) st0 where
+  go c i xs =
+    case xs of
+      [] -> pure (c, GraphResNext g)
+      y:ys -> do
+        let c' = c + 1
+        res <- graphEvalStep (f y) i
+        case res of
+          GraphResNext i' -> go c' i' ys
+          _ -> do
+            st <- get
+            pure (c', graphResEnrich st res)
 
 -- | Count of nodes reachable from the root of the graph.
 graphReachableSize :: Graph p -> Int
