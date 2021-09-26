@@ -367,10 +367,35 @@ uniqueMapInsert val umap@(UniqueMap fwd bwd src) =
 uniqueMapLookup :: (Eq k, Hashable k) => k -> UniqueMap k v -> Maybe v
 uniqueMapLookup k = HashMap.lookup k . uniqueMapFwd
 
--- | Garbage collect from roots
--- uniqueMapCollect :: (Eq k, Hashable k, Eq v, Hashable v) => (v -> [k]) -> [k] -> (HashSet k, UniqueMap k v)
--- uniqueMapCollect = go HashSet.empty where
---   go = error "TODO"
+uniqueMapReachable :: (Eq k, Hashable k) => (v -> [k]) -> [k] -> UniqueMap k v -> HashSet k
+uniqueMapReachable f ks0 um = go HashSet.empty ks0 where
+  go !seen xs =
+    case xs of
+      [] -> seen
+      k:ks ->
+        if HashSet.member k seen
+          then go seen ks
+          else case HashMap.lookup k (uniqueMapFwd um) of
+            Nothing -> go seen ks
+            Just v ->
+              let ks' = [k' | k' <- f v, not (HashSet.member k' seen)]
+              in go (HashSet.insert k seen) (ks' ++ ks)
+
+uniqueMapFilterWithKey :: (Eq k, Hashable k, Eq v, Hashable v) => (k -> v -> Bool) -> UniqueMap k v -> UniqueMap k v
+uniqueMapFilterWithKey f (UniqueMap fwd0 bwd0 src0) = go fwd0 bwd0 (HashMap.toList fwd0) where
+  go !fwd !bwd xs =
+    case xs of
+      [] -> UniqueMap fwd bwd src0
+      ((k, v):kvs) ->
+        if f k v
+          then go fwd bwd kvs
+          else go (HashMap.delete k fwd) (HashMap.delete v bwd) kvs
+
+-- | Garbage collect from root
+uniqueMapCollect :: (Eq k, Hashable k, Eq v, Hashable v) => (v -> [k]) -> [k] -> UniqueMap k v -> UniqueMap k v
+uniqueMapCollect f roots um0 =
+  let reachable = uniqueMapReachable f roots um0
+  in uniqueMapFilterWithKey (\k _ -> HashSet.member k reachable) um0
 
 -- | Intermediate state for building a 'Graph'.
 -- TODO put in a map the other way of GraphProp to GraphId
