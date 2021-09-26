@@ -3,5 +3,8 @@ cradle:
     - path: "./src"
       component: "ltlspec:lib"
 
+    - path: "./doctest"
+      component: "ltlspec:test:ltlspec-doctest"
+
     - path: "./test"
       component: "ltlspec:test:ltlspec-test"

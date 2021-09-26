@@ -65,6 +65,17 @@ library:
   source-dirs: src
 
 tests:
+  ltlspec-doctest:
+    main:                Main.hs
+    source-dirs:         doctest
+    ghc-options:
+    - -threaded
+    - -rtsopts
+    - -with-rtsopts=-N
+    dependencies:
+    - ltlspec
+    - doctest
+
   ltlspec-test:
     main:                Main.hs
     source-dirs:         test
@@ -78,4 +89,3 @@ tests:
     - tasty
     - tasty-hedgehog
     - tasty-hunit
-    - unliftio-core

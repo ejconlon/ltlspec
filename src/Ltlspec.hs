@@ -17,7 +17,7 @@ module Ltlspec where
 import Control.Applicative (liftA2)
 import Control.DeepSeq (NFData)
 import Control.Monad (ap, (>=>))
-import Control.Monad.State.Strict (State, runState)
+import Control.Monad.State.Strict (State, runState, state)
 import Data.Bifoldable (Bifoldable (..))
 import Data.Bifunctor (Bifunctor (..))
 import Data.Bitraversable (Bitraversable (..))
@@ -161,6 +161,10 @@ instance Monad Prop where
   p >>= f = propBind f p
 
 -- | Substitution of atoms in a 'Prop' is a monadic bind.
+--
+-- >>> propBind (pure . (+1)) (PropNot (PropAtom 1))
+-- PropNotF (PropAtomF 2)
+--
 propBind :: (p -> Prop q) -> Prop p -> Prop q
 propBind f = onR where
   onR = Prop . onF . unProp
@@ -176,6 +180,10 @@ propBind f = onR where
     PropReleaseF r1 r2 -> PropReleaseF (onR r1) (onR r2)
 
 -- | Fold a 'Prop' from the bottom up.
+--
+-- >>> propFoldUp (bifoldr (+) (+) 0) (PropUntil (PropAtom 1) (PropAtom 2))
+-- 3
+--
 propFoldUp :: (PropF x p -> x) -> Prop p -> x
 propFoldUp f = onR where
   onR = f . onF . unProp
@@ -221,6 +229,10 @@ propDepth :: Prop a -> Int
 propDepth = getMax . propFoldUp (succ . bifoldMap id mempty)
 
 -- | Gathers all the unique atoms in the proposition
+--
+-- >>> propAtoms (PropUntil (PropAtom 1) (PropAtom 2))
+-- fromList [1,2]
+--
 propAtoms :: (Eq p, Hashable p) => Prop p -> HashSet p
 propAtoms r0 = onR r0 HashSet.empty where
   onR r s = onF s (unProp r)
@@ -291,13 +303,13 @@ propEval f = go where
               -- If r1 holds, the proposition is satisfied
               PropResTrue -> PropResTrue
               -- If r1 advances, we need to satisfy the new prop and the existing release prop
-              PropResNext r1' -> error "TODO" -- PropResNext (Prop (PropAndF [r1', p0]))
+              PropResNext _ -> error "TODO" -- PropResNext (Prop (PropAndF [r1', p0]))
           -- If r2 advances,
-          PropResNext r2' ->
+          PropResNext _ ->
             case go r1 of
               PropResFalse -> error "TODO"
               PropResTrue -> error "TODO"
-              PropResNext r1' -> error "TODO"
+              PropResNext _ -> error "TODO"
   foldAnds acc = \case
     [] ->
       case acc of
@@ -343,6 +355,14 @@ newtype GraphProp p = GraphProp { unGraphProp :: PropF GraphId p }
   deriving newtype (Eq, Ord, Show, Functor, Foldable, Hashable, NFData)
   deriving stock (Traversable)
 
+-- | Get the immediate child graph ids of the given 'GraphProp'.
+--
+-- >>> graphPropChildren (GraphProp (PropUntilF 2 3))
+-- [2,3]
+--
+graphPropChildren :: GraphProp p -> [GraphId]
+graphPropChildren = bifoldr (:) (const id) [] . unGraphProp
+
 -- | Map that maintains unique key-value pairs
 data UniqueMap k v = UniqueMap
   { uniqueMapFwd :: !(HashMap k v)
@@ -351,9 +371,13 @@ data UniqueMap k v = UniqueMap
   } deriving stock (Eq, Ord, Show, Generic)
     deriving anyclass (NFData)
 
+uniqueMapSize :: UniqueMap k v -> Int
+uniqueMapSize = HashMap.size . uniqueMapFwd
+
 emptyUniqueMap :: Enum k => UniqueMap k v
 emptyUniqueMap = UniqueMap HashMap.empty HashMap.empty (toEnum 0)
 
+-- | Insert a value into the map, using the next key.
 uniqueMapInsert :: (Enum k, Eq k, Hashable k, Eq v, Hashable v) => v -> UniqueMap k v -> (k, UniqueMap k v)
 uniqueMapInsert val umap@(UniqueMap fwd bwd src) =
   case HashMap.lookup val bwd of
@@ -397,17 +421,11 @@ uniqueMapCollect f roots um0 =
   let reachable = uniqueMapReachable f roots um0
   in uniqueMapFilterWithKey (\k _ -> HashSet.member k reachable) um0
 
--- | Intermediate state for building a 'Graph'.
--- TODO put in a map the other way of GraphProp to GraphId
-data GraphState p = GraphState
-  { graphStateNodes :: !(UniqueMap GraphId (GraphProp p))
-  , graphStateNext :: !GraphId
-  } deriving stock (Eq, Ord, Show, Generic)
-    deriving anyclass (NFData)
+type GraphState p = UniqueMap GraphId (GraphProp p)
 
 -- | Initial state for building a 'Graph'.
 emptyGraphState :: GraphState p
-emptyGraphState = GraphState emptyUniqueMap 0
+emptyGraphState = emptyUniqueMap
 
 -- | An LTL proposition as a graph. Note that if it isn't a DAG
 -- you're going to have a very bad time evaluating it!
@@ -417,26 +435,67 @@ data Graph p = Graph
   } deriving stock (Eq, Ord, Show, Generic)
     deriving anyclass (NFData)
 
-propToGraphStep :: Prop p -> State (GraphState p) GraphId
-propToGraphStep = error "TODO"
+propToGraphStep :: (Eq p, Hashable p) => Prop p -> State (GraphState p) GraphId
+propToGraphStep = propFoldUpM (state . uniqueMapInsert . GraphProp)
 
 -- | Turn the given tree-structured proposition into a graph.
 -- Should satisfy `evalGraph f (propToGraph p) == fmap propToGraph (evalProp f p)`.
 -- That is to say, for propositions that are naturally tree-structured, we
 -- get the same result evaluating them in tree or graph form.
-propToGraph :: Prop p -> Graph p
+propToGraph :: (Eq p, Hashable p) => Prop p -> Graph p
 propToGraph p =
   let (root, st) = runState (propToGraphStep p) emptyGraphState
   in Graph st root
 
+data GraphRes =
+    GraphResTrue
+  | GraphResFalse
+  | GraphResNext !GraphId
+  | GraphResMissing !GraphId
+  deriving stock (Eq, Ord, Show, Generic)
+  deriving anyclass (Hashable, NFData)
+
+graphEvalStep :: (Eq p, Hashable p) => (p -> Bool) -> GraphProp p -> State (GraphState p) GraphRes
+graphEvalStep f p = state $ \st ->
+  error "TODO"
+
 -- | Evaluate the proposition at the current timestep with the given evaluation function.
 -- (See also 'propEval'.)
-graphEval :: (p -> Bool) -> Graph p -> Either Bool (Graph p)
-graphEval = error "TODO"
+graphEval :: (Eq p, Hashable p) => (p -> Bool) -> Graph p -> (GraphRes, Graph p)
+graphEval f g@(Graph st root) =
+  case uniqueMapLookup root st of
+    Nothing -> (GraphResMissing root, g)
+    Just p ->
+      let (res, st') = runState (graphEvalStep f p) st
+          root' =
+            case res of
+              GraphResNext nextRoot -> nextRoot
+              _ -> root
+      in (res, Graph st' root')
 
 -- graphFold :: (a -> p -> Bool) -> Graph p -> [a] -> (Int, PropRes p)
 -- graphFold f = go 0 where
 
--- graphSize :: Graph p -> Int
--- graphDepth :: Graph p -> Int
--- graphCollect :: Graph p -> (HashSet p, Graph p)
+-- | Count of nodes reachable from the root of the graph.
+graphReachableSize :: Graph p -> Int
+graphReachableSize g =
+  let um = graphState g
+      reachable = uniqueMapReachable graphPropChildren [graphRoot g] um
+  in HashSet.size reachable
+
+-- | Count of all nodes in the graph.
+graphTotalSize :: Graph p -> Int
+graphTotalSize = HashMap.size . uniqueMapFwd . graphState
+
+-- graphReachableDepth :: Graph p -> Int
+-- grpahReachableDepth = error "TODO"
+
+-- | Fold a 'Graph' from the bottom up.
+-- graphFoldUp :: (PropF x p -> x) -> Graph p -> x
+-- graphFoldUp f = error "TODO"
+
+graphCollect :: (Eq p, Hashable p) => Graph p -> Graph p
+graphCollect g =
+  let um = graphState g
+      um' = uniqueMapCollect graphPropChildren [graphRoot g] um
+  in g { graphState = um' }
