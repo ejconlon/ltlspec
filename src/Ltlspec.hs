@@ -17,7 +17,8 @@ module Ltlspec where
 import Control.Applicative (liftA2)
 import Control.DeepSeq (NFData)
 import Control.Monad (ap, (>=>))
-import Control.Monad.State.Strict (State, evalState, get, runState, state)
+import Control.Monad.Except (Except, MonadError, runExcept, throwError)
+import Control.Monad.State.Strict (MonadState, State, StateT, evalState, get, runState, runStateT, state)
 import Data.Bifoldable (Bifoldable (..))
 import Data.Bifunctor (Bifunctor (..))
 import Data.Bitraversable (Bitraversable (..))
@@ -427,6 +428,27 @@ type GraphState p = UniqueMap GraphId (GraphProp p)
 emptyGraphState :: GraphState p
 emptyGraphState = emptyUniqueMap
 
+-- | Error for when we try to reference a missing node.
+-- If this is ever thrown we implemented something wrong.
+newtype GraphIdMissing = GraphIdMissing { unGraphIdMissing :: GraphId }
+  deriving newtype (Eq, Ord, Show, Hashable)
+
+-- | A simple set of effects for graph traversal.
+newtype GSM p a = GSM { unGSM :: StateT (GraphState p) (Except GraphIdMissing) a }
+  deriving newtype (Functor, Applicative, Monad, MonadState (GraphState p), MonadError GraphIdMissing)
+
+runGSM :: GSM p a -> GraphState p -> Either GraphIdMissing (a, GraphState p)
+runGSM (GSM m) = runExcept . runStateT m
+
+stateToGSM :: State (GraphState p) a -> GSM p a
+stateToGSM = state . runState
+
+stateFromGSM :: GSM p a -> State (GraphState p) (Either GraphIdMissing a)
+stateFromGSM m = state $ \s ->
+  case runGSM m s of
+    Left e -> (Left e, s)
+    Right (a, s') -> (Right a, s')
+
 -- | An LTL proposition as a graph. Note that if it isn't a DAG
 -- you're going to have a very bad time evaluating it!
 data Graph p = Graph
@@ -450,62 +472,56 @@ propToGraph p =
   let (root, st) = runState (propToGraphStep p) emptyGraphState
   in Graph st root
 
-data GraphRes x =
-    GraphResTrue
-  | GraphResFalse
-  | GraphResNext !x
-  | GraphResMissing !GraphId
-  deriving stock (Eq, Ord, Show, Functor, Foldable, Traversable, Generic)
-  deriving anyclass (Hashable, NFData)
+graphResEnrich :: GraphState p -> PropRes GraphId -> PropRes (Graph p)
+graphResEnrich = fmap . Graph
 
-graphResEnrich :: GraphState p -> GraphRes GraphId -> GraphRes (Graph p)
-graphResEnrich st = \case
-  GraphResTrue -> GraphResTrue
-  GraphResFalse -> GraphResFalse
-  GraphResNext root -> GraphResNext (Graph st root)
-  GraphResMissing i -> GraphResMissing i
+-- | Negates the result
+graphResNot :: (Eq p, Hashable p) => PropRes GraphId -> State (GraphState p) (PropRes GraphId)
+graphResNot = \case
+  PropResTrue -> pure PropResFalse
+  PropResFalse -> pure PropResTrue
+  PropResNext i -> fmap PropResNext (graphInsert (GraphProp (PropNotF i)))
 
-graphEvalStep :: (Eq p, Hashable p) => (p -> Bool) -> GraphId -> State (GraphState p) (GraphRes GraphId)
+graphEvalStep :: (Eq p, Hashable p) => (p -> Bool) -> GraphId -> GSM p (PropRes GraphId)
 graphEvalStep f = go where
   go id0 = do
     st <- get
     case uniqueMapLookup id0 st of
-      Nothing -> pure (GraphResMissing id0)
+      Nothing -> throwError (GraphIdMissing id0)
       Just p0 ->
         case unGraphProp p0 of
-          PropAtomF p -> pure (if f p then GraphResTrue else GraphResFalse)
-          PropTrueF -> pure GraphResTrue
-          PropFalseF -> pure GraphResFalse
+          PropAtomF p -> pure (if f p then PropResTrue else PropResFalse)
+          PropTrueF -> pure PropResTrue
+          PropFalseF -> pure PropResFalse
           PropNotF r -> do
             res <- go r
-            case res of
-              GraphResTrue -> pure GraphResFalse
-              GraphResFalse -> pure GraphResTrue
-              GraphResNext i -> fmap GraphResNext (graphInsert (GraphProp (PropNotF i)))
-              GraphResMissing _ -> pure res
-          PropNextF r -> pure (GraphResNext r)
+            stateToGSM (graphResNot res)
+          PropNextF r -> pure (PropResNext r)
           _ -> error "TODO"
 
 -- | Evaluate the proposition at the current timestep with the given evaluation function.
 -- (See also 'propEval'.)
-graphEval :: (Eq p, Hashable p) => (p -> Bool) -> Graph p -> GraphRes (Graph p)
+graphEval :: (Eq p, Hashable p) => (p -> Bool) -> Graph p -> Either GraphIdMissing (PropRes (Graph p))
 graphEval f (Graph st root) =
-  let (res, st') = runState (graphEvalStep f root) st
-  in graphResEnrich st' res
+  let ea = runGSM (graphEvalStep f root) st
+  in fmap (\(res, st') -> graphResEnrich st' res) ea
 
-graphFold :: (Eq p, Hashable p) => (a -> p -> Bool) -> Graph p -> [a] -> (Int, GraphRes (Graph p))
+graphFold :: (Eq p, Hashable p) => (a -> p -> Bool) -> Graph p -> [a] -> (Int, Either GraphIdMissing (PropRes (Graph p)))
 graphFold f g@(Graph st0 root) zs = evalState (go 0 root zs) st0 where
   go c i xs =
     case xs of
-      [] -> pure (c, GraphResNext g)
+      [] -> pure (c, Right (PropResNext g))
       y:ys -> do
         let c' = c + 1
-        res <- graphEvalStep (f y) i
-        case res of
-          GraphResNext i' -> go c' i' ys
-          _ -> do
-            st <- get
-            pure (c', graphResEnrich st res)
+        eres <- stateFromGSM (graphEvalStep (f y) i)
+        case eres of
+          Left e -> pure (c', Left e)
+          Right res ->
+            case res of
+              PropResNext i' -> go c' i' ys
+              _ -> do
+                st <- get
+                pure (c', Right (graphResEnrich st res))
 
 -- | Count of nodes reachable from the root of the graph.
 graphReachableSize :: Graph p -> Int
