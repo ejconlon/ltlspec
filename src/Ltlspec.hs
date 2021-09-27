@@ -42,6 +42,9 @@ import GHC.Generics (Generic)
 -- TODO(ejconlon) Remove all ctors not necessary for Negation Normal Form
 -- (always, eventually), add helpers to construct equivalents, and
 -- add function to normalize. Required for translation to Buchi automaton.
+--
+-- TODO(ejconlon) Replace n-ary AND/OR with binary. Simpler implementation and
+-- results citing depth will have easier interpretation.
 data PropF r p =
     PropAtomF !p
   -- ^ An atomic prop - use this to embed predicates from your domain
