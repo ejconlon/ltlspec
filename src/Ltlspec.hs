@@ -39,12 +39,9 @@ import GHC.Generics (Generic)
 -- For graph-shaped props, the 'r' holes are node ids.
 -- In both cases, the 'p' holes are atoms.
 --
--- TODO(ejconlon) Remove all ctors not necessary for Negation Normal Form
--- (always, eventually), add helpers to construct equivalents, and
--- add function to normalize. Required for translation to Buchi automaton.
+-- This selection of operators corresponds to "Release Positive Normal Form"
 --
--- TODO(ejconlon) Replace n-ary AND/OR with binary. Simpler implementation and
--- results citing depth will have easier interpretation.
+-- TODO(ejconlon) Add conversion to Negation Normal Form.
 data PropF r p =
     PropAtomF !p
   -- ^ An atomic prop - use this to embed predicates from your domain
@@ -54,9 +51,9 @@ data PropF r p =
   -- ^ The constant False
   | PropNotF r
   -- ^ Logical negation of the prop
-  | PropAndF [r]
+  | PropAndF r r
   -- ^ Logical AND of several props (empty is true)
-  | PropOrF [r]
+  | PropOrF r r
   -- ^ Logical OR of several props (empty is false)
   | PropNextF r
   -- ^ A prop that holds the next timestamp
@@ -76,8 +73,8 @@ instance Bifunctor PropF where
     PropTrueF -> PropTrueF
     PropFalseF -> PropFalseF
     PropNotF r -> PropNotF (f r)
-    PropAndF rs -> PropAndF (fmap f rs)
-    PropOrF rs -> PropOrF (fmap f rs)
+    PropAndF r1 r2 -> PropAndF (f r1) (f r2)
+    PropOrF r1 r2 -> PropOrF (f r1) (f r2)
     PropNextF r -> PropNextF (f r)
     PropUntilF r1 r2 -> PropUntilF (f r1) (f r2)
     PropReleaseF r1 r2 -> PropReleaseF (f r1) (f r2)
@@ -89,8 +86,8 @@ instance Bifoldable PropF where
     PropTrueF -> z
     PropFalseF -> z
     PropNotF r -> f r z
-    PropAndF rs -> foldr f z rs
-    PropOrF rs -> foldr f z rs
+    PropAndF r1 r2 -> f r1 (f r2 z)
+    PropOrF r1 r2 -> f r1 (f r2 z)
     PropNextF r -> f r z
     PropUntilF r1 r2 -> f r1 (f r2 z)
     PropReleaseF r1 r2 -> f r1 (f r2 z)
@@ -102,8 +99,8 @@ instance Bitraversable PropF where
     PropTrueF -> pure PropTrueF
     PropFalseF -> pure PropFalseF
     PropNotF r -> fmap PropNotF (f r)
-    PropAndF rs -> fmap PropAndF (traverse f rs)
-    PropOrF rs -> fmap PropOrF (traverse f rs)
+    PropAndF r1 r2 -> liftA2 PropAndF (f r1) (f r2)
+    PropOrF r1 r2 -> liftA2 PropOrF (f r1) (f r2)
     PropNextF r -> fmap PropNextF (f r)
     PropUntilF r1 r2 -> liftA2 PropUntilF (f r1) (f r2)
     PropReleaseF r1 r2 -> liftA2 PropReleaseF (f r1) (f r2)
@@ -124,11 +121,11 @@ pattern PropFalse = Prop PropFalseF
 pattern PropNot :: Prop p -> Prop p
 pattern PropNot r = Prop (PropNotF r)
 
-pattern PropAnd :: [Prop p] -> Prop p
-pattern PropAnd rs = Prop (PropAndF rs)
+pattern PropAnd :: Prop p -> Prop p -> Prop p
+pattern PropAnd r1 r2 = Prop (PropAndF r1 r2)
 
-pattern PropOr :: [Prop p] -> Prop p
-pattern PropOr rs = Prop (PropOrF rs)
+pattern PropOr :: Prop p -> Prop p -> Prop p
+pattern PropOr r1 r2 = Prop (PropOrF r1 r2)
 
 pattern PropNext :: Prop p -> Prop p
 pattern PropNext r = Prop (PropNextF r)
@@ -177,8 +174,8 @@ propBind f = onR where
     PropTrueF -> PropTrueF
     PropFalseF -> PropFalseF
     PropNotF r -> PropNotF (onR r)
-    PropAndF rs -> PropAndF (fmap onR rs)
-    PropOrF rs -> PropAndF (fmap onR rs)
+    PropAndF r1 r2 -> PropAndF (onR r1) (onR r2)
+    PropOrF r1 r2 -> PropAndF (onR r1) (onR r2)
     PropNextF r -> PropNextF (onR r)
     PropUntilF r1 r2 -> PropUntilF (onR r1) (onR r2)
     PropReleaseF r1 r2 -> PropReleaseF (onR r1) (onR r2)
@@ -202,11 +199,13 @@ propFoldUpM f = onR where
     PropTrueF -> pure PropTrueF
     PropFalseF -> pure PropFalseF
     PropNotF r -> fmap PropNotF (onR r)
-    PropAndF rs -> fmap PropAndF (traverse onR rs)
-    PropOrF rs -> fmap PropAndF (traverse onR rs)
+    PropAndF r1 r2 -> liftA2 PropAndF (onR r1) (onR r2)
+    PropOrF r1 r2 -> liftA2 PropAndF (onR r1) (onR r2)
     PropNextF r -> fmap PropNextF (onR r)
     PropUntilF r1 r2 -> liftA2 PropUntilF (onR r1) (onR r2)
     PropReleaseF r1 r2 -> liftA2 PropReleaseF (onR r1) (onR r2)
+
+-- TODO(ejconlon) Add and and or functions for lists (and empty true, or empty false)
 
 -- | A prop that holds at every timestep. If it is ever false, the prop is false.
 propAlways :: Prop p -> Prop p
@@ -218,11 +217,11 @@ propEventually = PropUntil PropTrue
 
 -- | Propositional implication: r1 -> r2
 propIf :: Prop p -> Prop p -> Prop p
-propIf r1 r2 = PropOr [PropNot r1, r2]
+propIf = PropOr . PropNot
 
 -- | Bidiriectional propositional implication: r1 <-> r2
 propIff :: Prop p -> Prop p -> Prop p
-propIff r1 r2 = PropAnd [propIf r1 r2, propIf r2 r1]
+propIff r1 r2 = PropAnd (propIf r1 r2) (propIf r2 r1)
 
 -- | The size of the 'Prop' (number of constructors)
 propSize :: Prop a -> Int
@@ -269,8 +268,24 @@ propEval f = go where
       PropTrueF -> PropResTrue
       PropFalseF -> PropResFalse
       PropNotF r -> propResNot (go r)
-      PropAndF rs -> foldAnds [] rs
-      PropOrF rs -> foldOrs [] rs
+      PropAndF r1 r2 ->
+        case go r1 of
+          PropResTrue -> go r2
+          PropResFalse -> PropResFalse
+          n@(PropResNext r1') ->
+            case go r2 of
+              PropResTrue -> n
+              PropResFalse -> PropResFalse
+              PropResNext r2' -> PropResNext (Prop (PropAndF r1' r2'))
+      PropOrF r1 r2 ->
+        case go r1 of
+          PropResTrue -> PropResTrue
+          PropResFalse -> go r1
+          n@(PropResNext r1') ->
+            case go r2 of
+              PropResTrue -> PropResTrue
+              PropResFalse -> n
+              PropResNext r2' -> PropResNext (Prop (PropOrF r1' r2'))
       PropNextF r -> PropResNext r
       -- See "Until" logic from "Runtime Verification of Concurrent Haskell Programs" s3.2, p7.
       PropUntilF r1 r2 ->
@@ -285,16 +300,16 @@ propEval f = go where
               -- If r1 holds, we are still in the until
               PropResTrue -> PropResNext p0
               -- If r1 advances, we need to satisfy the new prop and the existing until prop
-              PropResNext r1' -> PropResNext (Prop (PropAndF [r1', p0]))
+              PropResNext r1' -> PropResNext (Prop (PropAndF r1' p0))
           -- If r2 advances,
           PropResNext r2' ->
             case go r1 of
               -- If r1 does not hold, then we are absolved of the until only if r2' holds
               PropResFalse -> PropResNext r2'
               -- If r1 does hold, then we can either wait for absolution or keep on with the until
-              PropResTrue -> PropResNext (Prop (PropOrF [r2', p0]))
+              PropResTrue -> PropResNext (Prop (PropOrF r2' p0))
               -- If r1 advances, we follow similar logic
-              PropResNext r1' -> PropResNext (Prop (PropOrF [r2', Prop (PropAndF [r1', p0])]))
+              PropResNext r1' -> PropResNext (Prop (PropOrF r2' (Prop (PropAndF r1' p0))))
       PropReleaseF r1 r2 ->
         case go r2 of
           -- If r2 does not hold, the proposition is falsified
@@ -314,26 +329,6 @@ propEval f = go where
               PropResFalse -> error "TODO"
               PropResTrue -> error "TODO"
               PropResNext _ -> error "TODO"
-  foldAnds acc = \case
-    [] ->
-      case acc of
-        [] -> PropResTrue
-        _ -> PropResNext (Prop (PropAndF (reverse acc)))
-    x:xs ->
-      case go x of
-        PropResTrue -> foldAnds acc xs
-        PropResFalse -> PropResFalse
-        PropResNext r -> foldAnds (r:acc) xs
-  foldOrs acc = \case
-    [] ->
-      case acc of
-        [] -> PropResFalse
-        _ -> PropResNext (Prop (PropOrF (reverse acc)))
-    x:xs ->
-      case go x of
-        PropResTrue -> PropResTrue
-        PropResFalse -> foldOrs acc xs
-        PropResNext r -> foldOrs (r:acc) xs
 
 -- | Evaluate the prop at every timestep until true/false or there are no more inputs.
 -- Also returns the number of timesteps evaluated.
