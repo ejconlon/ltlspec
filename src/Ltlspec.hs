@@ -40,8 +40,6 @@ import GHC.Generics (Generic)
 -- In both cases, the 'p' holes are atoms.
 --
 -- This selection of operators corresponds to "Release Positive Normal Form"
---
--- TODO(ejconlon) Add conversion to Negation Normal Form.
 data PropF r p =
     PropAtomF !p
   -- ^ An atomic prop - use this to embed predicates from your domain
@@ -205,7 +203,49 @@ propFoldUpM f = onR where
     PropUntilF r1 r2 -> liftA2 PropUntilF (onR r1) (onR r2)
     PropReleaseF r1 r2 -> liftA2 PropReleaseF (onR r1) (onR r2)
 
--- TODO(ejconlon) Add and and or functions for lists (and empty true, or empty false)
+-- | Put the prop in negation normal form, which basically involves
+-- pushing negations to the bottom.
+--
+-- >>> propNegationNormalForm (PropAtom 1)
+-- PropAtomF 1
+-- >>> propNegationNormalForm (PropNot (PropAtom 1))
+-- PropNotF (PropAtomF 1)
+-- >>> propNegationNormalForm (PropNot (PropAnd (PropNot (PropAtom 1)) (PropAtom 2)))
+-- PropOrF (PropAtomF 1) (PropNotF (PropAtomF 2))
+propNegationNormalForm :: Prop p -> Prop p
+propNegationNormalForm = posR where
+  posR = Prop . posF . unProp
+  posF f =
+    case f of
+      PropNotF r -> negF (unProp r)
+      _ -> first posR f
+  negR = Prop . negF . unProp
+  negF = \case
+    PropAtomF p -> PropNotF (Prop (PropAtomF p))
+    PropTrueF -> PropFalseF
+    PropFalseF -> PropTrueF
+    PropNotF r -> posF (unProp r)
+    PropAndF r1 r2 -> PropOrF (negR r1) (negR r2)
+    PropOrF r1 r2 -> PropAndF (negR r1) (negR r2)
+    PropNextF r -> PropNextF (negR r)
+    PropUntilF r1 r2 -> PropReleaseF (negR r1) (negR r2)
+    PropReleaseF r1 r2 -> PropUntilF (negR r1) (negR r2)
+
+-- | AND all the given props together (empty is true).
+propAndAll :: [Prop p] -> Prop p
+propAndAll = \case
+  [] -> PropTrue
+  [r] -> r
+  [r1, r2] -> PropAnd r1 r2
+  r1:rs -> PropAnd r1 (propAndAll rs)
+
+-- | OR all the given props together (empty is false).
+propOrAll :: [Prop p] -> Prop p
+propOrAll = \case
+  [] -> PropFalse
+  [r] -> r
+  [r1, r2] -> PropOr r1 r2
+  r1:rs -> PropOr r1 (propOrAll rs)
 
 -- | A prop that holds at every timestep. If it is ever false, the prop is false.
 propAlways :: Prop p -> Prop p
