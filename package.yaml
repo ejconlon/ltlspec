@@ -20,6 +20,12 @@ dependencies:
 - hashable
 - mtl
 - unordered-containers
+# test deps - these are here to make HLS work better
+# TODO move back out to test package
+- hedgehog
+- tasty
+- tasty-hedgehog
+- tasty-hunit
 
 default-extensions:
 - BangPatterns
@@ -85,7 +91,3 @@ tests:
     - -with-rtsopts=-N
     dependencies:
     - ltlspec
-    - hedgehog
-    - tasty
-    - tasty-hedgehog
-    - tasty-hunit

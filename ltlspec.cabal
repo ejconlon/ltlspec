@@ -25,6 +25,7 @@ source-repository head
 library
   exposed-modules:
       Ltlspec
+      LtlSpec.Test.Main
   other-modules:
       Paths_ltlspec
   hs-source-dirs:
@@ -62,7 +63,11 @@ library
     , containers
     , deepseq
     , hashable
+    , hedgehog
     , mtl
+    , tasty
+    , tasty-hedgehog
+    , tasty-hunit
     , unordered-containers
   default-language: Haskell2010
 
@@ -107,8 +112,12 @@ test-suite ltlspec-doctest
     , deepseq
     , doctest
     , hashable
+    , hedgehog
     , ltlspec
     , mtl
+    , tasty
+    , tasty-hedgehog
+    , tasty-hunit
     , unordered-containers
   default-language: Haskell2010
 
