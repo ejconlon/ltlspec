@@ -25,9 +25,9 @@ source-repository head
 library
   exposed-modules:
       Ltlspec
-      Ltlspec2.Models.Chat
-      Ltlspec2.Recursion
-      Ltlspec2.Test.Main
+      Ltlspec.Models.Chat
+      Ltlspec.Recursion
+      Ltlspec.Test.Main
   other-modules:
       Paths_ltlspec
   hs-source-dirs:
