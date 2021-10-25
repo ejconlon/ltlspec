@@ -25,7 +25,9 @@ source-repository head
 library
   exposed-modules:
       Ltlspec
-      LtlSpec.Test.Main
+      Ltlspec2.Models.Chat
+      Ltlspec2.Recursion
+      Ltlspec2.Test.Main
   other-modules:
       Paths_ltlspec
   hs-source-dirs:
@@ -65,6 +67,7 @@ library
     , hashable
     , hedgehog
     , mtl
+    , recursion-schemes
     , tasty
     , tasty-hedgehog
     , tasty-hunit
@@ -115,6 +118,7 @@ test-suite ltlspec-doctest
     , hedgehog
     , ltlspec
     , mtl
+    , recursion-schemes
     , tasty
     , tasty-hedgehog
     , tasty-hunit
@@ -164,6 +168,7 @@ test-suite ltlspec-test
     , hedgehog
     , ltlspec
     , mtl
+    , recursion-schemes
     , tasty
     , tasty-hedgehog
     , tasty-hunit

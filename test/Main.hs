@@ -1,3 +1,3 @@
 module Main (main) where
 
-import LtlSpec.Test.Main (main)
+import Ltlspec.Test.Main (main)
