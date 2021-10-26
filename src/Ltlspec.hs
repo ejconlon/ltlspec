@@ -6,18 +6,30 @@
 module Ltlspec where
 
 import Control.DeepSeq (NFData)
+import Control.Monad.Writer.Strict (execWriter, tell)
+import Data.Functor.Foldable (embed, fold, project)
 import Data.Functor.Foldable.TH (makeBaseFunctor)
 import Data.Hashable (Hashable)
+import Data.Semigroup (Max (..), Sum (..))
 import GHC.Generics (Generic)
+import Ltlspec.Recursion (foldUpM)
 
 type VarName = String
 type PropName = String
 type TyName = String
 
+data Atom = Atom !PropName ![VarName]
+  deriving stock (Eq, Show, Generic)
+  deriving anyclass (Hashable, NFData)
+
+data Binder = Binder !VarName !TyName
+  deriving stock (Eq, Show, Generic)
+  deriving anyclass (Hashable, NFData)
+
 -- | An LTL proposition with first-order data quantification.
 -- This selection of operators corresponds to "Release Positive Normal Form"
 data Prop =
-    PropAtom !PropName ![VarName]
+    PropAtom !Atom
   -- ^ An atomic prop - use this to embed predicates from your domain
   | PropTrue
   -- ^ The constrant True
@@ -37,10 +49,10 @@ data Prop =
   | PropRelease Prop Prop
   -- ^ 'PropRelease r1 r2' means 'always r2' until and including when 'r1' holds.
   -- If 'r2' is false, the prop is false. When 'r1' and 'r2' hold, the prop is true.
-  | PropForAll VarName TyName Prop
-  -- ^ 'PropForAll n t r' means for all 'n' of type 't' 'r' holds.
-  | PropExists VarName TyName Prop
-  -- ^ 'PropForAll n t r' means there exists an 'n' of type 't' for which 'r' holds.
+  | PropForAll !Binder Prop
+  -- ^ 'PropForAll (Binder n t) r' means for all 'n' of type 't' 'r' holds.
+  | PropExists !Binder Prop
+  -- ^ 'PropForAll (Binder n t) r' means there exists an 'n' of type 't' for which 'r' holds.
   deriving stock (Eq, Show, Generic)
   deriving anyclass (Hashable, NFData)
 
@@ -51,33 +63,33 @@ deriving stock instance Generic (PropF a)
 deriving anyclass instance Hashable a => (Hashable (PropF a))
 deriving anyclass instance NFData a => (NFData (PropF a))
 
--- -- | Put the prop in negation normal form, which basically involves
--- -- pushing negations to the bottom.
--- --
--- -- >>> propNegationNormalForm (PropAtom 1)
--- -- PropAtomF 1
--- -- >>> propNegationNormalForm (PropNot (PropAtom 1))
--- -- PropNotF (PropAtomF 1)
--- -- >>> propNegationNormalForm (PropNot (PropAnd (PropNot (PropAtom 1)) (PropAtom 2)))
--- -- PropOrF (PropAtomF 1) (PropNotF (PropAtomF 2))
--- propNegationNormalForm :: Prop -> Prop
--- propNegationNormalForm = posR where
---   posR = Prop . posF . unProp
---   posF f =
---     case f of
---       PropNotF r -> negF (unProp r)
---       _ -> first posR f
---   negR = Prop . negF . unProp
---   negF = \case
---     PropAtomF p -> PropNotF (Prop (PropAtomF p))
---     PropTrueF -> PropFalseF
---     PropFalseF -> PropTrueF
---     PropNotF r -> posF (unProp r)
---     PropAndF r1 r2 -> PropOrF (negR r1) (negR r2)
---     PropOrF r1 r2 -> PropAndF (negR r1) (negR r2)
---     PropNextF r -> PropNextF (negR r)
---     PropUntilF r1 r2 -> PropReleaseF (negR r1) (negR r2)
---     PropReleaseF r1 r2 -> PropUntilF (negR r1) (negR r2)
+-- | Put the prop in negation normal form, which basically involves
+-- pushing negations to the bottom.
+--
+-- >>> propNegationNormalForm (PropAtom (Atom "a" []))
+-- PropAtom (Atom "a" [])
+-- >>> propNegationNormalForm (PropNot (PropAtom (Atom "a" [])))
+-- PropNot (PropAtom (Atom "a" []))
+-- >>> propNegationNormalForm (PropNot (PropAnd (PropNot (PropAtom (Atom "a" []))) (PropAtom (Atom "b" []))))
+-- PropOr (PropAtom (Atom "a" [])) (PropNot (PropAtom (Atom "b" [])))
+propNegationNormalForm :: Prop -> Prop
+propNegationNormalForm = pos where
+  pos f =
+    case project f of
+      PropNotF r -> neg r
+      fr -> embed (fmap pos fr)
+  neg = \case
+    PropAtom a -> PropNot (PropAtom a)
+    PropTrue -> PropFalse
+    PropFalse -> PropTrue
+    PropNot r -> pos r
+    PropAnd r1 r2 -> PropOr (neg r1) (neg r2)
+    PropOr r1 r2 -> PropAnd (neg r1) (neg r2)
+    PropNext r -> PropNext (neg r)
+    PropUntil r1 r2 -> PropRelease (neg r1) (neg r2)
+    PropRelease r1 r2 -> PropUntil (neg r1) (neg r2)
+    PropForAll b r -> PropExists b (neg r)
+    PropExists b r -> PropForAll b (neg r)
 
 -- | AND all the given props together (empty is true).
 propAndAll :: [Prop] -> Prop
@@ -111,23 +123,36 @@ propIf = PropOr . PropNot
 propIff :: Prop -> Prop -> Prop
 propIff r1 r2 = PropAnd (propIf r1 r2) (propIf r2 r1)
 
--- -- | The size of the 'Prop' (number of constructors)
--- propSize :: Prop -> Int
--- propSize = getSum . foldUpM ((Sum 1 <>) . bifoldMap id mempty)
+-- | The size of the 'Prop' (number of constructors)
+--
+-- >>> propSize (PropAtom (Atom "a" []))
+-- 1
+-- >>> propSize (PropUntil (PropAtom (Atom "a" [])) (PropNot (PropAtom (Atom "b" []))))
+-- 4
+--
+propSize :: Prop -> Int
+propSize = getSum . fold ((Sum 1 <>) . sum)
 
--- -- | The depth of the 'Prop' (max length from root to leaf)
--- propDepth :: Prop a -> Int
--- propDepth = getMax . foldUpM (succ . bifoldMap id mempty)
+-- | The depth of the 'Prop' (max length from root to leaf)
+--
+-- >>> propDepth (PropAtom (Atom "a" []))
+-- 1
+-- >>> propDepth (PropUntil (PropAtom (Atom "a" [])) (PropNot (PropAtom (Atom "b" []))))
+-- 2
+--
+propDepth :: Prop -> Int
+propDepth = getMax . fold ((Max 1 <>) . sum)
 
--- -- | Gathers all the unique atoms in the proposition
--- --
--- -- >>> propAtoms (PropUntil (PropAtom 1) (PropAtom 2))
--- -- fromList [1,2]
--- --
--- propAtoms :: (Eq p, Hashable p) => Prop p -> HashSet p
--- propAtoms r0 = onR r0 HashSet.empty where
---   onR r s = onF s (unProp r)
---   onF = bifoldr onR HashSet.insert
+-- | Gathers all the unique atoms in the proposition
+--
+-- >>> propAtoms (PropUntil (PropAtom (Atom "a" [])) (PropAtom (Atom "b" [])))
+-- [Atom "a" [],Atom "b" []]
+--
+propAtoms :: Prop -> [Atom]
+propAtoms = execWriter . foldUpM go where
+  go = \case
+    PropAtomF a -> tell [a]
+    _ -> pure ()
 
 -- -- | When we evaluate a proposition at a certain time step, we either
 -- -- satisfy it, falsify it, or are left with another prop to evaluate
