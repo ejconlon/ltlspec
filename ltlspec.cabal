@@ -68,6 +68,7 @@ library
     , hashable
     , hedgehog
     , mtl
+    , random
     , recursion-schemes
     , tasty
     , tasty-hedgehog
@@ -119,6 +120,7 @@ test-suite ltlspec-doctest
     , hedgehog
     , ltlspec
     , mtl
+    , random
     , recursion-schemes
     , tasty
     , tasty-hedgehog
@@ -169,6 +171,7 @@ test-suite ltlspec-test
     , hedgehog
     , ltlspec
     , mtl
+    , random
     , recursion-schemes
     , tasty
     , tasty-hedgehog

@@ -19,6 +19,7 @@ dependencies:
 - deepseq
 - hashable
 - mtl
+- random
 - recursion-schemes
 - unordered-containers
 # test deps - these are here to make HLS work better
