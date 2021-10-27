@@ -26,6 +26,7 @@ library
   exposed-modules:
       Ltlspec
       Ltlspec.Models.Chat
+      Ltlspec.Models.DinningHakker
       Ltlspec.Recursion
       Ltlspec.Test.Main
   other-modules:
