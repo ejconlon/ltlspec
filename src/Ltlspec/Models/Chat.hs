@@ -62,7 +62,7 @@ list (state, trace, seed) client = (state, changeTrace trace, seed+1)
     }
 
 getJoinableChannels :: State -> ClientID -> [ChannelName]
-getJoinableChannels state client = concat (Map.elems state)
+getJoinableChannels state client = let res = concat (Map.elems state) in if null res then [0] else res
 
 testState :: Integer -> SystemState
 testState nclient= ((Map.fromList [(i,[]) | i <- [1..nclient]]),[], 0)
@@ -72,6 +72,7 @@ gen = mkStdGen 137
 
 getRandomElementOfList :: [a] -> StdGen -> a
 getRandomElementOfList l gen = let randomIndex = fst (randomR (0, ( (length l) - 1 )) gen) in l !! randomIndex
+
 
 simulationStep :: (SystemState, StdGen) -> (SystemState, StdGen)
 simulationStep ((state, trace, seed), gen) = 
