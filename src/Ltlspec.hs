@@ -7,6 +7,7 @@ module Ltlspec where
 
 import Control.DeepSeq (NFData)
 import Control.Monad.Writer.Strict (execWriter, tell)
+import Data.Map.Strict (Map)
 import Data.Functor.Foldable (embed, fold, project)
 import Data.Functor.Foldable.TH (makeBaseFunctor)
 import Data.Hashable (Hashable)
@@ -14,9 +15,21 @@ import Data.Semigroup (Max (..), Sum (..))
 import GHC.Generics (Generic)
 import Ltlspec.Recursion (foldUpM)
 
-type VarName = String
 type PropName = String
 type TyName = String
+type AxiomName = String
+
+type TyDefs = [TyName]
+type PropDefs = Map PropName [TyName]
+type AxiomDefs = Map AxiomName Prop
+
+data Theory = Theory
+  { theoryTypes :: !TyDefs
+  , theoryProps :: !PropDefs
+  , theoryAxioms :: !AxiomDefs
+  } deriving stock (Eq, Show)
+
+type VarName = String
 
 data Atom = Atom !PropName ![VarName]
   deriving stock (Eq, Show, Generic)
