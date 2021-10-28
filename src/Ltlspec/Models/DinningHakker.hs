@@ -1,6 +1,6 @@
 module Ltlspec.Models.DinningHakker where
 
-import qualified Data.Map as M
+import qualified Data.Map.Strict as M
 
 type TimeStamp = Int
 
@@ -9,21 +9,25 @@ type HakkerId = String
 type ChopstickId = Int
 
 data HakkerState =
-      Thinking
-    | Hungry
-    | Eating
+    Thinking
+  | Hungry
+  | Eating
+  deriving stock (Eq, Show)
 
 data ChopstickState =
-      Free
-    | Taken
+    Free
+  | Taken
+  deriving stock (Eq, Show)
 
 data HakkerMsg =
-      Take HakkerId ChopstickId
-    | Put HakkerId ChopstickId
+    Take HakkerId ChopstickId
+  | Put HakkerId ChopstickId
+  deriving stock (Eq, Show)
 
 data ChopstickMsg =
-      Grant ChopstickId HakkerId
-    | Busy ChopstickId HakkerId
+    Grant ChopstickId HakkerId
+  | Busy ChopstickId HakkerId
+  deriving stock (Eq, Show)
 
 class Message m
 
@@ -44,7 +48,7 @@ data Hakker = Hakker
                 , rchop :: ChopstickId
                 , lhold :: Bool
                 , rhold :: Bool
-                }
+                } deriving stock (Eq, Show)
 
 defaultHakker :: Hakker
 defaultHakker = Hakker
@@ -67,7 +71,7 @@ data Chopstick = Chopstick
                    -- Chopstick's message queue
                    , chopRecvs :: [HakkerMsg]
                    , chopState :: ChopstickState
-                   }
+                   } deriving stock (Eq, Show)
 
 defaultChopstick :: Chopstick
 defaultChopstick = Chopstick
@@ -81,9 +85,9 @@ type Hakkers = M.Map HakkerId Hakker
 
 type Chopsticks = M.Map ChopstickId Chopstick
 
-data GlobalState = GlobalState Hakkers Chopsticks
+data GlobalState = GlobalState Hakkers Chopsticks deriving stock (Eq, Show)
 
-data World = World TimeStamp [Either HakkerMsg ChopstickMsg] GlobalState
+data World = World TimeStamp [Either HakkerMsg ChopstickMsg] GlobalState deriving stock (Eq, Show)
 
 type Trace = [World]
 
@@ -131,7 +135,7 @@ hakkerReceive hakker@Hakker{hkRecvs=recvs} msg = hakker {hkRecvs = msg : recvs}
 -- the Chopstick will not process the Hakker's Take message.
 -- NOTE: i.e., the Busy message is not used in this simulation function
 stepPerfect :: Action -> World -> World
-stepPerfect (HakkerThink h) world@(World ts ms gs@(GlobalState hs cs)) =
+stepPerfect (HakkerThink h) (World ts ms gs@(GlobalState hs cs)) =
     let hk = hs M.! h in
     case hkState hk of
         Eating -> let
@@ -149,7 +153,7 @@ stepPerfect (HakkerThink h) world@(World ts ms gs@(GlobalState hs cs)) =
             in
             World (ts+1) (Left rightMsg : Left leftMsg : ms) gs'
         _ -> World (ts+1) ms gs
-stepPerfect (HakkerHungry h) world@(World ts ms gs@(GlobalState hs cs)) =
+stepPerfect (HakkerHungry h) (World ts ms gs@(GlobalState hs cs)) =
     let hk = hs M.! h in
     case hkState hk of
         Thinking -> let
@@ -167,7 +171,7 @@ stepPerfect (HakkerHungry h) world@(World ts ms gs@(GlobalState hs cs)) =
             in
             World (ts+1) (Left rightMsg : Left leftMsg : ms) gs'
         _ -> World (ts+1) ms gs
-stepPerfect (HakkerEat h) world@(World ts ms gs@(GlobalState hs cs)) =
+stepPerfect (HakkerEat h) (World ts ms gs@(GlobalState hs cs)) =
     let hk = hs M.! h in
     case hkState hk of
         Hungry -> case hkRecvs hk of
@@ -178,7 +182,7 @@ stepPerfect (HakkerEat h) world@(World ts ms gs@(GlobalState hs cs)) =
                 World (ts+1) ms (GlobalState hs' cs)
             _ -> World (ts+1) ms gs
         _ -> World (ts+1) ms gs
-stepPerfect (ChopstickResp c) world@(World ts ms gs@(GlobalState hs cs)) =
+stepPerfect (ChopstickResp c) (World ts ms gs@(GlobalState hs cs)) =
     let chop = cs M.! c in
     case chopState chop of
         Free -> case chopRecvs chop of
