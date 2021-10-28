@@ -85,10 +85,10 @@ getRandomElementOfList l gen = let randomIndex = fst (randomR (0, ( (length l) -
 simulationStep :: (SystemState, StdGen) -> (SystemState, StdGen)
 simulationStep ((state, trace, seed), gen) =
     let
-        randomActionIndex = fst (randomR (0::Int, 2) gen)
-        newgen = snd (randomR (0::Int, 2) gen)
+        randomActionIndex = fst (randomR (0::Int, 3) gen)
+        newgen = snd (randomR (0::Int, 3) gen)
     in
-    let actionname = ["send", "join", "list"] !! randomActionIndex in
+    let actionname = ["send", "join", "list", "leave"] !! randomActionIndex in
     case actionname of
         "send" -> let
                     client = getRandomElementOfList (Map.keys state) gen
@@ -124,4 +124,4 @@ getTrace :: SystemState -> SystemTrace
 getTrace (_, st, _) = st
 
 trace :: SystemTrace
-trace = getTrace (fst (generator 100 3) )
+trace = getTrace (fst (generator 10000 3) )
