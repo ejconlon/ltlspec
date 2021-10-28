@@ -7,21 +7,25 @@ type HakkerId = String
 type ChopstickId = Int
 
 data HakkerState =
-      Thinking
-    | Hungry
-    | Eating
+    Thinking
+  | Hungry
+  | Eating
+  deriving stock (Eq, Show)
 
 data ChopstickState =
-       Free
-     | Taken
+    Free
+  | Taken
+  deriving stock (Eq, Show)
 
 data HakkerMsg =
-      Take HakkerId ChopstickId
-    | Put HakkerId ChopstickId
+    Take HakkerId ChopstickId
+  | Put HakkerId ChopstickId
+  deriving stock (Eq, Show)
 
 data ChopstickMsg =
-      Grant ChopstickId HakkerId
-    | Busy ChopstickId HakkerId
+    Grant ChopstickId HakkerId
+  | Busy ChopstickId HakkerId
+  deriving stock (Eq, Show)
 
 class Msg m
 
@@ -29,26 +33,28 @@ instance Msg HakkerMsg
 instance Msg ChopstickMsg
 
 data Hakker = Hakker
-                { hid :: HakkerId
-                -- in-transit messages sent by Hakker
-                , hkMsgs :: [HakkerMsg]
-                , hkState :: HakkerState
-                , lchop :: ChopstickId
-                , rchop :: ChopstickId
-                }
+  { hid :: HakkerId
+  -- in-transit messages sent by Hakker
+  , hkMsgs :: [HakkerMsg]
+  , hkState :: HakkerState
+  , lchop :: ChopstickId
+  , rchop :: ChopstickId
+  } deriving stock (Eq, Show)
 
 data Chopstick = Chopstick
-                   { cid :: ChopstickId
-                   -- in-transit messages sent by Chopstick
-                   , chopMsgs :: [ChopstickMsg]
-                   }
+  { cid :: ChopstickId
+  -- in-transit messages sent by Chopstick
+  , chopMsgs :: [ChopstickMsg]
+  } deriving stock (Eq, Show)
 
 type Hakkers = M.Map HakkerId Hakker
 type Chopsticks = M.Map ChopstickId Chopstick
 type Traces = [Trace]
 
 data GlobalState = GlobalState Hakkers Chopsticks
+  deriving stock (Eq, Show)
 data Trace = Trace TimeStamp (Either HakkerMsg ChopstickMsg) GlobalState
+  deriving stock (Eq, Show)
 
 -- Is this needed?
 class Actor a where
@@ -64,4 +70,3 @@ instance Actor Chopstick where
     recv to from msg = undefined
 
 -- data World = ?
-
