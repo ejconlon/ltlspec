@@ -136,6 +136,20 @@ propIf = PropOr . PropNot
 propIff :: Prop -> Prop -> Prop
 propIff r1 r2 = PropAnd (propIf r1 r2) (propIf r2 r1)
 
+-- | Simple constructor for nested foralls.
+propForAllNested :: [(VarName, TyName)] -> Prop -> Prop
+propForAllNested pairs body = go pairs where
+  go = \case
+    [] -> body
+    (v, t):rest -> PropForAll (Binder v t) (go rest)
+
+-- | Simple constructor for nested exists.
+propExistsNested :: [(VarName, TyName)] -> Prop -> Prop
+propExistsNested pairs body = go pairs where
+  go = \case
+    [] -> body
+    (v, t):rest -> PropExists (Binder v t) (go rest)
+
 -- | The size of the 'Prop' (number of constructors)
 --
 -- >>> propSize (PropAtom (Atom "a" []))
