@@ -1,6 +1,6 @@
 module Ltlspec.Models.DinningHakker where
 
-import Data.Map as M
+import Data.Map.Strict as M
 
 type TimeStamp = Int
 type HakkerId = String
