@@ -70,7 +70,7 @@ list (state, trace, seed) client = (state, changeTrace trace, seed+1)
     }
 
 getJoinableChannels :: State -> ClientID -> [ChannelName]
-getJoinableChannels state client = concat (Map.elems state)
+getJoinableChannels state client = let res = concat (Map.elems state) in if null res then [0] else res
 
 testState :: Integer -> SystemState
 testState nclient= ((Map.fromList [(i,[]) | i <- [1..nclient]]),[], 0)
@@ -81,21 +81,24 @@ gen = mkStdGen 137
 getRandomElementOfList :: [a] -> StdGen -> a
 getRandomElementOfList l gen = let randomIndex = fst (randomR (0, ( (length l) - 1 )) gen) in l !! randomIndex
 
+
 simulationStep :: (SystemState, StdGen) -> (SystemState, StdGen)
 simulationStep ((state, trace, seed), gen) =
     let
-        randomActionIndex = fst (randomR (0::Int, 3) gen)
-        newgen = snd (randomR (0::Int, 3) gen)
+        randomActionIndex = fst (randomR (0::Int, 2) gen)
+        newgen = snd (randomR (0::Int, 2) gen)
     in
-    let actionname = ["send", "join", "leave", "list"] !! randomActionIndex in
+    let actionname = ["send", "join", "list"] !! randomActionIndex in
     case actionname of
         "send" -> let
                     client = getRandomElementOfList (Map.keys state) gen
-                    channel = getRandomElementOfList (Map.findWithDefault [] client state) gen
-                    message = "FOO"
                   in if null (Map.findWithDefault [] client state) then
-                        ((state, trace, seed), gen)
+                        ((state, trace, seed), newgen)
                     else
+                        let 
+                            channel = getRandomElementOfList (Map.findWithDefault [] client state) gen
+                            message = "FOO"
+                        in
                         (send (state, trace, seed) client message channel, newgen)
         "join" -> let
                     client = getRandomElementOfList (Map.keys state) gen
@@ -104,10 +107,10 @@ simulationStep ((state, trace, seed), gen) =
                   in (join (state, trace, seed) client channel, newgen)
         "leave" -> let
                         client = getRandomElementOfList (Map.keys state) gen
-                        channel = getRandomElementOfList (Map.findWithDefault [] client state) gen
                     in if null (Map.findWithDefault [] client state) then
-                        ((state, trace, seed), gen)
+                        ((state, trace, seed), newgen)
                     else
+                        let channel = getRandomElementOfList (Map.findWithDefault [] client state) gen in
                         (leave (state, trace, seed) client channel, newgen)
         "list" ->  let
                         client = getRandomElementOfList (Map.keys state) gen
@@ -120,4 +123,5 @@ generator niterations nclients =  simulationStep (generator (niterations-1) ncli
 getTrace :: SystemState -> SystemTrace
 getTrace (_, st, _) = st
 
-
+trace :: SystemTrace
+trace = getTrace (fst (generator 100 3) )
