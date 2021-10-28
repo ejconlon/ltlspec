@@ -62,7 +62,8 @@ library
       TypeFamilies
   ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wincomplete-uni-patterns -Wpartial-fields -Wredundant-constraints -fno-warn-unused-top-binds -fwrite-ide-info -hiedir=.hie
   build-depends:
-      base >=4.12 && <5
+      aeson
+    , base >=4.12 && <5
     , containers
     , deepseq
     , hashable
@@ -73,6 +74,8 @@ library
     , tasty
     , tasty-hedgehog
     , tasty-hunit
+    , unliftio
+    , unliftio-core
     , unordered-containers
   default-language: Haskell2010
 
@@ -111,7 +114,8 @@ executable ltlspec-exe
       TypeFamilies
   ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wincomplete-uni-patterns -Wpartial-fields -Wredundant-constraints -fno-warn-unused-top-binds -fwrite-ide-info -hiedir=.hie -threaded -rtsopts -with-rtsopts=-N
   build-depends:
-      base >=4.12 && <5
+      aeson
+    , base >=4.12 && <5
     , containers
     , deepseq
     , hashable
@@ -123,6 +127,8 @@ executable ltlspec-exe
     , tasty
     , tasty-hedgehog
     , tasty-hunit
+    , unliftio
+    , unliftio-core
     , unordered-containers
   default-language: Haskell2010
 
@@ -162,7 +168,8 @@ test-suite ltlspec-doctest
       TypeFamilies
   ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wincomplete-uni-patterns -Wpartial-fields -Wredundant-constraints -fno-warn-unused-top-binds -fwrite-ide-info -hiedir=.hie -threaded -rtsopts -with-rtsopts=-N
   build-depends:
-      base >=4.12 && <5
+      aeson
+    , base >=4.12 && <5
     , containers
     , deepseq
     , doctest
@@ -175,6 +182,8 @@ test-suite ltlspec-doctest
     , tasty
     , tasty-hedgehog
     , tasty-hunit
+    , unliftio
+    , unliftio-core
     , unordered-containers
   default-language: Haskell2010
 
@@ -214,7 +223,8 @@ test-suite ltlspec-test
       TypeFamilies
   ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wincomplete-uni-patterns -Wpartial-fields -Wredundant-constraints -fno-warn-unused-top-binds -fwrite-ide-info -hiedir=.hie -threaded -rtsopts -with-rtsopts=-N
   build-depends:
-      base >=4.12 && <5
+      aeson
+    , base >=4.12 && <5
     , containers
     , deepseq
     , hashable
@@ -226,5 +236,7 @@ test-suite ltlspec-test
     , tasty
     , tasty-hedgehog
     , tasty-hunit
+    , unliftio
+    , unliftio-core
     , unordered-containers
   default-language: Haskell2010
