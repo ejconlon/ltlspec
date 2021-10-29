@@ -2,12 +2,12 @@
 
 module Ltlspec.Models.Chat where
 
-import Data.Aeson (ToJSON (..), (.=), object)
-import System.Random (mkStdGen, randomR, StdGen)
-import Ltlspec 
+import Data.Aeson (ToJSON (..), object, (.=))
+import qualified Data.List as List
 import qualified Data.Map as Map
 import qualified Data.Set as Set
-import qualified Data.List as List
+import Ltlspec
+import System.Random (StdGen, mkStdGen, randomR)
 
 chatTheory :: Theory
 chatTheory = Theory
@@ -17,23 +17,25 @@ chatTheory = Theory
                                 ("Left", ["ActionID", "ClientID", "ChannelID"]),
                                 ("Joined", ["ActionID", "ClientID", "ChannelID"]),
                                 ("ListRequested",["ActionID", "ClientID"]),
-                                ("Sent", ["ActionID", "ClientID", "ChannelID"]), 
+                                ("Sent", ["ActionID", "ClientID", "ChannelID"]),
                                 ("Shared", ["ActionID", "ClientID", "ClientID"]),
                                 ("NewJoinNote", ["ActionID", "ClientID", "ChannelID", "ClientID"]),
                                 ("NewLeaveNote", ["ActionID", "ClientID", "ChannelID", "ClientID"]),
                                 ("ChannelListNote", ["ActionID", "ClientID", "ChannelID"])]
   , theoryAxioms = Map.fromList [
-        ("IsMemberBetweenJoinAndLeave", 
+        ("IsMemberBetweenJoinAndLeave",
             propAlways (
-                propForAllNested [("c","ClientID"), ("ch", "ChannelID"), ("i", "ActionID")] (
-                    propIf 
-                        (PropAtom (Atom "Joined" ["i","c","ch"])) 
-                        (PropUntil 
-                            (PropAtom (Atom "IsMember" ["c","ch"])) 
-                            (PropAtom (Atom "Left" ["i","c","ch"]))
-                        )
-                ) 
-            )   
+                propForAllNested [("c","ClientID"), ("ch", "ChannelID")] (
+                    propExistsNested [("i","ActionID"), ("j","ActionID")] (
+                        propIf
+                            (PropAtom (Atom "Joined" ["i","c","ch"]))
+                            (PropUntil
+                                (PropAtom (Atom "IsMember" ["c","ch"]))
+                                (PropAtom (Atom "Left" ["j","c","ch"]))
+                            )
+                    )    
+                )
+            )
         ),
         ("IfInChannelReceiveMessage",
             propAlways (
@@ -45,8 +47,8 @@ chatTheory = Theory
                             (PropAtom (Atom "IsMember" ["c2","ch"])),
                             (PropAtom (Atom "Sent" ["m","c1","ch"]))
                         ])
-                        (PropAnd 
-                            (PropNot (PropAtom (Atom "Shared" ["m","c1","c1"]))) 
+                        (PropAnd
+                            (PropNot (PropAtom (Atom "Shared" ["m","c1","c1"])))
                             (propEventually (PropAtom (Atom "Shared" ["m", "c1", "c2"])))
                         )
                 )
@@ -59,7 +61,7 @@ chatTheory = Theory
                 )
             )
         )
-    ]                                                                                                                                                          
+    ]
   }
 
 
@@ -120,9 +122,9 @@ join :: SystemState -> ClientID -> ChannelID -> SystemState
 join (trace, seed) client channel = ((changeTrace trace), seed+1)
     where {
         changeState s = Map.insert client  (( filter (/= channel) (Map.findWithDefault [] client s)) ++ [channel] ) s;
-        changeTrace t = let 
+        changeTrace t = let
                             oldS = fst (last t)
-                            newS = changeState (oldS) 
+                            newS = changeState (oldS)
                         in t ++ [(newS, Left (Join (seed+1) client channel ) )] ++ (map (\r -> (newS, Right (NewJoin (seed +1) client channel r) ) ) [ c | (c,v)<- Map.toList oldS, c/=client, elem channel v ] )
     }
 
@@ -130,9 +132,9 @@ leave :: SystemState -> ClientID -> ChannelID -> SystemState
 leave (trace, seed) client channel = (changeTrace trace, seed+1)
     where {
         changeState s = Map.insert client  (( filter (/= channel) (Map.findWithDefault [] client s))) s;
-        changeTrace t = let 
+        changeTrace t = let
                             oldS = fst (last t)
-                            newS = changeState (oldS) 
+                            newS = changeState (oldS)
                         in t ++ [(newS, Left (Leave (seed+1) client channel ))] ++ (map (\r -> (newS, Right (NewLeave (seed +1) client channel r) ) ) [ c | (c,v)<- Map.toList oldS, c/=client, elem channel v ] )
     }
 
@@ -167,7 +169,7 @@ step ((trace, seed), gen) actionname =
                   in if null (Map.findWithDefault [] client state) then
                         ((trace, seed), newgen)
                     else
-                        let 
+                        let
                             channel = getRandomElementOfList (Map.findWithDefault [] client state) gen
                             message = "FOO"
                         in
@@ -202,7 +204,7 @@ simulationStep ((trace, seed), gen) =
                   in if null (Map.findWithDefault [] client state) then
                         ((trace, seed), newgen)
                     else
-                        let 
+                        let
                             channel = getRandomElementOfList (Map.findWithDefault [] client state) gen
                             message = "FOO"
                         in
