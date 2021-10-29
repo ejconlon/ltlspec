@@ -256,15 +256,17 @@ dinningHakkerTheory = Theory
                             ("isEating",["HakkerId"])
                         ]
                         , theoryAxioms = M.fromList [
+                            -- checking liveness properties for all hakkers
+                            -- All hakkers will start from thinking, and should eventually start eating
+                            -- Because the Eating state is mutually exclusive for adjacent Hakkers
+                            -- forall h: Hakker. isThinking(h) -> F[isEating(h)]
                             ("Liveness",
                                 propAlways
                                     (PropForAll (Binder "h" "HakkerId") 
-                                                (PropAnd 
+                                                (propIf 
+                                                    (PropAtom (Atom "isThinking" ["h"])) 
                                                     (propEventually 
-                                                        (propIf (PropAtom (Atom "isThinking" ["h"])) (PropAtom (Atom "isEating" ["h"]))))
-                                                    (propEventually 
-                                                        (propIf (PropAtom (Atom "isThinking" ["h"])) (PropAtom (Atom "isEating" ["h"]))))
-                                                )
+                                                        (PropAtom (Atom "isEating" ["h"]))))
                                     )
                             )
                         ]
