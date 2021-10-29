@@ -1,6 +1,8 @@
 module Ltlspec.Models.DinningHakker where
 
 import qualified Data.Map.Strict as M
+import Data.Sequence as S (Seq (..), empty)
+import Ltlspec (Theory (..))
 
 type TimeStamp = Int
 
@@ -40,9 +42,9 @@ data Hakker = Hakker
                 -- in-transit messages sent by Hakker
                 -- to simulate network delay
                 -- NOTE: not used for now
-                , hkSends :: [HakkerMsg]
+                , hkSends :: Seq HakkerMsg
                 -- Hakker's message queue
-                , hkRecvs :: [ChopstickMsg]
+                , hkRecvs :: Seq ChopstickMsg
                 , hkState :: HakkerState
                 , lchop :: ChopstickId
                 , rchop :: ChopstickId
@@ -53,8 +55,8 @@ data Hakker = Hakker
 defaultHakker :: Hakker
 defaultHakker = Hakker
                   { hid = "DEFAULT"
-                  , hkSends = []
-                  , hkRecvs = []
+                  , hkSends = S.empty
+                  , hkRecvs = S.empty
                   , hkState = Thinking
                   , lchop = -1
                   , rchop = -1
@@ -67,17 +69,17 @@ data Chopstick = Chopstick
                    -- in-transit messages sent by Chopstick
                    -- to simulate network delay
                    -- NOTE: not used for now
-                   , chopSends :: [ChopstickMsg]
+                   , chopSends :: S.Seq ChopstickMsg
                    -- Chopstick's message queue
-                   , chopRecvs :: [HakkerMsg]
+                   , chopRecvs :: S.Seq HakkerMsg
                    , chopState :: ChopstickState
                    } deriving stock (Eq, Show)
 
 defaultChopstick :: Chopstick
 defaultChopstick = Chopstick
                      { cid = -1
-                     , chopSends = []
-                     , chopRecvs = []
+                     , chopSends = S.empty
+                     , chopRecvs = S.empty
                      , chopState = Free
                      }
 
@@ -105,6 +107,9 @@ initState hs = GlobalState hakkers chopsticks
         chopsticks = foldl (\m i -> M.insert i defaultChopstick{cid=i} m) M.empty idx
         hakkers = foldl (\m (i, h) -> M.insert h defaultHakker{hid=h, lchop=i, rchop=(i-1) `mod` l} m) M.empty (zip idx hs)
 
+initWorld :: GlobalState -> World
+initWorld gs = World 0 [] gs
+
 data Action =
       -- If the Hakker is Eating, send Put messages to both sides, and transfer to Thinking
       -- Otherwise do nothing.
@@ -122,12 +127,13 @@ data Action =
     | HakkerEat HakkerId
       -- Deliver a message from chopRecvs, and respond accordingly
     | ChopstickResp ChopstickId
+    deriving stock (Eq, Show)
 
 chopReceive :: Chopstick -> HakkerMsg -> Chopstick
-chopReceive chop@Chopstick{chopRecvs=recvs} msg = chop {chopRecvs = msg : recvs}
+chopReceive chop@Chopstick{chopRecvs=recvs} msg = chop {chopRecvs = msg :<| recvs}
 
 hakkerReceive :: Hakker -> ChopstickMsg -> Hakker
-hakkerReceive hakker@Hakker{hkRecvs=recvs} msg = hakker {hkRecvs = msg : recvs}
+hakkerReceive hakker@Hakker{hkRecvs=recvs} msg = hakker {hkRecvs = msg :<| recvs}
 
 -- One system step in perfect network condition
 -- This step function will cause deadlock for DinningHakker problem
@@ -175,7 +181,7 @@ stepPerfect (HakkerEat h) (World ts ms gs@(GlobalState hs cs)) =
     let hk = hs M.! h in
     case hkState hk of
         Hungry -> case hkRecvs hk of
-            Grant _ _ : Grant _ _ : msgs -> let
+            msgs :|> Grant _ _ :|> Grant _ _  -> let
                 hk' = hk {hkRecvs=msgs, hkState=Eating}
                 hs' = M.insert h hk' hs
                 in
@@ -186,16 +192,34 @@ stepPerfect (ChopstickResp c) (World ts ms gs@(GlobalState hs cs)) =
     let chop = cs M.! c in
     case chopState chop of
         Free -> case chopRecvs chop of
-            Take hid _ : msgs -> let
+            msgs :|> Take hid _ -> let
                 hk = hs M.! hid
                 msg = (Grant c hid)
                 hk' = hakkerReceive hk msg
                 hs' = M.insert hid hk' hs
-                cs' = M.insert c (chop {chopRecvs=msgs}) cs
+                cs' = M.insert c (chop {chopRecvs=msgs, chopState=Taken}) cs
                 in World (ts+1) (Right msg : ms) (GlobalState hs' cs')
             _ -> World (ts+1) ms gs
         Taken -> case chopRecvs chop of
-            Put _ _ : _ -> undefined
+            msgs :|> Put _ _ -> let
+                cs' = M.insert c (chop {chopRecvs=msgs, chopState=Free}) cs
+                in
+                World (ts+1) ms (GlobalState hs cs')
+            msgs :|> msg@(Take _ _) -> let
+                cs' = M.insert c (chop {chopRecvs=msg :<| msgs}) cs
+                in
+                World (ts+1) ms (GlobalState hs cs')
             _ -> World (ts+1) ms gs
 
--- Atomic Propositions
+-- The second field (the message list) of World will be reversed to recover the chronological order
+genTrace :: [Action] -> World -> [World]
+genTrace = undefined
+
+
+-- Domain Theory
+dinningHakkerTheory :: Theory
+dinningHakkerTheory = Theory
+                        { theoryTypes = []
+                        , theoryProps = M.fromList []
+                        , theoryAxioms = M.fromList []
+                        }
