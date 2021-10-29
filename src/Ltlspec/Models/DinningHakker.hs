@@ -2,7 +2,7 @@ module Ltlspec.Models.DinningHakker where
 
 import qualified Data.Map.Strict as M
 import Data.Sequence as S (Seq (..), empty)
-import Ltlspec (Theory (..))
+import Ltlspec (Theory (..), propAlways, Prop (PropForAll, PropAnd, PropAtom), propEventually, propIf, Atom(..), Binder(..))
 
 type TimeStamp = Int
 
@@ -217,11 +217,14 @@ genTrace (a : as) w =
     let nextw = stepPerfect a w
     in w : genTrace as nextw
 
-world3 :: World
-world3 = initWorld $ initState ["Ghosh", "Boner", "Klang"]
+scheduler :: [HakkerId] -> [Action]
+scheduler = undefined
 
-action3 :: [Action]
-action3 = [
+dhworld3 :: World
+dhworld3 = initWorld $ initState ["Ghosh", "Boner", "Klang"]
+
+dhaction3 :: [Action]
+dhaction3 = [
     HakkerHungry "Ghosh",
     HakkerHungry "Boner",
     HakkerHungry "Klang",
@@ -231,13 +234,31 @@ action3 = [
     HakkerEat "Ghosh"
     ]
 
-trace3 :: [World]
-trace3 = genTrace action3 world3
+dhtrace3 :: [World]
+dhtrace3 = genTrace dhaction3 dhworld3
+
+p = (propEventually (propIf (PropAtom (Atom "isThinking" ["h"])) (PropAtom (Atom "isEating" ["h"]))))
 
 -- Domain Theory
 dinningHakkerTheory :: Theory
 dinningHakkerTheory = Theory
-                        { theoryTypes = []
-                        , theoryProps = M.fromList []
-                        , theoryAxioms = M.fromList []
+                        { theoryTypes = ["HakkerId", "ChopstickId", "World"]
+                        , theoryProps = M.fromList [
+                            ("isThinking",["HakkerId"]),
+                            ("isHungry",["HakkerId"]),
+                            ("isEating",["HakkerId"])
+                        ]
+                        , theoryAxioms = M.fromList [
+                            ("Liveness",
+                                propAlways
+                                    (PropForAll (Binder "h" "HakkerId") 
+                                                (PropAnd 
+                                                    (propEventually 
+                                                        (propIf (PropAtom (Atom "isThinking" ["h"])) (PropAtom (Atom "isEating" ["h"]))))
+                                                    (propEventually 
+                                                        (propIf (PropAtom (Atom "isThinking" ["h"])) (PropAtom (Atom "isEating" ["h"]))))
+                                                )
+                                    )
+                            )
+                        ]
                         }
