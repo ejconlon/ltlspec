@@ -5,11 +5,12 @@ import Data.Sequence as S (Seq (..), empty)
 import Ltlspec (
       Theory (..)
     , Prop (..)
-    , Atom(..)
     , Binder(..)
+    , propAtom
     , propAlways
     , propEventually
-    , propIf)
+    , propIf
+    , propForAllNested)
 
 type TimeStamp = Int
 
@@ -132,6 +133,9 @@ chopReceive chop@Chopstick{chopRecvs=recvs} msg = chop {chopRecvs = msg :<| recv
 hakkerReceive :: Hakker -> ChopstickMsg -> Hakker
 hakkerReceive hakker@Hakker{hkRecvs=recvs} msg = hakker {hkRecvs = msg :<| recvs}
 
+tick :: World -> World
+tick (World ts ms gs)= World (ts + 1) ms gs
+
 -- One system step in perfect network condition
 -- This step function will cause deadlock for DinningHakker problem
 -- If the Chopstick is Taken, and gets a Take message from the other Hakker,
@@ -140,7 +144,7 @@ hakkerReceive hakker@Hakker{hkRecvs=recvs} msg = hakker {hkRecvs = msg :<| recvs
 stepPerfect :: Action -> World -> World
 -- If the Hakker is Eating, send Put messages to both sides, and transfer to Thinking
 -- Otherwise do nothing.
-stepPerfect (HakkerThink h) (World ts ms gs@(GlobalState hs cs)) =
+stepPerfect (HakkerThink h) w@(World ts ms (GlobalState hs cs)) =
     let hk = hs M.! h in
     case hkState hk of
         Eating -> let
@@ -157,10 +161,10 @@ stepPerfect (HakkerThink h) (World ts ms gs@(GlobalState hs cs)) =
             gs' = GlobalState hs' cs''
             in
             World (ts+1) (Left rightMsg : Left leftMsg : ms) gs'
-        _ -> World (ts+1) ms gs
+        _ -> tick w
 -- If Hakker is Thinking, send Take messages to both sides, and transfer to Hungry
 -- Otherwise do nothing
-stepPerfect (HakkerHungry h) (World ts ms gs@(GlobalState hs cs)) =
+stepPerfect (HakkerHungry h) w@(World ts ms (GlobalState hs cs)) =
     let hk = hs M.! h in
     case hkState hk of
         Thinking -> let
@@ -177,13 +181,13 @@ stepPerfect (HakkerHungry h) (World ts ms gs@(GlobalState hs cs)) =
             gs' = GlobalState hs' cs''
             in
             World (ts+1) (Left rightMsg : Left leftMsg : ms) gs'
-        _ -> World (ts+1) ms gs
+        _ -> tick w
 -- If Hakker is Hungry, check messages received from both sides.
 -- If haven't received messages from both side, stay Hungry
 -- If any message is Busy, stay Hungry
 -- If both sides of the messages are Grant, start Eating
 -- If Hakker is in other states, do nothing
-stepPerfect (HakkerEat h) (World ts ms gs@(GlobalState hs cs)) =
+stepPerfect (HakkerEat h) w@(World ts ms (GlobalState hs cs)) =
     let hk = hs M.! h in
     case hkState hk of
         Hungry -> case hkRecvs hk of
@@ -192,10 +196,10 @@ stepPerfect (HakkerEat h) (World ts ms gs@(GlobalState hs cs)) =
                 hs' = M.insert h hk' hs
                 in
                 World (ts+1) ms (GlobalState hs' cs)
-            _ -> World (ts+1) ms gs
-        _ -> World (ts+1) ms gs
+            _ -> tick w
+        _ -> tick w
 -- Deliver a message from chopRecvs, and respond accordingly
-stepPerfect (ChopstickResp c) (World ts ms gs@(GlobalState hs cs)) =
+stepPerfect (ChopstickResp c) w@(World ts ms (GlobalState hs cs)) =
     let chop = cs M.! c in
     case chopState chop of
         Free -> case chopRecvs chop of
@@ -206,7 +210,7 @@ stepPerfect (ChopstickResp c) (World ts ms gs@(GlobalState hs cs)) =
                 hs' = M.insert hid hk' hs
                 cs' = M.insert c (chop {chopRecvs=msgs, chopState=Taken}) cs
                 in World (ts+1) (Right msg : ms) (GlobalState hs' cs')
-            _ -> World (ts+1) ms gs
+            _ -> tick w
         Taken -> case chopRecvs chop of
             msgs :|> Put _ _ -> let
                 cs' = M.insert c (chop {chopRecvs=msgs, chopState=Free}) cs
@@ -216,7 +220,7 @@ stepPerfect (ChopstickResp c) (World ts ms gs@(GlobalState hs cs)) =
                 cs' = M.insert c (chop {chopRecvs=msg :<| msgs}) cs
                 in
                 World (ts+1) ms (GlobalState hs cs')
-            _ -> World (ts+1) ms gs
+            _ -> tick w
 
 genTrace :: [Action] -> World -> [World]
 genTrace [] w = [w]
@@ -244,16 +248,18 @@ dhaction3 = [
 dhtrace3 :: [World]
 dhtrace3 = genTrace dhaction3 dhworld3
 
-p = (propEventually (propIf (PropAtom (Atom "isThinking" ["h"])) (PropAtom (Atom "isEating" ["h"]))))
-
 -- Domain Theory
 dinningHakkerTheory :: Theory
 dinningHakkerTheory = Theory
-                        { theoryTypes = ["HakkerId", "ChopstickId", "World"]
+                        { theoryTypes = ["HakkerId", "ChopstickId", "TimeStamp", "HakkerMsg", "ChopstickMsg"]
                         , theoryProps = M.fromList [
-                            ("isThinking",["HakkerId"]),
-                            ("isHungry",["HakkerId"]),
-                            ("isEating",["HakkerId"])
+                              ("isThinking",["HakkerId"])
+                            , ("isHungry",["HakkerId"])
+                            , ("isEating",["HakkerId"])
+                            -- A message that has been received but not yet delivered by a chopstick
+                            -- i.e., the message is currently in the chopRecvs Seq
+                            , ("receivedNotDelivered", ["ChopstickId, HakkerMsg"])
+                            , ("fromAdjacent", ["ChopstickId, HakkerMsg"])
                         ]
                         , theoryAxioms = M.fromList [
                             -- checking liveness properties for all hakkers
@@ -262,11 +268,22 @@ dinningHakkerTheory = Theory
                             -- forall h: Hakker. isThinking(h) -> F[isEating(h)]
                             ("Liveness",
                                 propAlways
-                                    (PropForAll (Binder "h" "HakkerId") 
-                                                (propIf 
-                                                    (PropAtom (Atom "isThinking" ["h"])) 
-                                                    (propEventually 
-                                                        (PropAtom (Atom "isEating" ["h"]))))
+                                    (PropForAll
+                                        (Binder "h" "HakkerId") 
+                                        (propIf 
+                                            (propAtom "isThinking" ["h"])
+                                            (propEventually 
+                                                (propAtom "isEating" ["h"]))
+                                        )
+                                    )
+                            ),
+                            ("ReceiveFromAdjacentHakkers",
+                                propAlways 
+                                    (propForAllNested [("c", "ChopstickId"), ("hm", "HakkerMsg")]
+                                        (propIf 
+                                            (propAtom "receivedNotDeliverd" ["c", "hm"])
+                                            (propAtom "fromAdjacent" ["c", "hm"])
+                                        )
                                     )
                             )
                         ]
