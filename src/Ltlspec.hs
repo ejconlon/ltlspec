@@ -104,6 +104,9 @@ propNegationNormalForm = pos where
     PropForAll b r -> PropExists b (neg r)
     PropExists b r -> PropForAll b (neg r)
 
+propAtom :: PropName -> [VarName] -> Prop
+propAtom p args = PropAtom (Atom p args)
+
 -- | AND all the given props together (empty is true).
 propAndAll :: [Prop] -> Prop
 propAndAll = \case
