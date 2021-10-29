@@ -4,54 +4,119 @@ module Ltlspec.Models.Chat where
 
 import Data.Aeson (ToJSON (..), (.=), object)
 import System.Random (mkStdGen, randomR, StdGen)
+import Ltlspec 
 import qualified Data.Map as Map
 import qualified Data.Set as Set
 import qualified Data.List as List
 
+chatTheory :: Theory
+chatTheory = Theory
+  { theoryTypes = ["ClientID", "ChannelID", "ActionID"]
+  , theoryProps = Map.fromList [("IsMember", ["ClientID", "ChannelID"]),
+                                ("IsSameClient", ["ClientID", "ClientID"]),
+                                ("Left", ["ActionID", "ClientID", "ChannelID"]),
+                                ("Joined", ["ActionID", "ClientID", "ChannelID"]),
+                                ("ListRequested",["ActionID", "ClientID"]),
+                                ("Sent", ["ActionID", "ClientID", "ChannelID"]), 
+                                ("Shared", ["ActionID", "ClientID", "ClientID"]),
+                                ("NewJoinNote", ["ActionID", "ClientID", "ChannelID", "ClientID"]),
+                                ("NewLeaveNote", ["ActionID", "ClientID", "ChannelID", "ClientID"]),
+                                ("ChannelListNote", ["ActionID", "ClientID", "ChannelID"])]
+  , theoryAxioms = Map.fromList [
+        ("IsMemberBetweenJoinAndLeave", 
+            propAlways (
+                propForAllNested [("c","ClientID"), ("ch", "ChannelID"), ("i", "ActionID")] (
+                    propIf 
+                        (PropAtom (Atom "Joined" ["i","c","ch"])) 
+                        (PropUntil 
+                            (PropAtom (Atom "IsMember" ["c","ch"])) 
+                            (PropAtom (Atom "Left" ["i","c","ch"]))
+                        )
+                ) 
+            )   
+        ),
+        ("IfInChannelReceiveMessage",
+            propAlways (
+                propForAllNested [("c1","ClientID"),("ch","ChannelID"),("c2","ClientID"),("m","ActionID")] (
+                    propIf
+                        (propAndAll [
+                            (PropNot (PropAtom (Atom "IsSameClient" ["c1","c2"]))),
+                            (PropAtom (Atom "IsMember" ["c1","ch"])),
+                            (PropAtom (Atom "IsMember" ["c2","ch"])),
+                            (PropAtom (Atom "Sent" ["m","c1","ch"]))
+                        ])
+                        (PropAnd 
+                            (PropNot (PropAtom (Atom "Shared" ["m","c1","c1"]))) 
+                            (propEventually (PropAtom (Atom "Shared" ["m", "c1", "c2"])))
+                        )
+                )
+            )
+        ),
+        ("NeverSendMessageToMyself",
+            propAlways (
+                propForAllNested [("c","ClientID"), ("m", "ActionID")] (
+                    PropNot (PropAtom (Atom "Shared" ["m", "c", "c"]))
+                )
+            )
+        )
+    ]                                                                                                                                                          
+  }
+
+
+
 type ActionID = Integer
-
 type ClientID = Integer
-
-type ChannelName = Integer
-
+type ChannelID = Integer
 type MessageContent = String
 
 data ClientAction =
     List ActionID ClientID
-  | Join ActionID ClientID ChannelName
-  | Leave ActionID ClientID ChannelName
-  | Send ActionID ClientID MessageContent ChannelName
+  | Join ActionID ClientID ChannelID
+  | Leave ActionID ClientID ChannelID
+  | Send ActionID ClientID MessageContent ChannelID
   deriving stock (Eq, Show, Ord)
 
 instance ToJSON ClientAction where
   toJSON = \case
     List aid cid -> object ["type" .= ("list" :: String), "action" .= aid, "client" .= cid]
-    _ -> undefined
+    Join aid cid cn -> object ["type" .= ("join" :: String), "action" .= aid, "client" .= cid, "channel" .= cn]
+    Leave aid cid cn -> object ["type" .= ("leave" :: String), "action" .= aid, "client" .= cid, "channel" .= cn]
+    Send aid cid msg cn -> object ["type" .= ("send" :: String), "action" .= aid, "client" .= cid, "message" .= msg, "channel" .= cn]
+
 
 data ServerResponse =
-    Share ActionID MessageContent ClientID
-  | NewJoin ActionID ClientID ChannelName ClientID
-  | NewLeave ActionID ClientID ChannelName ClientID
-  | ChannelList ActionID ClientID ChannelName
+    Share ActionID ClientID MessageContent ClientID
+  | NewJoin ActionID ClientID ChannelID ClientID
+  | NewLeave ActionID ClientID ChannelID ClientID
+  | ChannelList ActionID ClientID ChannelID
   | StartService
   deriving stock (Eq, Show, Ord)
+
+instance ToJSON ServerResponse where
+  toJSON = \case
+    ChannelList aid cid cn -> object ["type" .= ("channel-list" :: String), "correspondent-action" .= aid, "client" .= cid, "channel" .= cn]
+    NewJoin aid sid cn rid -> object ["type" .= ("new-join" :: String), "correspondent-action" .= aid, "sender" .= sid, "channel" .= cn, "receiver" .= rid]
+    NewLeave aid sid cn rid -> object ["type" .= ("new-leave" :: String), "correspondent-action" .= aid, "sender" .= sid, "channel" .= cn, "receiver" .= rid]
+    Share aid sid msg rid -> object ["type" .= ("share" :: String), "correspondent-action" .= aid, "sender" .= sid, "message" .= msg, "receiver" .= rid]
+    StartService -> object ["type" .= ("start-service"::String) ]
+
 
 type SystemEvent = Either ClientAction ServerResponse
 
 type SystemTrace = [(State,SystemEvent)]
 
-type State = Map.Map ClientID [ChannelName]
+type State = Map.Map ClientID [ChannelID]
 
 type SystemState = (SystemTrace, Integer)
 
 
-send :: SystemState -> ClientID -> MessageContent -> ChannelName -> SystemState
+send :: SystemState -> ClientID -> MessageContent -> ChannelID -> SystemState
 send (trace, seed) client message channel = (changeTrace trace, (seed+1))
     where {
-        changeTrace t = let newS = fst (last t) in t ++ [(newS,Left (Send (seed + 1) client message channel) )] ++ (map (\r -> (newS,Right (Share (seed +1) message r) ) ) [ c | (c,v)<- Map.toList newS, c/=client, elem channel v ] )
+        changeTrace t = let newS = fst (last t) in t ++ [(newS,Left (Send (seed + 1) client message channel) )] ++ (map (\r -> (newS,Right (Share (seed +1) client message r) ) ) [ c | (c,v)<- Map.toList newS, c/=client, elem channel v ] )
     }
 
-join :: SystemState -> ClientID -> ChannelName -> SystemState
+join :: SystemState -> ClientID -> ChannelID -> SystemState
 join (trace, seed) client channel = ((changeTrace trace), seed+1)
     where {
         changeState s = Map.insert client  (( filter (/= channel) (Map.findWithDefault [] client s)) ++ [channel] ) s;
@@ -61,7 +126,7 @@ join (trace, seed) client channel = ((changeTrace trace), seed+1)
                         in t ++ [(newS, Left (Join (seed+1) client channel ) )] ++ (map (\r -> (newS, Right (NewJoin (seed +1) client channel r) ) ) [ c | (c,v)<- Map.toList oldS, c/=client, elem channel v ] )
     }
 
-leave :: SystemState -> ClientID -> ChannelName -> SystemState
+leave :: SystemState -> ClientID -> ChannelID -> SystemState
 leave (trace, seed) client channel = (changeTrace trace, seed+1)
     where {
         changeState s = Map.insert client  (( filter (/= channel) (Map.findWithDefault [] client s))) s;
@@ -77,11 +142,11 @@ list (trace, seed) client = (changeTrace trace, seed+1)
         changeTrace t = let newS = fst (last t) in t ++ [(newS, Left (List (seed+1) client))] ++ Set.toList (Set.map (\c -> (newS, Right (ChannelList (seed+1) client c))) (Set.fromList (concat (Map.elems newS))) )
     }
 
-getJoinableChannels :: State -> ClientID -> [ChannelName]
+getJoinableChannels :: State -> ClientID -> [ChannelID]
 getJoinableChannels state client = let res = List.sort (concat (Map.elems state)) in if null res then [0] else res
 
-testState :: Integer -> SystemState
-testState nclient= ([((Map.fromList [(i,[]) | i <- [1..nclient]]),Right StartService)], 0)
+initialState :: Integer -> SystemState
+initialState nclient= ([((Map.fromList [(i,[]) | i <- [1..nclient]]),Right StartService)], 0)
 
 gen :: StdGen
 gen = mkStdGen 137
@@ -159,11 +224,11 @@ simulationStep ((trace, seed), gen) =
                     in (list (trace, seed) client, newgen)
 
 randomTraceGenerator :: Integer -> Integer -> (SystemState, StdGen)
-randomTraceGenerator 0 nclients = (testState nclients, gen)
+randomTraceGenerator 0 nclients = (initialState nclients, gen)
 randomTraceGenerator niterations nclients =  simulationStep (randomTraceGenerator (niterations-1) nclients)
 
 singleActionTraceGenerator :: Integer -> Integer -> String -> (SystemState, StdGen)
-singleActionTraceGenerator 0 nclients _ = (testState nclients, gen)
+singleActionTraceGenerator 0 nclients _ = (initialState nclients, gen)
 singleActionTraceGenerator niterations nclients action =  step (singleActionTraceGenerator (niterations-1) nclients action) action
 
 
@@ -171,4 +236,4 @@ getTrace :: SystemState -> SystemTrace
 getTrace (st, _) = st
 
 trace :: SystemTrace
-trace = getTrace (fst (randomTraceGenerator 10000 3) )
+trace = getTrace (fst (randomTraceGenerator 5 3) )
