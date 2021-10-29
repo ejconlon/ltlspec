@@ -46,7 +46,7 @@ instance Message HakkerMsg
 instance Message ChopstickMsg
 
 data Hakker = Hakker
-  { hid :: HakkerId
+  { hakkerId :: HakkerId
   -- in-transit messages sent by Hakker
   -- to simulate network delay
   -- NOTE: not used for now
@@ -62,7 +62,7 @@ data Hakker = Hakker
 
 defaultHakker :: Hakker
 defaultHakker = Hakker
-  { hid = "DEFAULT"
+  { hakkerId = "DEFAULT"
   , hkSends = S.empty
   , hkRecvs = S.empty
   , hkState = Thinking
@@ -73,7 +73,7 @@ defaultHakker = Hakker
   }
 
 data Chopstick = Chopstick
-  { cid :: ChopstickId
+  { chopId :: ChopstickId
   -- in-transit messages sent by Chopstick
   -- to simulate network delay
   -- NOTE: not used for now
@@ -85,7 +85,7 @@ data Chopstick = Chopstick
 
 defaultChopstick :: Chopstick
 defaultChopstick = Chopstick
-  { cid = -1
+  { chopId = -1
   , chopSends = S.empty
   , chopRecvs = S.empty
   , chopState = Free
@@ -112,8 +112,8 @@ initState hs = GlobalState hakkers chopsticks
   where
     l = length hs
     idx = init $ scanl (\c _ -> c + 1) 0 hs
-    chopsticks = foldl (\m i -> M.insert i defaultChopstick{cid=i} m) M.empty idx
-    hakkers = foldl (\m (i, h) -> M.insert h defaultHakker{hid=h, lchop=i, rchop=(i-1) `mod` l} m) M.empty (zip idx hs)
+    chopsticks = foldl (\m i -> M.insert i defaultChopstick{chopId=i} m) M.empty idx
+    hakkers = foldl (\m (i, h) -> M.insert h defaultHakker{hakkerId=h, lchop=i, rchop=(i-1) `mod` l} m) M.empty (zip idx hs)
 
 initWorld :: GlobalState -> World
 initWorld gs = World 0 [] gs
