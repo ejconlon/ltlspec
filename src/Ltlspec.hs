@@ -104,6 +104,9 @@ propNegationNormalForm = pos where
     PropForAll b r -> PropExists b (neg r)
     PropExists b r -> PropForAll b (neg r)
 
+propAtom :: PropName -> [VarName] -> Prop
+propAtom p args = PropAtom (Atom p args)
+
 -- | AND all the given props together (empty is true).
 propAndAll :: [Prop] -> Prop
 propAndAll = \case
@@ -131,6 +134,13 @@ propEventually = PropUntil PropTrue
 -- | Propositional implication: r1 -> r2
 propIf :: Prop -> Prop -> Prop
 propIf = PropOr . PropNot
+
+-- | Simple constructor for nested ifs
+propIfNested :: [Prop] -> Prop -> Prop
+propIfNested hyps body = go hyps where
+  go = \case
+    [] -> body
+    hyp:hyps' -> propIf hyp (go hyps')
 
 -- | Bidiriectional propositional implication: r1 <-> r2
 propIff :: Prop -> Prop -> Prop
@@ -283,3 +293,19 @@ propAtoms = execWriter . foldUpM go where
 --         in case r of
 --           PropResNext p' -> go i' p' ys
 --           _ -> (i', r)
+
+-- | A (state, action, state) triple - used for defining worlds.
+data SAS s a = SAS
+  { sasBefore :: !s
+  , sasAction :: !a
+  , sasAfter :: !s
+  } deriving stock (Eq, Show)
+
+-- | Scan a list of actions into a list of SAS
+scanSAS :: (a -> s -> s) -> s -> [a] -> [SAS s a]
+scanSAS update initState actions = result where
+  result = case actions  of
+    [] -> []
+    a:as -> scanr go (initWorld a) as
+  initWorld a = SAS initState a (update a initState)
+  go a (SAS _ _ after) = SAS after a (update a after)
