@@ -135,6 +135,13 @@ propEventually = PropUntil PropTrue
 propIf :: Prop -> Prop -> Prop
 propIf = PropOr . PropNot
 
+-- | Simple constructor for nested ifs
+propIfNested :: [Prop] -> Prop -> Prop
+propIfNested hyps body = go hyps where
+  go = \case
+    [] -> body
+    hyp:hyps' -> propIf hyp (go hyps')
+
 -- | Bidiriectional propositional implication: r1 <-> r2
 propIff :: Prop -> Prop -> Prop
 propIff r1 r2 = PropAnd (propIf r1 r2) (propIf r2 r1)

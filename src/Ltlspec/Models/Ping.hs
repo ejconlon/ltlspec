@@ -3,17 +3,26 @@ module Ltlspec.Models.Ping where
 import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as Map
 import Data.Set (Set)
--- import qualified Data.Set as Set
-import Ltlspec (Theory(..), SAS, scanSAS)
+import qualified Data.Set as Set
+import Ltlspec (Theory(..), SAS, scanSAS, Prop (..), propAlways, propForAllNested, propIf, Atom (..), propEventually, Binder (..))
+
+pingResponsiveProp :: Prop
+pingResponsiveProp =
+  let isResponse = PropAnd (PropAtom (Atom "IsMesssage" ["y", "x", "n"])) (PropAtom (Atom "IsResponse" ["n", "m"]))
+      eventuallyIsResponse = propEventually (PropExists (Binder "n" "MessageId") isResponse)
+      body = propIf (PropAtom (Atom "IsMessage" ["x", "y", "m"])) eventuallyIsResponse
+  in propAlways (propForAllNested [("x", "ActorId"), ("y", "ActorId"), ("m", "MessageId")] body)
 
 pingTheory :: Theory
 pingTheory = Theory
   { theoryTypes = ["ActorId", "MessageId"]
   , theoryProps = Map.fromList
-      [ ("IsMessage", ["ActorId", "MessageId"])
+      [ ("IsMessage", ["ActorId", "ActorId", "MessageId"])
       , ("IsResponse", ["MessageId", "MessageId"])
       ]
-  , theoryAxioms = mempty -- Map.fromList []
+  , theoryAxioms = Map.fromList
+      [ ("isResponsive", pingResponsiveProp)
+      ]
   }
 
 type ActorId = Int
@@ -30,7 +39,9 @@ data PingMessage =
   deriving stock (Eq, Show)
 
 updatePingState :: PingMessage -> PingState -> PingState
-updatePingState = undefined
+updatePingState m s = case m of
+  PingMessagePing from _ reqId -> Map.adjust (Set.insert reqId) from s
+  PingMessagePong _ to reqId -> Map.adjust (Set.delete reqId) to s
 
 type PingWorld = SAS PingState PingMessage
 
