@@ -118,9 +118,36 @@ data Prop =
 
 Substitution on these proposition expressions is defined in the normal way.
 
+We also offer a number of combinators such as:
+
+```
+-- | A prop that holds at every timestep. If it is ever false, the prop is false.
+propAlways :: Prop -> Prop
+propAlways = PropRelease PropFalse
+
+-- | A prop that will hold at some timestep. If it is ever true, the prop is true.
+propEventually :: Prop -> Prop
+propEventually = PropUntil PropTrue
+
+-- | Propositional implication: r1 -> r2
+propIf :: Prop -> Prop -> Prop
+propIf = PropOr . PropNot
+```
+
+Propositions are defined [here](https://github.com/ejconlon/ltlspec/blob/master/src/Ltlspec.hs).
+
 ## Example domains
 
-We have two example domains of actor-based systems: a Chat system and the Dining Philosophers problem.
+We have three example domains of actor-based systems: a ping example, a Chat system, and the Dining Philosophers problem.
+
+In all examples we define either a type of messages observed to be exchanged between actors or a type of actions or events that may include exchanged messages. We then define a unique state type that will be used in the quantification of data varables and evaluation of atomic propositions in the domain's Bridge for its Theory. Depending on the complexity of the theory, we can define a world for the theory as the most recently seen action (message/event), pairs of `(action, new state)`, or triples of `(old state, action, new state)` With a simple update function from `action -> state -> state` we can scan lists of actions to lists of aforementioned triples (see `SAS` and `scanSAS` [here](https://github.com/ejconlon/ltlspec/blob/master/src/Ltlspec.hs)).
+
+### Ping example
+
+This example consists of actors sending "ping" messages to each other, expecting "pong" responses. The theory states that eventually all pings get pongs.
+
+The system is modeled [here](https://github.com/ejconlon/ltlspec/blob/master/src/Ltlspec/Models/Ping.hs).
+The theory for this system is `pingTheory` and a generated trace can be found in `pingMessagesOk`.
 
 ### Chat system
 
@@ -132,6 +159,9 @@ We model a Chat system with a single server and multiple clients. Clients initia
 4. Leave the channel
 
 The server sends acknowledgements and responses to these operations and forwards chat messages to all other members of the system.
+
+The system is modeled [here](https://github.com/ejconlon/ltlspec/blob/master/src/Ltlspec/Models/Chat.hs).
+The theory for this system is `chatTheory` and a generated trace can be found in `systemTrace`.
 
 ### Dining Philosophers
 
