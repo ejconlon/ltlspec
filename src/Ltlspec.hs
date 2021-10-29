@@ -283,3 +283,19 @@ propAtoms = execWriter . foldUpM go where
 --         in case r of
 --           PropResNext p' -> go i' p' ys
 --           _ -> (i', r)
+
+-- | A (state, action, state) triple - used for defining worlds.
+data SAS s a = SAS
+  { sasBefore :: !s
+  , sasAction :: !a
+  , sasAfter :: !s
+  } deriving stock (Eq, Show)
+
+-- | Scan a list of actions into a list of SAS
+scanSAS :: (a -> s -> s) -> s -> [a] -> [SAS s a]
+scanSAS update initState actions = result where
+  result = case actions  of
+    [] -> []
+    a:as -> scanr go (initWorld a) as
+  initWorld a = SAS initState a (update a initState)
+  go a (SAS _ _ after) = SAS after a (update a after)

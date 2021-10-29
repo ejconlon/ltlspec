@@ -244,8 +244,6 @@ dhaction3 = [
 dhtrace3 :: [World]
 dhtrace3 = genTrace dhaction3 dhworld3
 
-p = (propEventually (propIf (PropAtom (Atom "isThinking" ["h"])) (PropAtom (Atom "isEating" ["h"]))))
-
 -- Domain Theory
 dinningHakkerTheory :: Theory
 dinningHakkerTheory = Theory
@@ -262,10 +260,10 @@ dinningHakkerTheory = Theory
                             -- forall h: Hakker. isThinking(h) -> F[isEating(h)]
                             ("Liveness",
                                 propAlways
-                                    (PropForAll (Binder "h" "HakkerId") 
-                                                (propIf 
-                                                    (PropAtom (Atom "isThinking" ["h"])) 
-                                                    (propEventually 
+                                    (PropForAll (Binder "h" "HakkerId")
+                                                (propIf
+                                                    (PropAtom (Atom "isThinking" ["h"]))
+                                                    (propEventually
                                                         (PropAtom (Atom "isEating" ["h"]))))
                                     )
                             )
