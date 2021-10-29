@@ -2,7 +2,14 @@ module Ltlspec.Models.DinningHakker where
 
 import qualified Data.Map.Strict as M
 import Data.Sequence as S (Seq (..), empty)
-import Ltlspec (Theory (..), propAlways, Prop (PropForAll, PropAnd, PropAtom), propEventually, propIf, Atom(..), Binder(..))
+import Ltlspec (
+      Theory (..)
+    , Prop (..)
+    , Atom(..)
+    , Binder(..)
+    , propAlways
+    , propEventually
+    , propIf)
 
 type TimeStamp = Int
 
