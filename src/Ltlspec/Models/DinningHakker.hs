@@ -46,50 +46,50 @@ instance Message HakkerMsg
 instance Message ChopstickMsg
 
 data Hakker = Hakker
-                { hid :: HakkerId
-                -- in-transit messages sent by Hakker
-                -- to simulate network delay
-                -- NOTE: not used for now
-                , hkSends :: Seq HakkerMsg
-                -- Hakker's message queue
-                , hkRecvs :: Seq ChopstickMsg
-                , hkState :: HakkerState
-                , lchop :: ChopstickId
-                , rchop :: ChopstickId
-                , lhold :: Bool
-                , rhold :: Bool
-                } deriving stock (Eq, Show)
+  { hid :: HakkerId
+  -- in-transit messages sent by Hakker
+  -- to simulate network delay
+  -- NOTE: not used for now
+  , hkSends :: Seq HakkerMsg
+  -- Hakker's message queue
+  , hkRecvs :: Seq ChopstickMsg
+  , hkState :: HakkerState
+  , lchop :: ChopstickId
+  , rchop :: ChopstickId
+  , lhold :: Bool
+  , rhold :: Bool
+  } deriving stock (Eq, Show)
 
 defaultHakker :: Hakker
 defaultHakker = Hakker
-                  { hid = "DEFAULT"
-                  , hkSends = S.empty
-                  , hkRecvs = S.empty
-                  , hkState = Thinking
-                  , lchop = -1
-                  , rchop = -1
-                  , lhold = False
-                  , rhold = False
-                  }
+  { hid = "DEFAULT"
+  , hkSends = S.empty
+  , hkRecvs = S.empty
+  , hkState = Thinking
+  , lchop = -1
+  , rchop = -1
+  , lhold = False
+  , rhold = False
+  }
 
 data Chopstick = Chopstick
-                   { cid :: ChopstickId
-                   -- in-transit messages sent by Chopstick
-                   -- to simulate network delay
-                   -- NOTE: not used for now
-                   , chopSends :: S.Seq ChopstickMsg
-                   -- Chopstick's message queue
-                   , chopRecvs :: S.Seq HakkerMsg
-                   , chopState :: ChopstickState
-                   } deriving stock (Eq, Show)
+  { cid :: ChopstickId
+  -- in-transit messages sent by Chopstick
+  -- to simulate network delay
+  -- NOTE: not used for now
+  , chopSends :: S.Seq ChopstickMsg
+  -- Chopstick's message queue
+  , chopRecvs :: S.Seq HakkerMsg
+  , chopState :: ChopstickState
+  } deriving stock (Eq, Show)
 
 defaultChopstick :: Chopstick
 defaultChopstick = Chopstick
-                     { cid = -1
-                     , chopSends = S.empty
-                     , chopRecvs = S.empty
-                     , chopState = Free
-                     }
+  { cid = -1
+  , chopSends = S.empty
+  , chopRecvs = S.empty
+  , chopState = Free
+  }
 
 type Hakkers = M.Map HakkerId Hakker
 
@@ -161,7 +161,7 @@ stepPerfect (HakkerThink h) w@(World ts ms (GlobalState hs cs)) =
       gs' = GlobalState hs' cs''
       in
       World (ts+1) (Left rightMsg : Left leftMsg : ms) gs'
-      _ -> tick w
+    _ -> tick w
 -- If Hakker is Thinking, send Take messages to both sides, and transfer to Hungry
 -- Otherwise do nothing
 stepPerfect (HakkerHungry h) w@(World ts ms (GlobalState hs cs)) =
@@ -251,40 +251,40 @@ dhtrace3 = genTrace dhaction3 dhworld3
 -- Domain Theory
 dinningHakkerTheory :: Theory
 dinningHakkerTheory = Theory
-                        { theoryTypes = ["HakkerId", "ChopstickId", "TimeStamp", "HakkerMsg", "ChopstickMsg"]
-                        , theoryProps = M.fromList [
-                            ("isThinking",["HakkerId"])
-                          , ("isHungry",["HakkerId"])
-                          , ("isEating",["HakkerId"])
-                          -- A message that has been received but not yet delivered by a chopstick
-                          -- i.e., the message is currently in the chopRecvs Seq
-                          , ("receivedNotDelivered", ["ChopstickId, HakkerMsg"])
-                          , ("fromAdjacent", ["ChopstickId, HakkerMsg"])
-                        ]
-                        , theoryAxioms = M.fromList [
-                          -- checking liveness properties for all hakkers
-                          -- All hakkers will start from thinking, and should eventually start eating
-                          -- Because the Eating state is mutually exclusive for adjacent Hakkers
-                          -- forall h: Hakker. isThinking(h) -> F[isEating(h)]
-                          ("Liveness",
-                            propAlways
-                              (PropForAll
-                                (Binder "h" "HakkerId")
-                                (propIf
-                                  (propAtom "isThinking" ["h"])
-                                  (propEventually
-                                    (propAtom "isEating" ["h"]))
-                                )
-                              )
-                          ),
-                          ("ReceiveFromAdjacentHakkers",
-                            propAlways
-                              (propForAllNested [("c", "ChopstickId"), ("hm", "HakkerMsg")]
-                                (propIf
-                                  (propAtom "receivedNotDeliverd" ["c", "hm"])
-                                  (propAtom "fromAdjacent" ["c", "hm"])
-                                )
-                              )
-                          )
-                        ]
-                        }
+  { theoryTypes = ["HakkerId", "ChopstickId", "TimeStamp", "HakkerMsg", "ChopstickMsg"]
+  , theoryProps = M.fromList [
+      ("isThinking",["HakkerId"])
+    , ("isHungry",["HakkerId"])
+    , ("isEating",["HakkerId"])
+    -- A message that has been received but not yet delivered by a chopstick
+    -- i.e., the message is currently in the chopRecvs Seq
+    , ("receivedNotDelivered", ["ChopstickId, HakkerMsg"])
+    , ("fromAdjacent", ["ChopstickId, HakkerMsg"])
+  ]
+  , theoryAxioms = M.fromList [
+    -- checking liveness properties for all hakkers
+    -- All hakkers will start from thinking, and should eventually start eating
+    -- Because the Eating state is mutually exclusive for adjacent Hakkers
+    -- forall h: Hakker. isThinking(h) -> F[isEating(h)]
+    ("Liveness",
+      propAlways
+        (PropForAll
+          (Binder "h" "HakkerId")
+          (propIf
+            (propAtom "isThinking" ["h"])
+            (propEventually
+              (propAtom "isEating" ["h"]))
+          )
+        )
+    ),
+    ("ReceiveFromAdjacentHakkers",
+      propAlways
+        (propForAllNested [("c", "ChopstickId"), ("hm", "HakkerMsg")]
+          (propIf
+            (propAtom "receivedNotDeliverd" ["c", "hm"])
+            (propAtom "fromAdjacent" ["c", "hm"])
+          )
+        )
+    )
+  ]
+  }
