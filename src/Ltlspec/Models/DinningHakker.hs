@@ -111,21 +111,11 @@ initWorld :: GlobalState -> World
 initWorld gs = World 0 [] gs
 
 data Action =
-      -- If the Hakker is Eating, send Put messages to both sides, and transfer to Thinking
-      -- Otherwise do nothing.
       -- NOTE: if later we want to simulate delayed network, Hakker should also wait for confirm message from chopsticks
       HakkerThink HakkerId
-      -- If Hakker is Thinking, send Take messages to both sides, and transfer to Hungry
-      -- Otherwise do nothing
     | HakkerHungry HakkerId
-      -- If Hakker is Hungry, check messages received from both sides.
-      -- If haven't received messages from both side, stay Hungry
-      -- If any message is Busy, stay Hungry
-      -- If both sides of the messages are Grant, start Eating
-      -- If Hakker is in other states, do nothing
       -- NOTE: A different implementation would be transfer back to Thinking is any message is Busy
     | HakkerEat HakkerId
-      -- Deliver a message from chopRecvs, and respond accordingly
     | ChopstickResp ChopstickId
     deriving stock (Eq, Show)
 
@@ -141,6 +131,8 @@ hakkerReceive hakker@Hakker{hkRecvs=recvs} msg = hakker {hkRecvs = msg :<| recvs
 -- the Chopstick will not process the Hakker's Take message.
 -- NOTE: i.e., the Busy message is not used in this simulation function
 stepPerfect :: Action -> World -> World
+-- If the Hakker is Eating, send Put messages to both sides, and transfer to Thinking
+-- Otherwise do nothing.
 stepPerfect (HakkerThink h) (World ts ms gs@(GlobalState hs cs)) =
     let hk = hs M.! h in
     case hkState hk of
@@ -159,6 +151,8 @@ stepPerfect (HakkerThink h) (World ts ms gs@(GlobalState hs cs)) =
             in
             World (ts+1) (Left rightMsg : Left leftMsg : ms) gs'
         _ -> World (ts+1) ms gs
+-- If Hakker is Thinking, send Take messages to both sides, and transfer to Hungry
+-- Otherwise do nothing
 stepPerfect (HakkerHungry h) (World ts ms gs@(GlobalState hs cs)) =
     let hk = hs M.! h in
     case hkState hk of
@@ -177,6 +171,11 @@ stepPerfect (HakkerHungry h) (World ts ms gs@(GlobalState hs cs)) =
             in
             World (ts+1) (Left rightMsg : Left leftMsg : ms) gs'
         _ -> World (ts+1) ms gs
+-- If Hakker is Hungry, check messages received from both sides.
+-- If haven't received messages from both side, stay Hungry
+-- If any message is Busy, stay Hungry
+-- If both sides of the messages are Grant, start Eating
+-- If Hakker is in other states, do nothing
 stepPerfect (HakkerEat h) (World ts ms gs@(GlobalState hs cs)) =
     let hk = hs M.! h in
     case hkState hk of
@@ -188,6 +187,7 @@ stepPerfect (HakkerEat h) (World ts ms gs@(GlobalState hs cs)) =
                 World (ts+1) ms (GlobalState hs' cs)
             _ -> World (ts+1) ms gs
         _ -> World (ts+1) ms gs
+-- Deliver a message from chopRecvs, and respond accordingly
 stepPerfect (ChopstickResp c) (World ts ms gs@(GlobalState hs cs)) =
     let chop = cs M.! c in
     case chopState chop of
@@ -211,10 +211,28 @@ stepPerfect (ChopstickResp c) (World ts ms gs@(GlobalState hs cs)) =
                 World (ts+1) ms (GlobalState hs cs')
             _ -> World (ts+1) ms gs
 
--- The second field (the message list) of World will be reversed to recover the chronological order
 genTrace :: [Action] -> World -> [World]
-genTrace = undefined
+genTrace [] w = [w]
+genTrace (a : as) w =
+    let nextw = stepPerfect a w
+    in w : genTrace as nextw
 
+world3 :: World
+world3 = initWorld $ initState ["Ghosh", "Boner", "Klang"]
+
+action3 :: [Action]
+action3 = [
+    HakkerHungry "Ghosh",
+    HakkerHungry "Boner",
+    HakkerHungry "Klang",
+    ChopstickResp 0,
+    ChopstickResp 1,
+    ChopstickResp 2,
+    HakkerEat "Ghosh"
+    ]
+
+trace3 :: [World]
+trace3 = genTrace action3 world3
 
 -- Domain Theory
 dinningHakkerTheory :: Theory
