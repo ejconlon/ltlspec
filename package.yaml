@@ -25,12 +25,12 @@ dependencies:
 - unordered-containers
 # test deps - these are here to make HLS work better
 # TODO move back out to test package
-- hedgehog
+# - hedgehog
 - tasty
-- tasty-hedgehog
+# - tasty-hedgehog
 - tasty-hunit
-- unliftio
-- unliftio-core
+# - unliftio
+# - unliftio-core
 
 default-extensions:
 - BangPatterns

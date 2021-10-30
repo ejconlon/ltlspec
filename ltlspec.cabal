@@ -68,15 +68,11 @@ library
     , containers
     , deepseq
     , hashable
-    , hedgehog
     , mtl
     , random
     , recursion-schemes
     , tasty
-    , tasty-hedgehog
     , tasty-hunit
-    , unliftio
-    , unliftio-core
     , unordered-containers
   default-language: Haskell2010
 
@@ -120,16 +116,12 @@ executable ltlspec-exe
     , containers
     , deepseq
     , hashable
-    , hedgehog
     , ltlspec
     , mtl
     , random
     , recursion-schemes
     , tasty
-    , tasty-hedgehog
     , tasty-hunit
-    , unliftio
-    , unliftio-core
     , unordered-containers
   default-language: Haskell2010
 
@@ -175,16 +167,12 @@ test-suite ltlspec-doctest
     , deepseq
     , doctest
     , hashable
-    , hedgehog
     , ltlspec
     , mtl
     , random
     , recursion-schemes
     , tasty
-    , tasty-hedgehog
     , tasty-hunit
-    , unliftio
-    , unliftio-core
     , unordered-containers
   default-language: Haskell2010
 
@@ -229,15 +217,11 @@ test-suite ltlspec-test
     , containers
     , deepseq
     , hashable
-    , hedgehog
     , ltlspec
     , mtl
     , random
     , recursion-schemes
     , tasty
-    , tasty-hedgehog
     , tasty-hunit
-    , unliftio
-    , unliftio-core
     , unordered-containers
   default-language: Haskell2010
