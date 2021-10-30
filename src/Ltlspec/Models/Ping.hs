@@ -6,12 +6,16 @@ import Data.Set (Set)
 import qualified Data.Set as Set
 import Ltlspec (Theory(..), SAS, scanSAS, Prop (..), propAlways, propForAllNested, propIf, Atom (..), propEventually, Binder (..))
 
+-- | A proposition encoding responsiveness for ping messages.
+-- Textually (but omitting types), this is equivalent to:
+-- Always (Forall x y m. IsMessage x y m -> Eventually (Exists n. IsMessage y x n /\ IsResponse n m))
 pingResponsiveProp :: Prop
 pingResponsiveProp =
-  let isResponse = PropAnd (PropAtom (Atom "IsMesssage" ["y", "x", "n"])) (PropAtom (Atom "IsResponse" ["n", "m"]))
+  let prop = propAlways (propForAllNested [("x", "ActorId"), ("y", "ActorId"), ("m", "MessageId")] ifMessageEventuallyResponse)
+      ifMessageEventuallyResponse = propIf (PropAtom (Atom "IsMessage" ["x", "y", "m"])) eventuallyIsResponse
       eventuallyIsResponse = propEventually (PropExists (Binder "n" "MessageId") isResponse)
-      body = propIf (PropAtom (Atom "IsMessage" ["x", "y", "m"])) eventuallyIsResponse
-  in propAlways (propForAllNested [("x", "ActorId"), ("y", "ActorId"), ("m", "MessageId")] body)
+      isResponse = PropAnd (PropAtom (Atom "IsMesssage" ["y", "x", "n"])) (PropAtom (Atom "IsResponse" ["n", "m"]))
+  in prop
 
 pingTheory :: Theory
 pingTheory = Theory
@@ -39,12 +43,13 @@ data PingMessage =
   deriving stock (Eq, Show)
 
 updatePingState :: PingMessage -> PingState -> PingState
-updatePingState m s = case m of
-  PingMessagePing from _ reqId -> Map.adjust (Set.insert reqId) from s
-  PingMessagePong _ to reqId -> Map.adjust (Set.delete reqId) to s
+updatePingState = \case
+  PingMessagePing from _ reqId -> Map.adjust (Set.insert reqId) from
+  PingMessagePong _ to reqId -> Map.adjust (Set.delete reqId) to
 
 type PingWorld = SAS PingState PingMessage
 
+-- | A trace of a sequence of messages that demonstrate responsiveness.
 pingMessagesOk :: [PingMessage]
 pingMessagesOk =
   [ PingMessagePing 0 1 42
@@ -53,5 +58,6 @@ pingMessagesOk =
   , PingMessagePong 0 1 43
   ]
 
+-- | A trace of worlds corresponding to the sequence of messages.
 pingWorldOk :: [PingWorld]
 pingWorldOk = scanSAS updatePingState emptyPingState pingMessagesOk
