@@ -14,6 +14,10 @@ These were our deliverables from the proposal
     * We will document some interesting scenarios that one would encounter when trying to verify these propositions.
     * We will generate some synthetic logs that will demonstrate the occurrence of some of these scenarios. The code to generate these logs will be in our test suite, as the logs will serve as test input.
 
+### Evaluation
+
+These delierables will be explained below. Some represent code that exists in this repository. See `README.md` for instructions on building and running (tldr: install the `stack` build tool and run `make test`). Some parts (like the traces) are declared as values in the code and don't themselves have meaningful output, but they can be inspected on the REPL `make ghci`. They will eventually be used in our test suite.
+
 ## Theory language
 
 We offer two views on syntax for expressing a Theory, one textual for presentation and the other as an internal Haskell datatype for processing.
