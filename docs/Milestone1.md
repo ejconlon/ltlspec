@@ -63,7 +63,7 @@ isResponsive :
 
 The second presentation can be found as a set of type definitions in our codebase:
 
-```
+```haskell
 type PropName = String
 type TyName = String
 type AxiomName = String
@@ -81,7 +81,7 @@ data Theory = Theory
 
 Propositions are defined as follows:
 
-```
+```haskell
 type VarName = String
 
 data Atom = Atom !PropName ![VarName]
@@ -127,7 +127,7 @@ Substitution on these proposition expressions is defined in the normal way.
 
 We also offer a number of combinators such as:
 
-```
+```haskell
 -- | A prop that holds at every timestep. If it is ever false, the prop is false.
 propAlways :: Prop -> Prop
 propAlways = PropRelease PropFalse
