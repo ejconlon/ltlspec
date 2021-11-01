@@ -176,5 +176,5 @@ The theory for this system is `chatTheory` and a generated trace can be found in
 
 We model the Dining Philosophers problem with actors for each philosopher and chopstick.
 
-The system is modeled [here](https://github.com/ejconlon/ltlspec/blob/master/src/Ltlspec/Models/DiningHakker.hs).
+The system is modeled [here](https://github.com/ejconlon/ltlspec/blob/master/src/Ltlspec/Models/DinningHakker.hs).
 The theory for this system is `dinningHakkerTheory` and a generated trace can be found in `dhtrace3`.
