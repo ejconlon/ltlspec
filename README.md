@@ -19,7 +19,3 @@ VS Code has a great [plugin](https://marketplace.visualstudio.com/items?itemName
 The `Makefile` has useful targets - `make build`, `make test`, and `make docs` are the main ones.
 
 If you want more utilities for linting and formatting, run `make deps`. Then you can run `make lint` or `make format`.
-
-## Documentation
-
-All LaTeX files are in `docs`. `make gendocs` will run `pdflatex` on them and put the results in `gendocs`.

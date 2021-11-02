@@ -9,7 +9,7 @@ parameters:
     default: "v3"
   haskell_image:
     type: string
-    default: "ejconlon/haskell-custom"
+    default: "haskell"
 
 commands:
   install_native_deps:
