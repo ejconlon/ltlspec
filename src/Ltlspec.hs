@@ -7,10 +7,10 @@ module Ltlspec where
 
 import Control.DeepSeq (NFData)
 import Control.Monad.Writer.Strict (execWriter, tell)
-import Data.Map.Strict (Map)
 import Data.Functor.Foldable (embed, fold, project)
 import Data.Functor.Foldable.TH (makeBaseFunctor)
 import Data.Hashable (Hashable)
+import Data.Map.Strict (Map)
 import Data.Semigroup (Max (..), Sum (..))
 import GHC.Generics (Generic)
 import Ltlspec.Recursion (foldUpM)

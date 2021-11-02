@@ -2,15 +2,7 @@ module Ltlspec.Models.DinningHakker where
 
 import qualified Data.Map.Strict as M
 import Data.Sequence as S (Seq (..), empty)
-import Ltlspec (
-    Theory (..)
-  , Prop (..)
-  , Binder(..)
-  , propAtom
-  , propAlways
-  , propEventually
-  , propIf
-  , propForAllNested)
+import Ltlspec (Binder (..), Prop (..), Theory (..), propAlways, propAtom, propEventually, propForAllNested, propIf)
 
 type TimeStamp = Int
 
@@ -116,7 +108,7 @@ initState hs = GlobalState hakkers chopsticks
     hakkers = foldl (\m (i, h) -> M.insert h defaultHakker{hakkerId=h, lchop=i, rchop=(i-1) `mod` l} m) M.empty (zip idx hs)
 
 initWorld :: GlobalState -> World
-initWorld gs = World 0 [] gs
+initWorld = World 0 []
 
 data Action =
     -- NOTE: if later we want to simulate delayed network, Hakker should also wait for confirm message from chopsticks
@@ -205,7 +197,7 @@ stepPerfect (ChopstickResp c) w@(World ts ms (GlobalState hs cs)) =
     Free -> case chopRecvs chop of
       msgs :|> Take hid _ -> let
         hk = hs M.! hid
-        msg = (Grant c hid)
+        msg = Grant c hid
         hk' = hakkerReceive hk msg
         hs' = M.insert hid hk' hs
         cs' = M.insert c (chop {chopRecvs=msgs, chopState=Taken}) cs

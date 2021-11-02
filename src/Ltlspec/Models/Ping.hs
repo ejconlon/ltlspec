@@ -4,7 +4,8 @@ import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as Map
 import Data.Set (Set)
 import qualified Data.Set as Set
-import Ltlspec (Theory(..), SAS, scanSAS, Prop (..), propAlways, propForAllNested, propIf, Atom (..), propEventually, Binder (..))
+import Ltlspec (Atom (..), Binder (..), Prop (..), SAS, Theory (..), propAlways, propEventually, propForAllNested,
+                propIf, scanSAS)
 
 -- | A proposition encoding responsiveness for ping messages.
 -- Textually (but omitting types), this is equivalent to:
