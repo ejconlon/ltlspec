@@ -166,6 +166,7 @@ randomGen = mkStdGen 137
 getRandomElementOfList :: [a] -> StdGen -> a
 getRandomElementOfList l gen = let randomIndex = fst (randomR (0, length l - 1) gen) in l !! randomIndex
 
+-- TODO(tarcisio) Decompose to two functions, ChatState -> StdGen -> (ChatMessage, StdGen), and ChatMessage -> ChatState -> ChatState
 step :: (SystemState, StdGen) -> ActionRep -> (SystemState, StdGen)
 step ((trace, seed), gen) actionname =
     let
@@ -246,5 +247,8 @@ singleActionTraceGenerator niterations nclients action =  step (singleActionTrac
 getTrace :: SystemState -> SystemTrace
 getTrace (st, _) = st
 
+-- TODO(tarcisio) Emit list of ChatWorld = SAS ChatMessage ChatState
 sampleTrace :: SystemTrace
 sampleTrace = getTrace (fst (randomTraceGenerator 5 3) )
+
+-- TODO(tarcisio) Implement bridge for this theory with unit tests

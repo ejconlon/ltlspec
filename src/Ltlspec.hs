@@ -1,3 +1,4 @@
+{-# LANGUAGE FunctionalDependencies #-}
 {-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE TypeFamilies #-}
@@ -15,6 +16,8 @@ import Data.Semigroup (Max (..), Sum (..))
 import GHC.Generics (Generic)
 import Ltlspec.Recursion (foldUpM)
 
+type Error = String
+
 type PropName = String
 type TyName = String
 type AxiomName = String
@@ -31,9 +34,11 @@ data Theory = Theory
 
 type VarName = String
 
-data Atom = Atom !PropName ![VarName]
-  deriving stock (Eq, Show, Generic)
+data Atom v = Atom !PropName ![v]
+  deriving stock (Eq, Show, Generic, Functor, Foldable, Traversable)
   deriving anyclass (Hashable, NFData)
+
+type AtomVar = Atom VarName
 
 data Binder = Binder !VarName !TyName
   deriving stock (Eq, Show, Generic)
@@ -42,7 +47,7 @@ data Binder = Binder !VarName !TyName
 -- | An LTL proposition with first-order data quantification.
 -- This selection of operators corresponds to "Release Positive Normal Form"
 data Prop =
-    PropAtom !Atom
+    PropAtom !AtomVar
   -- ^ An atomic prop - use this to embed predicates from your domain
   | PropTrue
   -- ^ The constrant True
@@ -185,11 +190,34 @@ propDepth = getMax . fold ((Max 1 <>) . sum)
 -- >>> propAtoms (PropUntil (PropAtom (Atom "a" [])) (PropAtom (Atom "b" [])))
 -- [Atom "a" [],Atom "b" []]
 --
-propAtoms :: Prop -> [Atom]
+propAtoms :: Prop -> [AtomVar]
 propAtoms = execWriter . foldUpM go where
   go = \case
     PropAtomF a -> tell [a]
     _ -> pure ()
+
+-- | A 'Bridge' is something that can eval props and quantify in a given world.
+-- `w` is world type, `e` is error type, `v` is value type.
+-- Typeclass-wise we associate instances with the world type. `w -> e v` means
+-- the world type determines the others.
+class Bridge e v w | w -> e v where
+  -- | Evaluate the atomic proposition or fail.
+  bridgeEvalProp :: w -> Atom v -> Either e Prop
+  -- | Quantify over all values of the given type or fail.
+  bridgeQuantify :: w -> TyName -> Either e [v]
+
+-- | Variables bound during prop eval
+type Env v = [(VarName, v)]
+
+-- | Just a named tuple of environment and prop
+data EnvProp v = EnvProp
+  { epEnv :: !(Env v)
+  , epProp :: !Prop
+  } deriving stock (Eq, Show)
+
+-- TODO(yanze) implement this, and later come up with propFold and resurrect unit tests!
+envPropEval :: Bridge e v w => w -> EnvProp v -> Either e [EnvProp v]
+envPropEval = undefined
 
 -- -- | When we evaluate a proposition at a certain time step, we either
 -- -- satisfy it, falsify it, or are left with another prop to evaluate
