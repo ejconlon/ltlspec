@@ -215,9 +215,46 @@ data EnvProp v = EnvProp
   , epProp :: !Prop
   } deriving stock (Eq, Show)
 
+data EnvPropGood v =
+    EnvPropGoodBool !Bool
+  | EnvPropGoodNext !(EnvProp v)
+  deriving stock (Eq, Show)
+
+data EnvPropBad e =
+    EnvPropBadErr !e
+  | EnvPropBadMissing !VarName
+  deriving stock (Eq, Show)
+
+type EnvPropRes e v = Either (EnvPropBad e) (EnvPropGood v)
+
+lookupEnv :: Env v -> Atom VarName -> Either VarName (Atom v)
+lookupEnv = undefined
+
+sequenceRes :: [EnvPropRes e v] -> Either (EnvPropBad e) [EnvPropGood v]
+sequenceRes = undefined
+
 -- TODO(yanze) implement this, and later come up with propFold and resurrect unit tests!
-envPropEval :: Bridge e v w => w -> EnvProp v -> Either e [EnvProp v]
-envPropEval = undefined
+envPropEval :: Bridge e v w => w -> EnvProp v -> EnvPropRes e v
+envPropEval world (EnvProp env0 prop0) = go env0 prop0 where
+  go env prop =
+    case prop of
+      PropAtom atomVar ->
+        case lookupEnv env atomVar of
+          Left varName -> Left (EnvPropBadMissing varName)
+          Right atomVal ->
+            case bridgeEvalProp world atomVal of
+              Left err -> Left (EnvPropBadErr err)
+              Right anotherProp -> go env anotherProp
+      PropTrue -> Right (EnvPropGoodBool True)
+      PropForAll (Binder varName tyName) bodyProp ->
+        case bridgeQuantify world tyName of
+          Left err -> Left (EnvPropBadErr err)
+          Right vals ->
+            let results = fmap (\val -> go ((varName,val):env) bodyProp) vals
+            in case sequenceRes results of
+              Left bad -> Left bad
+              Right _ -> error "TODO"
+      _ -> error "TODO"
 
 -- -- | When we evaluate a proposition at a certain time step, we either
 -- -- satisfy it, falsify it, or are left with another prop to evaluate
