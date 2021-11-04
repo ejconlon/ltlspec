@@ -246,6 +246,7 @@ envPropEval (EnvProp env0 prop0) world = go env0 prop0 where
               Left err -> Left (EnvPropBadErr err)
               Right anotherProp -> go env anotherProp
       PropTrue -> Right (EnvPropGoodBool True)
+      PropFalse -> Right (EnvPropGoodBool False)
       PropForAll (Binder varName tyName) bodyProp ->
         case bridgeQuantify world tyName of
           Left err -> Left (EnvPropBadErr err)

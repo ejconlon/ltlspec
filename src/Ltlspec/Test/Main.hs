@@ -1,8 +1,10 @@
 module Ltlspec.Test.Main (main) where
 
 import qualified Data.Map.Strict as Map
-import Ltlspec (Atom (..), Binder (..), Bridge (..), Prop (..), Theory (..), VarName, propForAllNested, propIf,
-                propIfNested)
+import Ltlspec (Atom (..), Bridge (..), EnvProp (..), EnvPropBad (..), EnvPropGood (..), EnvPropRes, Prop (..),
+                Theory (..), VarName, envPropFold, propForAllNested, propIf, propIfNested)
+import Test.Tasty (TestTree, defaultMain, testGroup)
+import Test.Tasty.HUnit (testCase, (@?=))
 
 -- import Data.Foldable (toList)
 -- import Data.Hashable (Hashable)
@@ -164,6 +166,30 @@ instance Eq v => Bridge EqErr (EqValue v) (EqWorld v) where
       "Value" -> Right eqvs
       _ -> Left (EqErr "Bad type")
 
+data EqCase v = EqCase
+  { eqCaseName :: !String
+  , eqCaseWorlds :: ![EqWorld v]
+  , eqCaseProp :: !Prop
+  , eqCaseSteps :: !Int
+  , eqCaseRes :: !(EnvPropRes EqErr (EqValue v))
+  } deriving stock (Eq, Show)
+
+testEqCase :: (Eq v, Show v) => EqCase v -> TestTree
+testEqCase (EqCase name worlds prop expectedSteps expectedRes) = testCase name $ do
+  let actualPair = envPropFold (EnvProp [] prop) worlds
+  actualPair @?= (expectedSteps, expectedRes)
+
+eqCases :: [EqCase Char]
+eqCases =
+  [ EqCase "null false" [] PropFalse 0 (Right (EnvPropGoodNext (EnvProp [] PropFalse)))
+  , EqCase "null true" [] PropTrue 0 (Right (EnvPropGoodNext (EnvProp [] PropTrue)))
+  , EqCase "empty false" [EqWorld []] PropFalse 1 (Right (EnvPropGoodBool False))
+  , EqCase "empty true" [EqWorld []] PropTrue 1 (Right (EnvPropGoodBool True))
+  ]
+
+testEqCases :: TestTree
+testEqCases = testGroup "Eq cases" (fmap testEqCase eqCases)
+
 -- testEventually :: TestTree
 -- testEventually = testCase "eventually" $ do
 --   let prop = propEventually (PropAtom (OrdPred CompEQ 'e'))
@@ -182,4 +208,4 @@ instance Eq v => Bridge EqErr (EqValue v) (EqWorld v) where
 -- testProp = testGroup "Prop" [testEventually, testAlways]
 
 main :: IO ()
-main = pure () -- defaultMain (testGroup "Ltlspec" [testProp])
+main = defaultMain (testGroup "Ltlspec" [testEqCases])
