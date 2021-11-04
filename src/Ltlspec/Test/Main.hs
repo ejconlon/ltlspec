@@ -1,5 +1,9 @@
 module Ltlspec.Test.Main (main) where
 
+import qualified Data.Map.Strict as Map
+import Ltlspec (Atom (..), Binder (..), Bridge (..), Prop (..), Theory (..), VarName, propForAllNested, propIf,
+                propIfNested)
+
 -- import Data.Foldable (toList)
 -- import Data.Hashable (Hashable)
 -- import GHC.Generics (Generic)
@@ -103,6 +107,62 @@ module Ltlspec.Test.Main (main) where
 
 -- ordPredPropFold :: Ord a => OrdPredProp a -> [a] -> (Int, OrdPredPropRes a)
 -- ordPredPropFold = propFold ordPredEval
+
+eqForAll :: [VarName] -> Prop -> Prop
+eqForAll = propForAllNested . fmap (, "Value")
+
+eqProp :: VarName -> VarName -> Prop
+eqProp x y = PropAtom (Atom "IsEq" [x, y])
+
+eqAxReflexive, eqAxTransitive, eqAxSymmetric :: Prop
+eqAxReflexive = eqForAll ["x"] (eqProp "x" "x")
+eqAxTransitive = eqForAll ["x", "y", "z"] (propIfNested [eqProp "x" "y", eqProp "y" "z"] (eqProp "x" "z"))
+eqAxSymmetric = eqForAll ["x", "y"] (propIf (eqProp "x" "y") (eqProp "y" "x"))
+
+-- A theory of total order over some type
+orderTheory :: Theory
+orderTheory = Theory
+  { theoryTypes = ["Value"]
+  , theoryProps = Map.fromList
+      [ ("IsEq", ["Value", "Value"])
+      ]
+  , theoryAxioms = Map.fromList
+      [ ("Reflexive", eqAxReflexive)
+      , ("Transitive", eqAxTransitive)
+      , ("Symmetric", eqAxSymmetric)
+      ]
+  }
+
+newtype EqErr = EqErr { unEqErr :: String }
+  deriving (Eq, Show)
+
+data EqValue v =
+    EqValueNormal v
+  | EqValueNever
+  | EqValueErr !EqErr
+  deriving (Eq, Show)
+
+eqEval :: Eq v => EqValue v -> EqValue v -> Either EqErr Prop
+eqEval a b =
+  case (a, b) of
+    (EqValueNever, _) -> Right PropFalse
+    (_, EqValueNever) -> Right PropFalse
+    (EqValueErr err, _) -> Left err
+    (_, EqValueErr err) -> Left err
+    (EqValueNormal x, EqValueNormal y) -> Right (if x == y then PropTrue else PropFalse)
+
+newtype EqWorld v = EqWorld { unEqWorld :: [EqValue v] }
+  deriving stock (Eq, Show)
+
+instance Eq v => Bridge EqErr (EqValue v) (EqWorld v) where
+  bridgeEvalProp _ (Atom propName vals) =
+    case (propName, vals) of
+      ("IsEq", [v1, v2]) -> eqEval v1 v2
+      _ -> Left (EqErr "Bad prop")
+  bridgeQuantify (EqWorld eqvs) tyName =
+    case tyName of
+      "Value" -> Right eqvs
+      _ -> Left (EqErr "Bad type")
 
 -- testEventually :: TestTree
 -- testEventually = testCase "eventually" $ do

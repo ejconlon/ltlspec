@@ -233,9 +233,9 @@ lookupEnv = undefined
 sequenceRes :: [EnvPropRes e v] -> Either (EnvPropBad e) [EnvPropGood v]
 sequenceRes = undefined
 
--- TODO(yanze) implement this, and later come up with propFold and resurrect unit tests!
-envPropEval :: Bridge e v w => w -> EnvProp v -> EnvPropRes e v
-envPropEval world (EnvProp env0 prop0) = go env0 prop0 where
+-- TODO(yanze) implement this and resurrect unit tests!
+envPropEval :: Bridge e v w => EnvProp v -> w -> EnvPropRes e v
+envPropEval (EnvProp env0 prop0) world = go env0 prop0 where
   go env prop =
     case prop of
       PropAtom atomVar ->
@@ -345,19 +345,19 @@ envPropEval world (EnvProp env0 prop0) = go env0 prop0 where
 --               PropResTrue -> error "TODO"
 --               PropResNext _ -> error "TODO"
 
--- -- | Evaluate the prop at every timestep until true/false or there are no more inputs.
--- -- Also returns the number of timesteps evaluated.
--- propFold :: (a -> p -> Bool) -> Prop p -> [a] -> (Int, PropRes (Prop p))
--- propFold f = go 0 where
---   go i p xs =
---     case xs of
---       [] -> (i, PropResNext p)
---       y:ys ->
---         let i' = i + 1
---             r = propEval (f y) p
---         in case r of
---           PropResNext p' -> go i' p' ys
---           _ -> (i', r)
+-- | Evaluate the prop at every timestep until true/false or there are no more inputs.
+-- Also returns the number of timesteps evaluated.
+envPropFold :: Bridge e v w => EnvProp v -> [w] -> (Int, EnvPropRes e v)
+envPropFold = go 0 where
+  go i p ws =
+    case ws of
+      [] -> (i, Right (EnvPropGoodNext p))
+      w:ws' ->
+        let i' = i + 1
+            r = envPropEval p w
+        in case r of
+          Right (EnvPropGoodNext p') -> go i' p' ws'
+          _ -> (i', r)
 
 -- | A (state, action, state) triple - used for defining worlds.
 data SAS s a = SAS
