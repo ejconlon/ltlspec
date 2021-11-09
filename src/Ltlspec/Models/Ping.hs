@@ -4,8 +4,8 @@ import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as Map
 import Data.Set (Set)
 import qualified Data.Set as Set
-import Ltlspec (Atom (..), Binder (..), Bridge (..), Error, Prop (..), SAS (..), Theory (..), propAlways,
-                propEventually, propForAllNested, propIf, scanSAS)
+import Ltlspec (propAlways, propEventually, propForAllNested, propIf, scanSAS)
+import Ltlspec.Types (Atom (..), Binder (..), Bridge (..), Error, Prop (..), SAS (..), Theory (..))
 
 -- | A proposition encoding responsiveness for ping messages.
 -- Textually (but omitting types), this is equivalent to:
@@ -73,10 +73,10 @@ data PingVal =
 -- TODO(ejconlon) Finish bridge and unit test it
 
 evalIsMessage :: PingState -> ActorId -> ActorId -> MessageId -> Either Error Prop
-evalIsMessage _ _ _ _ = Left "TODO"
+evalIsMessage _ _ _ _ = error "TODO"
 
 evalIsResponse :: PingState -> MessageId -> MessageId -> Either Error Prop
-evalIsResponse _ _ _ = Left "TODO"
+evalIsResponse _ _ _ = error "TODO"
 
 instance Bridge Error PingVal PingWorld where
   bridgeEvalProp (SAS _ _ s) (Atom propName vals) =
@@ -84,4 +84,4 @@ instance Bridge Error PingVal PingWorld where
       ("IsMessage", [PingValActor x, PingValActor y, PingValMessage m]) -> evalIsMessage s x y m
       ("IsResponse", [PingValMessage n, PingValMessage m]) -> evalIsResponse s n m
       _ -> Left ("Could not eval " <> propName <> " on " <> show vals)
-  bridgeQuantify w tyName = undefined
+  bridgeQuantify _ _ = error "TODO"

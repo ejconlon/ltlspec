@@ -6,8 +6,8 @@ import Data.Aeson (ToJSON (..), object, (.=))
 import qualified Data.List as List
 import qualified Data.Map as Map
 import qualified Data.Set as Set
-import Ltlspec (Atom (Atom), Prop (PropAnd, PropAtom, PropNot, PropUntil), Theory (..), propAlways, propAndAll,
-                propEventually, propExistsNested, propForAllNested, propIf)
+import Ltlspec (propAlways, propAndAll, propEventually, propExistsNested, propForAllNested, propIf)
+import Ltlspec.Types (Atom (..), Prop (..), Theory (..))
 import System.Random (StdGen, mkStdGen, randomR)
 
 chatTheory :: Theory

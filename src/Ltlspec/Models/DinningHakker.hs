@@ -2,7 +2,8 @@ module Ltlspec.Models.DinningHakker where
 
 import qualified Data.Map.Strict as M
 import Data.Sequence as S (Seq (..), empty)
-import Ltlspec (Binder (..), Prop (..), Theory (..), propAlways, propAtom, propEventually, propForAllNested, propIf)
+import Ltlspec (propAlways, propAtom, propEventually, propForAllNested, propIf)
+import Ltlspec.Types (Binder (..), Prop (..), Theory (..))
 
 type TimeStamp = Int
 
@@ -221,7 +222,7 @@ genTrace (a : as) w =
   in w : genTrace as nextw
 
 scheduler :: [HakkerId] -> [Action]
-scheduler = undefined
+scheduler = error "TODO"
 
 dhworld3 :: World
 dhworld3 = initWorld $ initState ["Ghosh", "Boner", "Klang"]

@@ -30,6 +30,7 @@ library
       Ltlspec.Models.Ping
       Ltlspec.Recursion
       Ltlspec.Test.Main
+      Ltlspec.Types
   other-modules:
       Paths_ltlspec
   hs-source-dirs:
