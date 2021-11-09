@@ -242,6 +242,10 @@ simulationStep ((trace, seed), gen) =
                         client = getRandomElementOfList (Map.keys state) gen
                     in (list (trace, seed) client, newgen)
 
+-- randomActionGenertor :: Integer -> [ActionRep]
+-- randomActionGenertor 0 = []
+
+
 randomTraceGenerator :: Integer -> Integer -> (SystemState, StdGen)
 randomTraceGenerator 0 nclients = (initialState nclients, randomGen)
 randomTraceGenerator niterations nclients =  simulationStep (randomTraceGenerator (niterations-1) nclients)
@@ -256,3 +260,12 @@ getTrace (st, _) = st
 
 sampleTrace :: SystemTrace
 sampleTrace = getTrace (fst (randomTraceGenerator 5 3) )
+
+
+
+-- foo :: State StdGen Message
+-- foo = do
+--   gen <- get
+--   let (r, gen') = randomR ... gen
+--   put gen'
+--   pure (f r)
