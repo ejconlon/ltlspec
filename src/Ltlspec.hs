@@ -4,7 +4,7 @@ module Ltlspec where
 import Control.Monad.Writer.Strict (execWriter, tell)
 import Data.Functor.Foldable (embed, fold, project)
 import Data.Semigroup (Max (..), Sum (..))
-import Data.Sequence (Seq (..), (<|))
+import Data.Sequence (Seq (..))
 import Ltlspec.Recursion (foldUpM)
 import Ltlspec.Types (Atom (..), AtomVar, Binder (..), Bridge (..), Env, EnvProp (..), EnvPropBad (..),
                       EnvPropGood (..), EnvPropRes, EnvPropStep (..), Prop (..), PropF (..), PropName, Quantifier (..),
@@ -125,8 +125,16 @@ propAtoms = execWriter . foldUpM go where
     PropAtomF a -> tell [a]
     _ -> pure ()
 
-lookupEnv :: Env v -> Atom VarName -> Either VarName (Atom v)
-lookupEnv = error "TODO"
+-- | Looks up a variable in the environment ('Nothing' means missing)
+lookupEnvName :: Env v -> VarName -> Maybe v
+lookupEnvName zs x =
+  case zs of
+    Empty -> Nothing
+    (n, v) :<| ys -> if x == n then Just v else lookupEnvName ys x
+
+-- | Looks up all atom variables in the environment ('Left' means missing)
+lookupEnvAtom :: Env v -> Atom VarName -> Either VarName (Atom v)
+lookupEnvAtom env = traverse (\n -> maybe (Left n) Right (lookupEnvName env n))
 
 -- | Combines "forall" branch results
 sequenceForAllRes :: [EnvPropRes e v] -> Either (EnvPropBad e) (EnvPropGood v)
@@ -148,7 +156,7 @@ envPropEval (EnvProp env0 prop0) world = go env0 prop0 where
   go env prop =
     case prop of
       PropAtom atomVar ->
-        case lookupEnv env atomVar of
+        case lookupEnvAtom env atomVar of
           Left varName -> Left (EnvPropBadMissing varName)
           Right atomVal ->
             case bridgeEvalProp world atomVal of
@@ -160,7 +168,7 @@ envPropEval (EnvProp env0 prop0) world = go env0 prop0 where
         case bridgeQuantify world tyName of
           Left err -> Left (EnvPropBadErr err)
           Right vals ->
-            let results = fmap (\val -> go ((varName,val) <| env) bodyProp) vals
+            let results = fmap (\val -> go ((varName,val) :<| env) bodyProp) vals
             in sequenceForAllRes results
       _ -> error "TODO"
 
