@@ -2,20 +2,27 @@
 2021-10-29
 
 ## Deliverables
+
+These were our deliverables from the proposal
+
 * Theory language (syntax)
   * We will offer a short description (a few paragraphs) of the constructs we support in the Theory, and we will suggest a plausible syntax for expressing them.
 * Example domain (actor-based system)
   * Theory for the domain
-    * We will define a Theory (in the above textual format) that contains some interesting propositions and axioms one might need to verify operation of an actor-based system.
+    * We will define a Theory (in the above textual format) that contains some interesting propositions and axioms one might need to verify operation of an actor-based system. (NOTE: We've chosen to use a better and more useful Haskell datatype format instead, from Milestone 3. See note below.)
   * Synthetic logs or interesting scenarios
     * We will document some interesting scenarios that one would encounter when trying to verify these propositions.
     * We will generate some synthetic logs that will demonstrate the occurrence of some of these scenarios. The code to generate these logs will be in our test suite, as the logs will serve as test input.
+
+### Evaluation
+
+These delierables will be explained below. Some represent code that exists in this repository. See `README.md` for instructions on building and running (tldr: install the `stack` build tool and run `make test`). Some parts (like the traces) are declared as values in the code and don't themselves have meaningful output, but they can be inspected on the REPL `make ghci`. They will eventually be used in our test suite.
 
 ## Theory language
 
 We offer two views on syntax for expressing a Theory, one textual for presentation and the other as an internal Haskell datatype for processing.
 
-The first follows `Rabe 2006` in a textual presentation similar to LF. We do not support declarations of additional sorts, only types, propositions, and axioms. `Set` and `Prop` are the only two sorts defined. For now, we only support base types, not type constructors. A theory in this form consists of a sequence of type definitions of the form `<Identifier> : <Sort>` (where we use `<>` here to indicate classes of elements for replacement). There are three classes of declarations:
+The first follows `Rabe 2006` in a textual presentation similar to LF. We do not support declarations of additional sorts, only types, propositions, and axioms. `Set` and `Prop` are the only two sorts defined. For now, we only support concrete base types, not type constructors nor polymorphic types. A theory in this form consists of a sequence of type definitions of the form `<Identifier> : <Sort>` (where we use `<>` here to indicate classes of elements for replacement). There are three classes of declarations:
 
 1. Type declarations of the form `<TypeName> : Set`
 2. User-defined proposition declarations of the form `<PropName> : <TypeName> -> <TypeName> -> Prop`.
@@ -56,7 +63,7 @@ isResponsive :
 
 The second presentation can be found as a set of type definitions in our codebase:
 
-```
+```haskell
 type PropName = String
 type TyName = String
 type AxiomName = String
@@ -74,7 +81,7 @@ data Theory = Theory
 
 Propositions are defined as follows:
 
-```
+```haskell
 type VarName = String
 
 data Atom = Atom !PropName ![VarName]
@@ -118,9 +125,38 @@ data Prop =
 
 Substitution on these proposition expressions is defined in the normal way.
 
+We also offer a number of combinators such as:
+
+```haskell
+-- | A prop that holds at every timestep. If it is ever false, the prop is false.
+propAlways :: Prop -> Prop
+propAlways = PropRelease PropFalse
+
+-- | A prop that will hold at some timestep. If it is ever true, the prop is true.
+propEventually :: Prop -> Prop
+propEventually = PropUntil PropTrue
+
+-- | Propositional implication: r1 -> r2
+propIf :: Prop -> Prop -> Prop
+propIf = PropOr . PropNot
+```
+
+Propositions are defined [here](https://github.com/ejconlon/ltlspec/blob/master/src/Ltlspec.hs).
+
 ## Example domains
 
-We have two example domains of actor-based systems: a Chat system and the Dining Philosophers problem.
+We have three example domains of actor-based systems: a ping example, a Chat system, and the Dining Philosophers problem.
+
+In all examples we define either a type of messages observed to be exchanged between actors or a type of actions or events that may include exchanged messages. We then define a unique state type that will be used in the quantification of data varables and evaluation of atomic propositions in the domain's Bridge for its Theory. Depending on the complexity of the theory, we can define a world for the theory as the most recently seen action (message/event), pairs of `(action, new state)`, or triples of `(old state, action, new state)` With a simple update function from `action -> state -> state` we can scan lists of actions to lists of aforementioned triples (see `SAS` and `scanSAS` [here](https://github.com/ejconlon/ltlspec/blob/master/src/Ltlspec.hs)).
+
+In place of delivering the "textual" theory for each domain, we believe we have delivered something better, which is that we've already encoded each theory as values of a `Theory` datatype in Haskell. We did this because we found it useful to have some machine-checked structure enforced in our encoding. This was work promised in Milestone 3 that is ready for this Milestone. We anticipate formatting portions of these theories textually for our final report, since they're easier to read and understand that way.
+
+### Ping example
+
+This example consists of actors sending "ping" messages to each other, expecting "pong" responses. The theory states that eventually all pings get pongs.
+
+The system is modeled [here](https://github.com/ejconlon/ltlspec/blob/master/src/Ltlspec/Models/Ping.hs).
+The theory for this system is `pingTheory` and a synthetic manual trace can be found in `pingMessagesOk`.
 
 ### Chat system
 
@@ -133,6 +169,12 @@ We model a Chat system with a single server and multiple clients. Clients initia
 
 The server sends acknowledgements and responses to these operations and forwards chat messages to all other members of the system.
 
+The system is modeled [here](https://github.com/ejconlon/ltlspec/blob/master/src/Ltlspec/Models/Chat.hs).
+The theory for this system is `chatTheory` and a generated trace can be found in `systemTrace`.
+
 ### Dining Philosophers
 
 We model the Dining Philosophers problem with actors for each philosopher and chopstick.
+
+The system is modeled [here](https://github.com/ejconlon/ltlspec/blob/master/src/Ltlspec/Models/DinningHakker.hs).
+The theory for this system is `dinningHakkerTheory` and a generated trace can be found in `dhtrace3`.

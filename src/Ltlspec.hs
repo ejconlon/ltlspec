@@ -1,80 +1,14 @@
-{-# LANGUAGE StandaloneDeriving #-}
-{-# LANGUAGE TemplateHaskell #-}
-{-# LANGUAGE TypeFamilies #-}
-
 -- | Linear Temporal Logic (LTL) propositions and functions for manipulating and evaluating them.
 module Ltlspec where
 
-import Control.DeepSeq (NFData)
 import Control.Monad.Writer.Strict (execWriter, tell)
-import Data.Map.Strict (Map)
 import Data.Functor.Foldable (embed, fold, project)
-import Data.Functor.Foldable.TH (makeBaseFunctor)
-import Data.Hashable (Hashable)
 import Data.Semigroup (Max (..), Sum (..))
-import GHC.Generics (Generic)
+import Data.Sequence (Seq (..))
 import Ltlspec.Recursion (foldUpM)
-
-type PropName = String
-type TyName = String
-type AxiomName = String
-
-type TyDefs = [TyName]
-type PropDefs = Map PropName [TyName]
-type AxiomDefs = Map AxiomName Prop
-
-data Theory = Theory
-  { theoryTypes :: !TyDefs
-  , theoryProps :: !PropDefs
-  , theoryAxioms :: !AxiomDefs
-  } deriving stock (Eq, Show)
-
-type VarName = String
-
-data Atom = Atom !PropName ![VarName]
-  deriving stock (Eq, Show, Generic)
-  deriving anyclass (Hashable, NFData)
-
-data Binder = Binder !VarName !TyName
-  deriving stock (Eq, Show, Generic)
-  deriving anyclass (Hashable, NFData)
-
--- | An LTL proposition with first-order data quantification.
--- This selection of operators corresponds to "Release Positive Normal Form"
-data Prop =
-    PropAtom !Atom
-  -- ^ An atomic prop - use this to embed predicates from your domain
-  | PropTrue
-  -- ^ The constrant True
-  | PropFalse
-  -- ^ The constant False
-  | PropNot Prop
-  -- ^ Logical negation of the prop
-  | PropAnd Prop Prop
-  -- ^ Logical AND of several props (empty is true)
-  | PropOr Prop Prop
-  -- ^ Logical OR of several props (empty is false)
-  | PropNext Prop
-  -- ^ A prop that holds the next timestamp
-  | PropUntil Prop Prop
-  -- ^ 'PropUntil r1 r2' means 'eventually r2' and at least until 'r2' holds, 'r1' always holds.
-  -- If both are false, the prop is false. When 'r2' holds, the prop is true.
-  | PropRelease Prop Prop
-  -- ^ 'PropRelease r1 r2' means 'always r2' until and including when 'r1' holds.
-  -- If 'r2' is false, the prop is false. When 'r1' and 'r2' hold, the prop is true.
-  | PropForAll !Binder Prop
-  -- ^ 'PropForAll (Binder n t) r' means for all 'n' of type 't' 'r' holds.
-  | PropExists !Binder Prop
-  -- ^ 'PropForAll (Binder n t) r' means there exists an 'n' of type 't' for which 'r' holds.
-  deriving stock (Eq, Show, Generic)
-  deriving anyclass (Hashable, NFData)
-
--- Makes PropF and instances for Recursive and Corecursive from Data.Functor.Foldable
-makeBaseFunctor ''Prop
-
-deriving stock instance Generic (PropF a)
-deriving anyclass instance Hashable a => (Hashable (PropF a))
-deriving anyclass instance NFData a => (NFData (PropF a))
+import Ltlspec.Types (Atom (..), AtomVar, Binder (..), Bridge (..), Env, EnvProp (..), EnvPropBad (..),
+                      EnvPropGood (..), EnvPropRes, EnvPropStep (..), Prop (..), PropF (..), PropName, Quantifier (..),
+                      SAS (..), TyName, VarName)
 
 -- | Put the prop in negation normal form, which basically involves
 -- pushing negations to the bottom.
@@ -185,21 +119,58 @@ propDepth = getMax . fold ((Max 1 <>) . sum)
 -- >>> propAtoms (PropUntil (PropAtom (Atom "a" [])) (PropAtom (Atom "b" [])))
 -- [Atom "a" [],Atom "b" []]
 --
-propAtoms :: Prop -> [Atom]
+propAtoms :: Prop -> [AtomVar]
 propAtoms = execWriter . foldUpM go where
   go = \case
     PropAtomF a -> tell [a]
     _ -> pure ()
 
--- -- | When we evaluate a proposition at a certain time step, we either
--- -- satisfy it, falsify it, or are left with another prop to evaluate
--- -- on the next timestep.
--- data PropRes x =
---     PropResTrue
---   | PropResFalse
---   | PropResNext !x
---   deriving stock (Eq, Show, Functor, Foldable, Traversable, Generic)
---   deriving anyclass (Hashable, NFData)
+-- | Looks up a variable in the environment ('Nothing' means missing)
+lookupEnvName :: Env v -> VarName -> Maybe v
+lookupEnvName zs x =
+  case zs of
+    Empty -> Nothing
+    (n, v) :<| ys -> if x == n then Just v else lookupEnvName ys x
+
+-- | Looks up all atom variables in the environment ('Left' means missing)
+lookupEnvAtom :: Env v -> Atom VarName -> Either VarName (Atom v)
+lookupEnvAtom env = traverse (\n -> maybe (Left n) Right (lookupEnvName env n))
+
+-- | Combines "forall" branch results
+sequenceForAllRes :: [EnvPropRes e v] -> Either (EnvPropBad e) (EnvPropGood v)
+sequenceForAllRes rs = sequenceA rs >>= go Empty where
+  go !acc = \case
+    [] -> Right (EnvPropGoodNext (EnvPropStepQuant QuantifierForAll acc))
+    p:ps ->
+      case p of
+        EnvPropGoodBool b -> if b then go acc ps else Right p
+        EnvPropGoodNext x -> go (acc :|> x) ps
+
+-- | Combines "exists" branch results
+sequenceExistsRes :: [EnvPropRes e v] -> Either (EnvPropBad e) (EnvPropGood v)
+sequenceExistsRes = error "TODO"
+
+-- TODO(yanze) implement this and resurrect unit tests!
+envPropEval :: Bridge e v w => EnvProp v -> w -> EnvPropRes e v
+envPropEval (EnvProp env0 prop0) world = go env0 prop0 where
+  go env prop =
+    case prop of
+      PropAtom atomVar ->
+        case lookupEnvAtom env atomVar of
+          Left varName -> Left (EnvPropBadMissing varName)
+          Right atomVal ->
+            case bridgeEvalProp world atomVal of
+              Left err -> Left (EnvPropBadErr err)
+              Right anotherProp -> go env anotherProp
+      PropTrue -> Right (EnvPropGoodBool True)
+      PropFalse -> Right (EnvPropGoodBool False)
+      PropForAll (Binder varName tyName) bodyProp ->
+        case bridgeQuantify world tyName of
+          Left err -> Left (EnvPropBadErr err)
+          Right vals ->
+            let results = fmap (\val -> go ((varName,val) :<| env) bodyProp) vals
+            in sequenceForAllRes results
+      _ -> error "TODO"
 
 -- -- | Negates the result
 -- propResNot :: PropRes (Prop p) -> PropRes (Prop p)
@@ -280,26 +251,22 @@ propAtoms = execWriter . foldUpM go where
 --               PropResTrue -> error "TODO"
 --               PropResNext _ -> error "TODO"
 
--- -- | Evaluate the prop at every timestep until true/false or there are no more inputs.
--- -- Also returns the number of timesteps evaluated.
--- propFold :: (a -> p -> Bool) -> Prop p -> [a] -> (Int, PropRes (Prop p))
--- propFold f = go 0 where
---   go i p xs =
---     case xs of
---       [] -> (i, PropResNext p)
---       y:ys ->
---         let i' = i + 1
---             r = propEval (f y) p
---         in case r of
---           PropResNext p' -> go i' p' ys
---           _ -> (i', r)
-
--- | A (state, action, state) triple - used for defining worlds.
-data SAS s a = SAS
-  { sasBefore :: !s
-  , sasAction :: !a
-  , sasAfter :: !s
-  } deriving stock (Eq, Show)
+-- | Evaluate the prop at every timestep until true/false or there are no more inputs.
+-- Also returns the number of timesteps evaluated.
+envPropFold :: Bridge e v w => EnvProp v -> [w] -> (Int, EnvPropRes e v)
+envPropFold = go 0 where
+  go i p ws =
+    case ws of
+      [] -> (i, Right (EnvPropGoodNext (EnvPropStepSingle p)))
+      w:_ ->
+        let i' = i + 1
+            r = envPropEval p w
+        in case r of
+          Left _ -> (i', r)
+          Right q ->
+            case q of
+              EnvPropGoodBool _ -> (i', r)
+              EnvPropGoodNext _ -> error "TODO"
 
 -- | Scan a list of actions into a list of SAS
 scanSAS :: (a -> s -> s) -> s -> [a] -> [SAS s a]

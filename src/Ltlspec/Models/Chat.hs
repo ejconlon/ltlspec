@@ -6,16 +6,8 @@ import Data.Aeson (ToJSON (..), object, (.=))
 import qualified Data.List as List
 import qualified Data.Map as Map
 import qualified Data.Set as Set
-import Ltlspec
-    ( Prop(PropAtom, PropUntil, PropAnd, PropNot),
-      Atom(Atom),
-      Theory(..),
-      propAndAll,
-      propAlways,
-      propEventually,
-      propIf,
-      propForAllNested,
-      propExistsNested )
+import Ltlspec (propAlways, propAndAll, propEventually, propExistsNested, propForAllNested, propIf)
+import Ltlspec.Types (Atom (..), Prop (..), Theory (..))
 import System.Random (StdGen, mkStdGen, randomR)
 
 chatTheory :: Theory
@@ -174,6 +166,7 @@ randomGen = mkStdGen 137
 getRandomElementOfList :: [a] -> StdGen -> a
 getRandomElementOfList l gen = let randomIndex = fst (randomR (0, length l - 1) gen) in l !! randomIndex
 
+-- TODO(tarcisio) Decompose to two functions, ChatState -> StdGen -> (ChatMessage, StdGen), and ChatMessage -> ChatState -> ChatState
 step :: (SystemState, StdGen) -> ActionRep -> (SystemState, StdGen)
 step ((trace, seed), gen) actionname =
     let
@@ -258,14 +251,8 @@ singleActionTraceGenerator niterations nclients action =  step (singleActionTrac
 getTrace :: SystemState -> SystemTrace
 getTrace (st, _) = st
 
+-- TODO(tarcisio) Emit list of ChatWorld = SAS ChatMessage ChatState
 sampleTrace :: SystemTrace
 sampleTrace = getTrace (fst (randomTraceGenerator 5 3) )
 
-
-
--- foo :: State StdGen Message
--- foo = do
---   gen <- get
---   let (r, gen') = randomR ... gen
---   put gen'
---   pure (f r)
+-- TODO(tarcisio) Implement bridge for this theory with unit tests

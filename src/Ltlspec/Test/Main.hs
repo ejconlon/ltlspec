@@ -1,108 +1,96 @@
 module Ltlspec.Test.Main (main) where
 
--- import Data.Foldable (toList)
--- import Data.Hashable (Hashable)
--- import GHC.Generics (Generic)
--- import Hedgehog (Gen, Property, PropertyT, forAll, property)
--- import Ltlspec (Prop, PropRes (..), pattern PropAtom, propAlways, propAtoms, propEval, propEventually, propFold)
--- import Test.Tasty (TestName, TestTree, defaultMain, testGroup)
--- import Test.Tasty.HUnit (testCase, (@?=))
--- import Test.Tasty.Hedgehog (testProperty)
+import qualified Data.Map.Strict as Map
+import Ltlspec (envPropFold, propForAllNested, propIf, propIfNested)
+import Ltlspec.Types (Atom (..), Bridge (..), EnvProp (..), EnvPropGood (..), EnvPropRes, EnvPropStep (..), Prop (..),
+                      Theory (..), VarName)
+import Test.Tasty (TestTree, defaultMain, testGroup)
+import Test.Tasty.HUnit (testCase, (@?=))
+-- import Data.Sequence (Seq)
+-- import qualified Data.Sequence as Seq
+import Control.Monad (when)
+import System.Environment (lookupEnv, setEnv)
+import System.IO (BufferMode (NoBuffering), hSetBuffering, stderr, stdout)
 
--- class Unconstrained a
--- instance Unconstrained a
+eqForAll :: [VarName] -> Prop -> Prop
+eqForAll = propForAllNested . fmap (, "Value")
 
--- newtype ConstrainedTrans c g m = ConstrainedTrans { unConstrainedTrans :: forall x. c x => g x -> m x }
+eqProp :: VarName -> VarName -> Prop
+eqProp x y = PropAtom (Atom "IsEq" [x, y])
 
--- idTrans :: ConstrainedTrans Unconstrained m m
--- idTrans = ConstrainedTrans id
+eqAxReflexive, eqAxTransitive, eqAxSymmetric :: Prop
+eqAxReflexive = eqForAll ["x"] (eqProp "x" "x")
+eqAxTransitive = eqForAll ["x", "y", "z"] (propIfNested [eqProp "x" "y", eqProp "y" "z"] (eqProp "x" "z"))
+eqAxSymmetric = eqForAll ["x", "y"] (propIf (eqProp "x" "y") (eqProp "y" "x"))
 
--- propertyTrans :: ConstrainedTrans Show Gen (PropertyT IO)
--- propertyTrans = ConstrainedTrans forAll
+-- A theory of total order over some type
+orderTheory :: Theory
+orderTheory = Theory
+  { theoryTypes = ["Value"]
+  , theoryProps = Map.fromList
+      [ ("IsEq", ["Value", "Value"])
+      ]
+  , theoryAxioms = Map.fromList
+      [ ("Reflexive", eqAxReflexive)
+      , ("Transitive", eqAxTransitive)
+      , ("Symmetric", eqAxSymmetric)
+      ]
+  }
 
--- data CheckPhase s a =
---     CheckPhaseStart
---   | CheckPhaseAct !Int ![a] !s !a
---   | CheckPhaseEnd !Int ![a]
---   deriving (Eq, Show)
+newtype EqErr = EqErr { unEqErr :: String }
+  deriving (Eq, Show)
 
--- data Kase g m s a = Kase
---   { kaseMkStart :: g s
---   , kaseMkNext :: s -> g (Maybe a)
---   , kaseAct :: s -> a -> m s
---   , kaseCheck :: CheckPhase s a -> s -> m ()
---   }
+data EqValue v =
+    EqValueNormal v
+  | EqValueNever
+  | EqValueErr !EqErr
+  deriving (Eq, Show)
 
--- runKaseGeneric :: (Monad m, c s, c (Maybe a)) => ConstrainedTrans c g m -> Kase g m s a -> m ()
--- runKaseGeneric trans (Kase mkStart mkNext act check) = go where
---   go = do
---     start <- unConstrainedTrans trans mkStart
---     check CheckPhaseStart start
---     loop 0 [] start
---   loop !i !hist !state = do
---     mayNext <- unConstrainedTrans trans (mkNext state)
---     case mayNext of
---       Nothing -> check (CheckPhaseEnd i hist) state
---       Just next -> do
---         state' <- act state next
---         check (CheckPhaseAct i hist state next) state'
---         loop (i + 1) (next:hist) state'
+eqEval :: Eq v => EqValue v -> EqValue v -> Either EqErr Prop
+eqEval a b =
+  case (a, b) of
+    (EqValueNever, _) -> Right PropFalse
+    (_, EqValueNever) -> Right PropFalse
+    (EqValueErr err, _) -> Left err
+    (_, EqValueErr err) -> Left err
+    (EqValueNormal x, EqValueNormal y) -> Right (if x == y then PropTrue else PropFalse)
 
--- runKase :: Monad m => Kase m m s a -> m ()
--- runKase = runKaseGeneric idTrans
+newtype EqWorld v = EqWorld { unEqWorld :: [EqValue v] }
+  deriving stock (Eq, Show)
 
--- runKaseProperty :: (Show s, Show a) => Kase Gen (PropertyT IO) s a -> PropertyT IO ()
--- runKaseProperty = runKaseGeneric propertyTrans
+instance Eq v => Bridge EqErr (EqValue v) (EqWorld v) where
+  bridgeEvalProp _ (Atom propName vals) =
+    case (propName, vals) of
+      ("IsEq", [v1, v2]) -> eqEval v1 v2
+      _ -> Left (EqErr "Bad prop")
+  bridgeQuantify (EqWorld eqvs) tyName =
+    case tyName of
+      "Value" -> Right eqvs
+      _ -> Left (EqErr "Bad type")
 
--- kaseProperty :: (Show s, Show a) => Kase Gen (PropertyT IO) s a -> Property
--- kaseProperty = property . runKaseProperty
+data EqCase v = EqCase
+  { eqCaseName :: !String
+  , eqCaseWorlds :: ![EqWorld v]
+  , eqCaseProp :: !Prop
+  , eqCaseSteps :: !Int
+  , eqCaseRes :: !(EnvPropRes EqErr (EqValue v))
+  } deriving stock (Eq, Show)
 
--- testKaseProperty :: (Show s, Show a) => TestName -> Kase Gen (PropertyT IO) s a -> TestTree
--- testKaseProperty name = testProperty name . kaseProperty
+testEqCase :: (Eq v, Show v) => EqCase v -> TestTree
+testEqCase (EqCase name worlds prop expectedSteps expectedRes) = testCase name $ do
+  let actualPair = envPropFold (EnvProp mempty prop) worlds
+  actualPair @?= (expectedSteps, expectedRes)
 
--- testKaseUnit :: TestName -> Kase IO IO s a -> TestTree
--- testKaseUnit name = testCase name . runKase
+eqCases :: [EqCase Char]
+eqCases =
+  [ EqCase "null false" [] PropFalse 0 (Right (EnvPropGoodNext (EnvPropStepSingle (EnvProp mempty PropFalse))))
+  , EqCase "null true" [] PropTrue 0 (Right (EnvPropGoodNext (EnvPropStepSingle (EnvProp mempty PropTrue))))
+  , EqCase "empty false" [EqWorld []] PropFalse 1 (Right (EnvPropGoodBool False))
+  , EqCase "empty true" [EqWorld []] PropTrue 1 (Right (EnvPropGoodBool True))
+  ]
 
--- data Comp = CompLT | CompLTE | CompEQ | CompNEQ | CompGTE | CompGT
---   deriving stock (Eq, Ord, Show, Enum, Bounded, Generic)
---   deriving anyclass (Hashable)
-
--- compNot :: Comp -> Comp
--- compNot = \case
---   CompLT -> CompGTE
---   CompLTE -> CompGT
---   CompEQ -> CompNEQ
---   CompNEQ -> CompEQ
---   CompGTE -> CompLT
---   CompGT -> CompLTE
-
--- data OrdPred a = OrdPred
---   { ordPredComp :: !Comp
---   , ordPredRef :: !a
---   } deriving stock (Eq, Ord, Show, Generic)
---     deriving anyclass (Hashable)
-
--- ordPredNot :: OrdPred a -> OrdPred a
--- ordPredNot (OrdPred c a) = OrdPred (compNot c) a
-
--- ordPredEval :: Ord a => a -> OrdPred a -> Bool
--- ordPredEval val (OrdPred comp ref) =
---   case comp of
---     CompLT -> val < ref
---     CompLTE -> val <= ref
---     CompEQ -> val == ref
---     CompNEQ -> val /= ref
---     CompGTE -> val >= ref
---     CompGT -> val > ref
-
--- type OrdPredProp a = Prop (OrdPred a)
--- type OrdPredPropRes a = PropRes (OrdPredProp a)
-
--- ordPredPropEval :: Ord a => a -> OrdPredProp a -> OrdPredPropRes a
--- ordPredPropEval val = propEval (ordPredEval val)
-
--- ordPredPropFold :: Ord a => OrdPredProp a -> [a] -> (Int, OrdPredPropRes a)
--- ordPredPropFold = propFold ordPredEval
+testEqCases :: TestTree
+testEqCases = testGroup "Eq cases" (fmap testEqCase eqCases)
 
 -- testEventually :: TestTree
 -- testEventually = testCase "eventually" $ do
@@ -122,4 +110,13 @@ module Ltlspec.Test.Main (main) where
 -- testProp = testGroup "Prop" [testEventually, testAlways]
 
 main :: IO ()
-main = pure () -- defaultMain (testGroup "Ltlspec" [testProp])
+main = do
+  mayDebugStr <- lookupEnv "DEBUG"
+  let debug = Just "1" == mayDebugStr
+  when debug $ do
+    setEnv "TASTY_NUM_THREADS" "1"
+    hSetBuffering stdout NoBuffering
+    hSetBuffering stderr NoBuffering
+  defaultMain $ testGroup "Ltlspec"
+    [ testEqCases
+    ]
