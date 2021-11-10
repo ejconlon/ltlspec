@@ -1,6 +1,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
 {-# OPTIONS_GHC -Wno-incomplete-patterns #-}
+{-# OPTIONS_GHC -Wno-name-shadowing #-}
 
 module Ltlspec.Models.Chat where
 
@@ -8,8 +9,8 @@ import Data.Aeson (ToJSON (..), object, (.=))
 import qualified Data.List as List
 import qualified Data.Map as Map
 import qualified Data.Set as Set
-import Ltlspec (propAlways, propAndAll, propEventually, propExistsNested, propForAllNested, propIf)
-import Ltlspec.Types (Atom (..), Prop (..), Theory (..), SAS (SAS, sasAfter))
+import Ltlspec (propAlways, propAndAll, propEventually, propExistsNested, propForAllNested, propIf, scanSAS)
+import Ltlspec.Types (Atom (..), Prop (..), Theory (..), SAS (SAS, sasAfter), Bridge (bridgeEvalProp, bridgeQuantify), Error)
 import System.Random (StdGen, mkStdGen, randomR)
 import qualified Data.Bifunctor
 
@@ -124,6 +125,13 @@ type SystemState = (Buffer, ClientsState, Integer)
 
 type ChatState = (ClientsState, Integer)
 
+type ChatWorld = SAS ChatState SystemEvent
+
+data ChatVal =
+    ChatValClient ClientID
+    | ChatValChannel ChannelID
+    | ChatValAction ActionID
+    deriving stock (Eq, Show)
 send :: SystemState -> ClientID -> MessageContent -> ChannelID -> SystemState
 send (buffer, cState, seed) client message channel = (updateBuffer, cState , seed+1)
     where {
@@ -172,8 +180,8 @@ randomGen = mkStdGen 137
 getRandomElementOfList :: [a] -> StdGen -> a
 getRandomElementOfList l gen = let randomIndex = fst (randomR (0, length l - 1) gen) in l !! randomIndex
 
-processEvent :: ChatState -> SystemEvent -> ChatState
-processEvent (cState, seed) event =
+processEvent :: SystemEvent -> ChatState -> ChatState
+processEvent event (cState, seed) =
     case event of
         Left NoOp -> (cState, seed)
         Left (List aid _) -> (cState, aid)
@@ -243,10 +251,35 @@ bufferToList b = fst (randomEventPick b randomGen)
 generateSequenceOfMessages :: Integer -> Integer -> [SystemEvent]
 generateSequenceOfMessages a b = (bufferToList . fst3 . fst)  (simulation a b) where fst3 (b,_,_) = b
 
+trace :: [ChatWorld]
+trace = scanSAS processEvent (initialChatState 3) (generateSequenceOfMessages 20 3)
 
-generateTraceGivenMessages :: [SystemEvent] -> [SAS ChatState SystemEvent]
-generateTraceGivenMessages (e:es) = List.foldl func [SAS (initialChatState 3) e (processEvent (initialChatState 3) e) ] es 
-    where func sass ev = sass ++ [SAS (sasAfter (last sass)) ev (processEvent (sasAfter (last sass)) ev)] 
+
+generateTraceGivenMessages :: [SystemEvent] -> [ChatWorld]
+generateTraceGivenMessages (e:es) = List.foldl func [SAS (initialChatState 3) e (processEvent e (initialChatState 3)) ] es
+    where func sass ev = sass ++ [SAS (sasAfter (last sass)) ev (processEvent ev (sasAfter (last sass)))]
 
 -- TODO(tarcisio) Implement bridge for this theory with unit tests
+
+
+instance Bridge Error ChatVal ChatWorld where
+    bridgeEvalProp (SAS _ e s2) (Atom propName vals) =
+        case (propName, vals) of
+            ("IsMember", [ChatValClient cid, ChatValChannel chid]) -> if chid `elem` Map.findWithDefault [] cid (fst s2) then Right PropTrue else Right PropFalse
+            ("IsSameClient", [ChatValClient cid1, ChatValClient cid2]) -> if cid1 == cid2 then Right PropTrue else Right PropFalse
+            ("Left", [ChatValAction aid, ChatValClient cid, ChatValChannel chid]) -> if e == Left (Leave aid cid chid) then Right PropTrue else Right PropFalse
+            ("Joined", [ChatValAction aid, ChatValClient cid, ChatValChannel chid]) -> if e == Left (Join aid cid chid) then Right PropTrue else Right PropFalse
+            ("Sent", [ChatValAction aid, ChatValClient cid, ChatValChannel chid]) -> case e of
+                                                                                        Left (Send a c _ ch) -> if a==aid && c==cid && ch==chid then Right PropTrue  else Right PropFalse
+                                                                                        _ -> Right PropFalse
+            ("ListRequested", [ChatValAction aid, ChatValClient cid]) -> if e == Left (List aid cid) then Right PropTrue else Right PropFalse
+            ("Shared", [ChatValAction aid, ChatValClient sid, ChatValClient rid]) -> case e of 
+                                                                                        Right (Share a s _ r) -> if a==aid && s==sid && r==rid then Right PropTrue else Right PropFalse
+                                                                                        _ -> Right PropFalse
+            ("NewJoinNote", [ChatValAction aid, ChatValClient cid1, ChatValChannel chid, ChatValClient cid2]) -> if e == Right (NewJoin aid cid1 chid cid2) then Right PropTrue else Right PropFalse
+            ("NewLeaveNote", [ChatValAction aid, ChatValClient cid1, ChatValChannel chid, ChatValClient cid2]) -> if e == Right (NewLeave aid cid1 chid cid2) then Right PropTrue else Right PropFalse
+            ("ChannelListNote", [ChatValAction aid, ChatValClient cid, ChatValChannel chid]) -> if e == Right (ChannelList aid cid chid) then Right PropTrue else Right PropFalse
+            _ -> Left ("Could not eval " <> propName <> " on " <> show vals)
+    
+    bridgeQuantify = error "TODO"
 
