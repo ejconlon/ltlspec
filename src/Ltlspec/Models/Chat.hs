@@ -1,4 +1,6 @@
 {-# LANGUAGE OverloadedStrings #-}
+{-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
+{-# OPTIONS_GHC -Wno-incomplete-patterns #-}
 
 module Ltlspec.Models.Chat where
 
@@ -7,8 +9,9 @@ import qualified Data.List as List
 import qualified Data.Map as Map
 import qualified Data.Set as Set
 import Ltlspec (propAlways, propAndAll, propEventually, propExistsNested, propForAllNested, propIf)
-import Ltlspec.Types (Atom (..), Prop (..), Theory (..))
+import Ltlspec.Types (Atom (..), Prop (..), Theory (..), SAS (SAS, sasAfter))
 import System.Random (StdGen, mkStdGen, randomR)
+import qualified Data.Bifunctor
 
 chatTheory :: Theory
 chatTheory = Theory
@@ -73,7 +76,8 @@ type ChannelID = Integer
 type MessageContent = String
 
 data ClientAction =
-    List ActionID ClientID
+    NoOp
+  | List ActionID ClientID
   | Join ActionID ClientID ChannelID
   | Leave ActionID ClientID ChannelID
   | Send ActionID ClientID MessageContent ChannelID
@@ -112,53 +116,55 @@ instance ToJSON ServerResponse where
 
 type SystemEvent = Either ClientAction ServerResponse
 
-type SystemTrace = [(State,SystemEvent)]
+type Buffer = Map.Map ChannelID [SystemEvent]
 
-type State = Map.Map ClientID [ChannelID]
+type ClientsState = Map.Map ClientID [ChannelID]
 
-type SystemState = (SystemTrace, Integer)
+type SystemState = (Buffer, ClientsState, Integer)
 
+type ChatState = (ClientsState, Integer)
 
 send :: SystemState -> ClientID -> MessageContent -> ChannelID -> SystemState
-send (trace, seed) client message channel = (changeTrace trace, seed+1)
+send (buffer, cState, seed) client message channel = (updateBuffer, cState , seed+1)
     where {
-        changeTrace t = let newS = fst (last t) in t ++ [(newS,Left (Send (seed + 1) client message channel) )] ++ [(\ r -> (newS, Right (Share (seed + 1) client message r))) c |
-                           (c, v) <- Map.toList newS, c /= client, channel `elem` v]
+        updateBuffer = let oldL = Map.findWithDefault [] channel buffer in
+            Map.insert channel (oldL ++ [Left (Send (seed + 1) client message channel)] ++ [( Right . Share (seed + 1) client message) c |
+                           (c, v) <- Map.toList cState, c /= client, channel `elem` v]) buffer
     }
 
 join :: SystemState -> ClientID -> ChannelID -> SystemState
-join (trace, seed) client channel = (changeTrace trace, seed+1)
+join (buffer, cState, seed) client channel = (updateBuffer, changeState cState, seed+1)
     where {
         changeState s = Map.insert client  (filter (/= channel) (Map.findWithDefault [] client s) ++ [channel] ) s;
-        changeTrace t = let
-                            oldS = fst (last t)
-                            newS = changeState oldS
-                        in t ++ [(newS, Left (Join (seed+1) client channel ) )] ++ [(\ r -> (newS, Right (NewJoin (seed + 1) client channel r))) c |
-                           (c, v) <- Map.toList oldS, c /= client, channel `elem` v]
+        updateBuffer = let oldL = Map.findWithDefault [] channel buffer in
+                        Map.insert channel (oldL ++ [Left (Join (seed+1) client channel)] ++ [( Right . NewJoin (seed + 1) client channel) c |
+                           (c, v) <- Map.toList cState, c /= client, channel `elem` v]) buffer
     }
 
 leave :: SystemState -> ClientID -> ChannelID -> SystemState
-leave (trace, seed) client channel = (changeTrace trace, seed+1)
+leave (buffer, cState, seed) client channel = (updateBuffer, changeState cState, seed+1)
     where {
-        changeState s = Map.insert client  (filter (/= channel) (Map.findWithDefault [] client s)) s;
-        changeTrace t = let
-                            oldS = fst (last t)
-                            newS = changeState oldS
-                        in t ++ [(newS, Left (Leave (seed+1) client channel ))] ++ [(\ r -> (newS, Right (NewLeave (seed + 1) client channel r))) c |
-                           (c, v) <- Map.toList oldS, c /= client, channel `elem` v]
+        changeState s = Map.insert client  (filter (/= channel) (Map.findWithDefault [] client s) ++ [channel] ) s;
+        updateBuffer = let oldL = Map.findWithDefault [] channel buffer in
+                        Map.insert channel (oldL ++ [Left (Leave (seed+1) client channel )] ++ [( Right . NewLeave (seed + 1) client channel) c |
+                           (c, v) <- Map.toList cState, c /= client, channel `elem` v]) buffer
     }
 
 list :: SystemState -> ClientID -> SystemState
-list (trace, seed) client = (changeTrace trace, seed+1)
+list (buffer, cState, seed) client = (updateBuffer, cState, seed+1)
     where {
-        changeTrace t = let newS = fst (last t) in t ++ [(newS, Left (List (seed+1) client))] ++ Set.toList (Set.map (\c -> (newS, Right (ChannelList (seed+1) client c))) (Set.fromList (concat (Map.elems newS))) )
+        insertRightBuffer ch m = let oldL = Map.findWithDefault [] ch m in Map.insert ch (oldL ++ [Right (ChannelList (seed+1) client ch)]) m;
+        updateBuffer = Set.fold insertRightBuffer buffer (Set.fromList (concat (Map.elems cState)))
     }
 
-getJoinableChannels :: State -> ClientID -> [ChannelID]
+getJoinableChannels :: ClientsState -> ClientID -> [ChannelID]
 getJoinableChannels state client = let res = List.sort (concat ([v | (k,v) <- Map.toList state, k /= client  ])) in if null res then [0] else res
 
 initialState :: Integer -> SystemState
-initialState nclient= ([(Map.fromList [(i,[]) | i <- [1..nclient]],Right StartService)], 0)
+initialState nclient = (Map.empty, Map.fromList [(i,[]) | i <- [1..nclient]], 0)
+
+initialChatState :: Integer -> ChatState
+initialChatState nclients = (Map.fromList [(i,[]) | i <- [1..nclients]], 0)
 
 randomGen :: StdGen
 randomGen = mkStdGen 137
@@ -166,93 +172,81 @@ randomGen = mkStdGen 137
 getRandomElementOfList :: [a] -> StdGen -> a
 getRandomElementOfList l gen = let randomIndex = fst (randomR (0, length l - 1) gen) in l !! randomIndex
 
--- TODO(tarcisio) Decompose to two functions, ChatState -> StdGen -> (ChatMessage, StdGen), and ChatMessage -> ChatState -> ChatState
-step :: (SystemState, StdGen) -> ActionRep -> (SystemState, StdGen)
-step ((trace, seed), gen) actionname =
-    let
-        newgen = snd (randomR (0::Int, 3) gen)
-        state = fst (last trace)
-    in
-    case actionname of
-        ActionSend -> let
-                    client = getRandomElementOfList (Map.keys state) gen
-                  in if null (Map.findWithDefault [] client state) then
-                        ((trace, seed), newgen)
-                    else
-                        let
-                            channel = getRandomElementOfList (Map.findWithDefault [] client state) gen
-                            message = "FOO"
-                        in
-                        (send (trace, seed) client message channel, newgen)
-        ActionJoin -> let
-                    client = getRandomElementOfList (Map.keys state) gen
-                    allchanels = getJoinableChannels state client
-                    channel = getRandomElementOfList ( allchanels ++ [last allchanels + 1]) gen
-                  in (join (trace, seed) client channel, newgen)
-        ActionLeave -> let
-                        client = getRandomElementOfList (Map.keys state) gen
-                    in if null (Map.findWithDefault [] client state) then
-                        ((trace, seed), newgen)
-                    else
-                        let channel = getRandomElementOfList (Map.findWithDefault [] client state) gen in
-                        (leave (trace, seed) client channel, newgen)
-        ActionList ->  let
-                        client = getRandomElementOfList (Map.keys state) gen
-                    in (list (trace, seed) client, newgen)
+processEvent :: ChatState -> SystemEvent -> ChatState
+processEvent (cState, seed) event =
+    case event of
+        Left NoOp -> (cState, seed)
+        Left (List aid _) -> (cState, aid)
+        Left (Join aid cid chid) -> (Map.insert cid  (filter (/= chid) (Map.findWithDefault [] cid cState) ++ [chid] ) cState, aid)
+        Left (Leave aid cid chid) -> (Map.insert cid  (filter (/= chid) (Map.findWithDefault [] cid cState)) cState, aid)
+        Left (Send aid _ _ _) -> (cState, aid)
+        Right (Share aid _ _ _) -> (cState, aid)
+        Right (NewJoin aid _ _ _) -> (cState, aid)
+        Right (NewLeave aid _ _ _) -> (cState, aid)
+        Right (ChannelList aid _ _) -> (cState, aid)
+        Right StartService -> (cState, seed)
 
 simulationStep :: (SystemState, StdGen) -> (SystemState, StdGen)
-simulationStep ((trace, seed), gen) =
+simulationStep ((buffer, cState, seed), gen) =
     let
         randomActionIndex = fst (randomR (0::Int, 11) gen)
         newgen = snd (randomR (0::Int, 11) gen)
-        state = fst (last trace)
     in
     let actionname = [ActionSend,ActionSend,ActionSend,ActionSend,ActionSend, ActionJoin, ActionJoin, ActionJoin, ActionJoin, ActionList, ActionLeave, ActionLeave] !! randomActionIndex in
     case actionname of
-        ActionSend -> let
-                    client = getRandomElementOfList (Map.keys state) gen
-                  in if null (Map.findWithDefault [] client state) then
-                        ((trace, seed), newgen)
-                    else
-                        let
-                            channel = getRandomElementOfList (Map.findWithDefault [] client state) gen
-                            message = "FOO"
-                        in
-                        (send (trace, seed) client message channel, newgen)
-        ActionJoin -> let
-                    client = getRandomElementOfList (Map.keys state) gen
-                    allchanels = getJoinableChannels state client
-                    channel = getRandomElementOfList ( allchanels ++ [last allchanels + 1]) gen
-                  in (join (trace, seed) client channel, newgen)
-        ActionLeave -> let
-                        client = getRandomElementOfList (Map.keys state) gen
-                    in if null (Map.findWithDefault [] client state) then
-                        ((trace, seed), newgen)
-                    else
-                        let channel = getRandomElementOfList (Map.findWithDefault [] client state) gen in
-                        (leave (trace, seed) client channel, newgen)
-        ActionList ->  let
-                        client = getRandomElementOfList (Map.keys state) gen
-                    in (list (trace, seed) client, newgen)
-
--- randomActionGenertor :: Integer -> [ActionRep]
--- randomActionGenertor 0 = []
-
-
-randomTraceGenerator :: Integer -> Integer -> (SystemState, StdGen)
-randomTraceGenerator 0 nclients = (initialState nclients, randomGen)
-randomTraceGenerator niterations nclients =  simulationStep (randomTraceGenerator (niterations-1) nclients)
-
-singleActionTraceGenerator :: Integer -> Integer -> ActionRep -> (SystemState, StdGen)
-singleActionTraceGenerator 0 nclients _ = (initialState nclients, randomGen)
-singleActionTraceGenerator niterations nclients action =  step (singleActionTraceGenerator (niterations-1) nclients action) action
+        ActionSend ->   let
+                            client = getRandomElementOfList (Map.keys cState) gen
+                            channels = Map.findWithDefault [] client cState
+                        in if null channels then
+                                ((buffer, cState, seed), newgen)
+                            else
+                                let
+                                    channel = getRandomElementOfList (Map.findWithDefault [] client cState) gen
+                                    message = "FOO"
+                                in
+                                    (send (buffer, cState, seed) client message channel, newgen)
+        ActionJoin ->   let
+                            client = getRandomElementOfList (Map.keys cState) gen
+                            allchanels = getJoinableChannels cState client
+                            channel = getRandomElementOfList ( allchanels ++ [last allchanels + 1]) gen
+                        in (join (buffer, cState, seed) client channel, newgen)
+        ActionLeave ->  let
+                            client = getRandomElementOfList (Map.keys cState) gen
+                            channels = Map.findWithDefault [] client cState
+                        in if null channels then
+                            ((buffer, cState, seed), newgen)
+                        else
+                            let channel = getRandomElementOfList channels gen in
+                                (leave (buffer, cState, seed) client channel, newgen)
+        ActionList ->   let
+                            client = getRandomElementOfList (Map.keys cState) gen
+                        in (list (buffer, cState, seed) client, newgen)
 
 
-getTrace :: SystemState -> SystemTrace
-getTrace (st, _) = st
+simulation :: Integer -> Integer -> (SystemState, StdGen)
+simulation 0 nclients = (initialState nclients, randomGen)
+simulation niterations nclients =  simulationStep (simulation (niterations-1) nclients)
 
--- TODO(tarcisio) Emit list of ChatWorld = SAS ChatMessage ChatState
-sampleTrace :: SystemTrace
-sampleTrace = getTrace (fst (randomTraceGenerator 5 3) )
+bufferToList :: Buffer -> [SystemEvent]
+bufferToList b = fst (randomEventPick b randomGen)
+    where {
+        randomEventPick b gen
+         | null (concat (Map.elems b)) = ([], gen)
+         | otherwise = let
+                            ch = getRandomElementOfList [ k | (k,v)<- Map.toList b, not (null v)] gen
+                            m:ms = Map.findWithDefault [] ch b
+                            newGen = snd (randomR (0::Int, 11) gen)
+                            tmpResult = randomEventPick (Map.insert ch ms b) newGen
+                        in Data.Bifunctor.first (m :) tmpResult
+    }
+
+generateSequenceOfMessages :: Integer -> Integer -> [SystemEvent]
+generateSequenceOfMessages a b = (bufferToList . fst3 . fst)  (simulation a b) where fst3 (b,_,_) = b
+
+
+generateTraceGivenMessages :: [SystemEvent] -> [SAS ChatState SystemEvent]
+generateTraceGivenMessages (e:es) = List.foldl func [SAS (initialChatState 3) e (processEvent (initialChatState 3) e) ] es 
+    where func sass ev = sass ++ [SAS (sasAfter (last sass)) ev (processEvent (sasAfter (last sass)) ev)] 
 
 -- TODO(tarcisio) Implement bridge for this theory with unit tests
+
