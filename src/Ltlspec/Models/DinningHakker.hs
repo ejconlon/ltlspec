@@ -113,11 +113,11 @@ data Action =
   | ChopstickResp ChopstickId
   deriving stock (Eq, Show)
 
-chopReceive :: Chopstick -> HakkerMsg -> Chopstick
-chopReceive chop@Chopstick{chopRecvs=recvs} msg = chop {chopRecvs = msg :<| recvs}
+chopReceive :: HakkerMsg -> Chopstick -> Chopstick
+chopReceive msg chop@Chopstick{chopRecvs=recvs} = chop {chopRecvs = msg :<| recvs}
 
-hakkerReceive :: Hakker -> ChopstickMsg -> Hakker
-hakkerReceive hakker@Hakker{hkRecvs=recvs} msg = hakker {hkRecvs = msg :<| recvs}
+hakkerReceive :: ChopstickMsg -> Hakker -> Hakker
+hakkerReceive msg hakker@Hakker{hkRecvs=recvs} = hakker {hkRecvs = msg :<| recvs}
 
 -- One system step in perfect network condition
 -- This step function will cause deadlock for DinningHakker problem
@@ -135,10 +135,8 @@ stepPerfect (HakkerThink h) gs@GlobalState{timestamp=ts, hakkers=hs, chopsticks=
       rightCid = rchop hk
       leftMsg = Put ts h leftCid
       rightMsg = Put ts h rightCid
-      leftChop' = chopReceive (cs M.! leftCid) leftMsg
-      rightChop' = chopReceive (cs M.! rightCid) rightMsg
-      cs' = M.insert leftCid leftChop' cs
-      cs'' = M.insert rightCid rightChop' cs'
+      cs' = M.adjust (chopReceive leftMsg) leftCid cs
+      cs'' = M.adjust (chopReceive rightMsg) rightCid cs'
       hk' = hk {hkState=Thinking}
       hs' = M.insert h hk' hs
       ms' = Left rightMsg : Left leftMsg :ms
@@ -155,10 +153,8 @@ stepPerfect (HakkerHungry h) gs@GlobalState{timestamp=ts, hakkers=hs, chopsticks
       rightCid = rchop hk
       leftMsg = Take ts h leftCid
       rightMsg = Take ts h rightCid
-      leftChop' = chopReceive (cs M.! leftCid) leftMsg
-      rightChop' = chopReceive (cs M.! rightCid) rightMsg
-      cs' = M.insert leftCid leftChop' cs
-      cs'' = M.insert rightCid rightChop' cs'
+      cs' = M.adjust (chopReceive leftMsg) leftCid cs
+      cs'' = M.adjust (chopReceive rightMsg) rightCid cs'
       hk' = hk {hkState=Hungry}
       hs' = M.insert h hk' hs
       ms' = Left rightMsg : Left leftMsg : ms
@@ -187,10 +183,8 @@ stepPerfect (ChopstickResp c) gs@GlobalState{timestamp=ts, hakkers=hs, chopstick
   case chopState chop of
     Free -> case chopRecvs chop of
       msgs :|> Take _ hid _ -> let
-        hk = hs M.! hid
         msg = Grant ts c hid
-        hk' = hakkerReceive hk msg
-        hs' = M.insert hid hk' hs
+        hs' = M.adjust (hakkerReceive msg) hid hs
         cs' = M.insert c (chop {chopRecvs=msgs, chopState=Taken}) cs
         in
         tick gs {hakkers=hs', chopsticks=cs', messages=(Right msg : ms)}
