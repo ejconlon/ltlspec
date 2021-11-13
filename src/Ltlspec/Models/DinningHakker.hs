@@ -34,7 +34,7 @@ data ChopstickMsg =
 
 data Hakker = Hakker
   { hakkerId :: HakkerId
-  -- Hakker's message queue
+  -- Hakker's message queue, received but not delivered
   , hkRecvs :: Seq ChopstickMsg
   , hkState :: HakkerState
   , lchop :: ChopstickId
@@ -74,13 +74,20 @@ type Chopsticks = M.Map ChopstickId Chopstick
 
 type Message = Either HakkerMsg ChopstickMsg
 
+data Network = Network
+  { packets:: [Message] }
+
+sendMessage:: Message -> Network -> Network
+sendMessage = error "TODO"
+
+recvMessage:: Network -> Network
+recvMessage = error "TODO"
+
 data GlobalState = GlobalState
   { timestamp:: TimeStamp
   , hakkers:: Hakkers
   , chopsticks:: Chopsticks
   , messages:: [Message]
-  -- NOTE: not sured for now, in-transit network packet
-  , packets:: [Message]
   }
   deriving stock (Eq, Show)
 
@@ -90,7 +97,6 @@ defaultGlobalState = GlobalState
   , hakkers = M.empty
   , chopsticks = M.empty
   , messages = []
-  , packets = []
   }
 
 initState :: [HakkerId] -> GlobalState
@@ -105,12 +111,12 @@ tick :: GlobalState -> GlobalState
 tick gs = gs {timestamp = (timestamp gs) + 1}
 
 data Action =
-    -- NOTE: if later we want to simulate delayed network, Hakker should also wait for confirm message from chopsticks
     HakkerThink HakkerId
   | HakkerHungry HakkerId
-    -- NOTE: A different implementation would be transfer back to Thinking is any message is Busy
   | HakkerEat HakkerId
   | ChopstickResp ChopstickId
+  -- Below are messages for delayed network
+  | Nop
   deriving stock (Eq, Show)
 
 chopReceive :: HakkerMsg -> Chopstick -> Chopstick
@@ -120,10 +126,12 @@ hakkerReceive :: ChopstickMsg -> Hakker -> Hakker
 hakkerReceive msg hakker@Hakker{hkRecvs=recvs} = hakker {hkRecvs = msg :<| recvs}
 
 -- One system step in perfect network condition
--- This step function will cause deadlock for DinningHakker problem
--- If the Chopstick is Taken, and gets a Take message from the other Hakker,
--- the Chopstick will not process the Hakker's Take message.
--- NOTE: i.e., the Busy message is not used in this simulation function
+-- This step function will not cause deadlock for DinningHakker problem.
+-- All messages are immediately received.
+-- All messages are processed in the order they are received.
+-- NOTE: the Busy message is not used in this simulation function
+-- NOTE: A different implementation would be transfer back to Thinking is any message is Busy
+-- NOTE: if later we want to simulate packet loss, Hakker should also wait for confirmation from chopsticks
 stepPerfect :: Action -> GlobalState -> GlobalState
 -- If the Hakker is Eating, send Put messages to both sides, and transfer to Thinking
 -- Otherwise do nothing.
@@ -194,11 +202,17 @@ stepPerfect (ChopstickResp c) gs@GlobalState{timestamp=ts, hakkers=hs, chopstick
         cs' = M.insert c (chop {chopRecvs=msgs, chopState=Free}) cs
         in
         tick gs {hakkers=hs, chopsticks=cs'}
+      -- If the message is already taken, but the next message is a Take.
+      -- Move the Take message to the end of the list.
+      -- This is fine, because there's only two Hakkers knowing the chopstick
+      -- And only one of them will send Take message
       msgs :|> msg@(Take _ _ _) -> let
         cs' = M.insert c (chop {chopRecvs=msg :<| msgs}) cs
         in
         tick gs {hakkers=hs, chopsticks=cs'}
       _ -> tick gs
+-- Do not handle other cases
+stepPerfect _ gs = gs
 
 type World = SAS GlobalState Action
 
