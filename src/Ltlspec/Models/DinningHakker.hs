@@ -125,7 +125,7 @@ chopReceive msg chop@Chopstick{chopRecvs=recvs} = chop {chopRecvs = msg :<| recv
 hakkerReceive :: ChopstickMsg -> Hakker -> Hakker
 hakkerReceive msg hakker@Hakker{hkRecvs=recvs} = hakker {hkRecvs = msg :<| recvs}
 
--- One system step in perfect network condition
+-- | One system step in perfect network condition
 -- This step function will not cause deadlock for DinningHakker problem.
 -- All messages are immediately received.
 -- All messages are processed in the order they are received.

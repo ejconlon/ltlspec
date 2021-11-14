@@ -126,6 +126,7 @@ propAtoms = execWriter . foldUpM go where
     _ -> pure ()
 
 -- | Looks up a variable in the environment ('Nothing' means missing)
+-- FIXME: We can change to map for poentially better performance
 lookupEnvName :: Env v -> VarName -> Maybe v
 lookupEnvName zs x =
   case zs of
@@ -133,11 +134,11 @@ lookupEnvName zs x =
     (n, v) :<| ys -> if x == n then Just v else lookupEnvName ys x
 
 -- | Looks up all atom variables in the environment ('Left' means missing)
-lookupEnvAtom :: Env v -> Atom VarName -> Either VarName (Atom v)
+lookupEnvAtom :: Env v -> AtomVar -> Either VarName (Atom v)
 lookupEnvAtom env = traverse (\n -> maybe (Left n) Right (lookupEnvName env n))
 
 -- | Combines "forall" branch results
-sequenceForAllRes :: [EnvPropRes e v] -> Either (EnvPropBad e) (EnvPropGood v)
+sequenceForAllRes :: [EnvPropRes e v] -> EnvPropRes e v
 sequenceForAllRes rs = sequenceA rs >>= go Empty where
   go !acc = \case
     [] -> Right (EnvPropGoodNext (EnvPropStepQuant QuantifierForAll acc))
@@ -147,7 +148,7 @@ sequenceForAllRes rs = sequenceA rs >>= go Empty where
         EnvPropGoodNext x -> go (acc :|> x) ps
 
 -- | Combines "exists" branch results
-sequenceExistsRes :: [EnvPropRes e v] -> Either (EnvPropBad e) (EnvPropGood v)
+sequenceExistsRes :: [EnvPropRes e v] -> EnvPropRes e v
 sequenceExistsRes = error "TODO"
 
 -- TODO(yanze) implement this and resurrect unit tests!
@@ -164,13 +165,28 @@ envPropEval (EnvProp env0 prop0) world = go env0 prop0 where
               Right anotherProp -> go env anotherProp
       PropTrue -> Right (EnvPropGoodBool True)
       PropFalse -> Right (EnvPropGoodBool False)
+      PropNot _ -> error "TODO"
+      PropAnd p1 p2 -> case go env p1 of
+        bad@(Left _) -> bad
+        Right (EnvPropGoodBool True) -> go env p2
+        false@(Right (EnvPropGoodBool False)) -> false
+        next@(Right (EnvPropGoodNext propStep)) -> case go env p2 of
+          bad@(Left _) -> bad
+          Right (EnvPropGoodBool True) -> next
+          false@(Right (EnvPropGoodBool False)) -> false
+          next2@(Right (EnvPropGoodNext propStep2)) -> undefined
+      PropOr _ _ -> error "TODO"
+      PropNext _ -> error "TODO"
+      PropUntil _ _ -> error "TODO"
+      PropRelease _ _ -> error "TODO"
       PropForAll (Binder varName tyName) bodyProp ->
         case bridgeQuantify world tyName of
           Left err -> Left (EnvPropBadErr err)
           Right vals ->
+            -- NOTE: so far this seems to be the only place that can change env
             let results = fmap (\val -> go ((varName,val) :<| env) bodyProp) vals
             in sequenceForAllRes results
-      _ -> error "TODO"
+      PropExists _ _ -> error "TODO"
 
 -- -- | Negates the result
 -- propResNot :: PropRes (Prop p) -> PropRes (Prop p)
