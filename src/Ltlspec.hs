@@ -135,25 +135,6 @@ lookupEnvName zs x = M.lookup x zs
 insertEnv :: Env v -> VarName -> v -> Env v
 insertEnv env name val = M.insertWithKey (\k _ -> error ("Data variable " ++ k ++ " was bound twice! (during insertion)")) name val env
 
--- mergeEnv should be safe for name conflicts
--- There are two cases I can think of
--- case1: ∀a:T. p(a) ∧ q(a)
--- here because the data variable "a" in both environments will be the same
--- therefore it's safe to union them
--- case2: (∀a:T. p(a)) ∧ (∀a:R. q(a))
--- we should report an error
--- NOTE:
--- There's one drawback:
--- (∀a:T. p(a)) ∧ (∀a:T. q(a)) should be allowed
--- Because it's equivalent to ∀a:T.(p(a) ∧ q(a))
--- Right now we will reject it, and rely on users to write a good proposition
--- Maybe we should run a normalization pass on the domain axioms
-mergeEnv :: Eq v => Env v -> Env v -> Env v
-mergeEnv = M.unionWithKey
-  (\k x1 x2 -> if x1 == x2
-    then x1
-    else error ("Data variable " ++ k ++ " was bound twice! (during merge)"))
-
 -- | Looks up all atom variables in the environment ('Left' means missing)
 lookupEnvAtom :: Env v -> AtomVar -> Either VarName (Atom v)
 lookupEnvAtom env = traverse (\n -> maybe (Left n) Right (lookupEnvName env n))
