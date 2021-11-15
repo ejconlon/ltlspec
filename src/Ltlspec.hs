@@ -186,8 +186,12 @@ mergeEnvPropSteps pc ep1 ep2 = case ep1 of
   EnvPropStepSingle ep -> error "TODO"
   EnvPropStepParallel qt eps -> error "TODO"
 
-negateEnvPropSteps :: EnvPropStep v -> EnvPropStep v
-negateEnvPropSteps = error "TODO"
+negateEnvPropStep :: EnvPropStep v -> EnvPropStep v
+negateEnvPropStep = \case
+  EnvPropStepSingle (EnvProp e p) -> EnvPropStepSingle (EnvProp e (PropNot p))
+  EnvPropStepParallel qt eps ->
+    let eps' = fmap negateEnvPropStep eps
+    in EnvPropStepParallel qt eps'
 
 -- TODO(yanze) implement this and resurrect unit tests!
 envPropEval :: Bridge e v w => EnvProp v -> w -> EnvPropRes e v
@@ -207,7 +211,7 @@ envPropEval ep0@(EnvProp env0 prop0) world = go env0 prop0 where
         bad@(Left _) -> bad
         Right (EnvPropGoodBool True) -> GoodB False
         Right (EnvPropGoodBool False) -> GoodB True
-        Right (EnvPropGoodNext next) -> GoodN $ negateEnvPropSteps next
+        Right (EnvPropGoodNext next) -> GoodN $ negateEnvPropStep next
       PropAnd p1 p2 -> case go env p1 of
         -- the evaluation of p1 raised an error
         bad@(Left _) -> bad
