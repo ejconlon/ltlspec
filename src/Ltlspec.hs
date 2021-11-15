@@ -2,7 +2,6 @@
 module Ltlspec where
 
 import Control.Monad.Writer.Strict (execWriter, tell)
-import Data.Foldable (foldl')
 import Data.Functor.Foldable (embed, fold, project)
 import qualified Data.Map.Strict as M
 import Data.Semigroup (Max (..), Sum (..))
@@ -303,7 +302,7 @@ evalEnvPropGood res world = case res of
   EnvPropGoodNext (EnvPropStepParallel qt ps) ->
     let
       allRes = fmap (\x -> evalEnvPropGood (EnvPropGoodNext x) world) ps
-      results = foldl' (\rs r -> r : rs) [] allRes
+      results = foldr (\r rs -> r : rs) [] allRes
       result = case qt of
         QuantifierForAll -> sequenceForAllRes results
         QuantifierExists -> sequenceExistsRes results
