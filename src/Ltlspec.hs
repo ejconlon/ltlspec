@@ -2,6 +2,7 @@
 module Ltlspec where
 
 import Control.Monad.Writer.Strict (execWriter, tell)
+import Data.Foldable (foldl')
 import Data.Functor.Foldable (embed, fold, project)
 import qualified Data.Map.Strict as M
 import Data.Semigroup (Max (..), Sum (..))
@@ -286,25 +287,30 @@ envPropEval ep0@(EnvProp env0 prop0) world = go env0 prop0 where
             let results = fmap (\val -> go (insertEnv env varName val) bodyProp) vals
             in sequenceExistsRes results
 
-evalEnvPropRes :: Bridge e v w => (Int, EnvPropRes e v) -> w -> (Int, EnvPropRes e v)
-evalEnvPropRes (i, res) world = case res of
-  Left _ -> (i+1, res)
-  Right (EnvPropGoodBool _) -> (i+1, res)
-  Right (EnvPropGoodNext (EnvPropStepSingle p)) -> (i+1, envPropEval p world)
-  Right (EnvPropGoodNext (EnvPropStepParallel qt ps)) ->
+evalEnvPropGood :: Bridge e v w => EnvPropGood v -> w -> EnvPropRes e v
+evalEnvPropGood res world = case res of
+  EnvPropGoodBool _ -> Right res
+  EnvPropGoodNext (EnvPropStepSingle p) -> envPropEval p world
+  EnvPropGoodNext (EnvPropStepParallel qt ps) ->
     let
-      allRes = fmap (\x -> evalEnvPropRes (i, Right (EnvPropGoodNext x)) world) ps
-      results = foldl (\rs (_, r) -> r : rs) [] allRes
+      allRes = fmap (\x -> evalEnvPropGood (EnvPropGoodNext x) world) ps
+      results = foldl' (\rs r -> r : rs) [] allRes
       result = case qt of
         QuantifierForAll -> sequenceForAllRes results
         QuantifierExists -> sequenceExistsRes results
-    in (i+1, result)
+    in result
 
 -- | Evaluate the prop at every timestep until true/false or there are no more inputs.
 -- Also returns the number of timesteps evaluated.
 -- NOTE: the first world is the leftmost one in the list
 envPropFold :: Bridge e v w => EnvProp v -> [w] -> (Int, EnvPropRes e v)
-envPropFold p ws = foldl evalEnvPropRes (0, Right (EnvPropGoodNext (EnvPropStepSingle p))) ws
+envPropFold p = go 0 (Right (EnvPropGoodNext (EnvPropStepSingle p))) where
+  go i r [] = (i, r)
+  go i r (w:ws) =
+    case r of
+      Left _ -> (i, r)
+      Right (EnvPropGoodBool _) -> (i, r)
+      Right good -> go (i+1) (evalEnvPropGood good w) ws
 
 -- | Scan a list of actions into a list of SAS
 scanSAS :: (a -> s -> s) -> s -> [a] -> [SAS s a]
