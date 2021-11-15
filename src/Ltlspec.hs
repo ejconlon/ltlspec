@@ -5,7 +5,7 @@ import Control.Monad.Writer.Strict (execWriter, tell)
 import Data.Functor.Foldable (embed, fold, project)
 import qualified Data.Map.Strict as M
 import Data.Semigroup (Max (..), Sum (..))
-import Data.Sequence (Seq (..))
+import Data.Sequence (Seq (..), fromList)
 import Ltlspec.Recursion (foldUpM)
 import Ltlspec.Types (Atom (..), AtomVar, Binder (..), Bridge (..), Env, EnvProp (..), EnvPropBad (..),
                       EnvPropGood (..), EnvPropRes, EnvPropStep (..), Prop (..), PropF (..), PropName, Quantifier (..),
@@ -140,8 +140,14 @@ insertEnv env name val = M.insertWithKey (\k _ -> error ("Data variable " ++ k +
 -- case1: ∀a:T. p(a) ∧ q(a)
 -- here because the data variable "a" in both environments will be the same
 -- therefore it's safe to union them
--- case2: (∀a:T. p(a)) ∧ (∀a:T. q(a))
+-- case2: (∀a:T. p(a)) ∧ (∀a:R. q(a))
 -- we should report an error
+-- NOTE:
+-- There's one drawback:
+-- (∀a:T. p(a)) ∧ (∀a:T. q(a)) should be allowed
+-- Because it's equivalent to ∀a:T.(p(a) ∧ q(a))
+-- Right now we will reject it, and rely on users to write a good proposition
+-- Maybe we should run a normalization pass on the domain axioms
 mergeEnv :: Eq v => Env v -> Env v -> Env v
 mergeEnv = M.unionWithKey
   (\k x1 x2 -> if x1 == x2
@@ -172,8 +178,6 @@ sequenceExistsRes rs = sequenceA rs >>= go Empty where
         EnvPropGoodBool b -> if b then Right p else go acc ps
         EnvPropGoodNext x -> go (acc :|> x) ps
 
-type PropCombinator = Prop -> Prop -> Prop
-
 -- typing less is a blessing
 pattern GoodB :: Bool -> Either a (EnvPropGood v)
 pattern GoodB b = Right (EnvPropGoodBool b)
@@ -181,10 +185,17 @@ pattern GoodB b = Right (EnvPropGoodBool b)
 pattern GoodN :: EnvPropStep v -> Either a (EnvPropGood v)
 pattern GoodN ep = Right (EnvPropGoodNext ep)
 
+data PropCombinator = PcAnd | PcOr
+
+-- | Anytime we have And/Or/Forall/Exists, we need to check multiple propostions concurrently
+-- This merge function will merge single step propositions into a sequence.
+-- The elements in the sequence are *conceptually* running in parallel.
 mergeEnvPropSteps :: PropCombinator -> EnvPropStep v -> EnvPropStep v -> EnvPropStep v
-mergeEnvPropSteps pc ep1 ep2 = case ep1 of
-  EnvPropStepSingle ep -> error "TODO"
-  EnvPropStepParallel qt eps -> error "TODO"
+mergeEnvPropSteps pc step1 step2 = combine pc step1 step2
+  where
+    combine combinator s1 s2 = case combinator of
+      PcAnd -> EnvPropStepParallel QuantifierForAll (fromList [s1, s2])
+      PcOr -> EnvPropStepParallel QuantifierExists (fromList [s1, s2])
 
 negateEnvPropStep :: EnvPropStep v -> EnvPropStep v
 negateEnvPropStep = \case
@@ -229,7 +240,7 @@ envPropEval ep0@(EnvProp env0 prop0) world = go env0 prop0 where
           false@(Right (EnvPropGoodBool False)) -> false
           -- both p1 and p2 needs further evaluation in the next world,
           -- merge them based on the current proposition (PropAnd)
-          Right (EnvPropGoodNext next2) -> GoodN $ mergeEnvPropSteps PropAnd next1 next2
+          Right (EnvPropGoodNext next2) -> GoodN $ mergeEnvPropSteps PcAnd next1 next2
       PropOr p1 p2 -> case go env p1 of
         bad@(Left _) -> bad
         Right (EnvPropGoodBool False) -> go env p2
@@ -238,7 +249,7 @@ envPropEval ep0@(EnvProp env0 prop0) world = go env0 prop0 where
           bad@(Left _) -> bad
           Right (EnvPropGoodBool False) -> GoodN next1
           true@(Right (EnvPropGoodBool True)) -> true
-          Right (EnvPropGoodNext next2) -> GoodN $ mergeEnvPropSteps PropOr next1 next2
+          Right (EnvPropGoodNext next2) -> GoodN $ mergeEnvPropSteps PcOr next1 next2
       PropNext p -> GoodN $ EnvPropStepSingle (EnvProp env p)
       PropUntil p1 p2 -> case go env p2 of
         bad@(Left _) -> bad
@@ -256,12 +267,12 @@ envPropEval ep0@(EnvProp env0 prop0) world = go env0 prop0 where
           -- Therefore we use PropAnd to connect the residual and the original prop.
           -- the residual will be evaluate first, and if it's true, the proposition is proven;
           -- otherwise, we need to evaluate the same prop in the next world (next time tick)
-          Right (EnvPropGoodNext next) -> GoodN $ mergeEnvPropSteps PropAnd next (EnvPropStepSingle ep0)
+          Right (EnvPropGoodNext next) -> GoodN $ mergeEnvPropSteps PcAnd next (EnvPropStepSingle ep0)
         -- p2 has some residual for next world
         -- If p2 is evaluate to be true in the next world,
         -- the whole prop is true in the *current* world.
         -- Therefore, we use PropOr to connect.
-        Right (EnvPropGoodNext next) -> GoodN $ mergeEnvPropSteps PropOr next (EnvPropStepSingle ep0)
+        Right (EnvPropGoodNext next) -> GoodN $ mergeEnvPropSteps PcOr next (EnvPropStepSingle ep0)
       PropRelease p1 p2 -> case go env p2 of
         bad@(Left _) -> bad
         -- p2 is false, the prop is false!
@@ -278,9 +289,9 @@ envPropEval ep0@(EnvProp env0 prop0) world = go env0 prop0 where
           -- If the residual is true, the prop is proven,
           -- otherwise we need to keep evaluating the prop in next world
           -- Therefore we use PropOr to connect the residual and the original prop.
-          Right (EnvPropGoodNext next) -> GoodN $ mergeEnvPropSteps PropOr next (EnvPropStepSingle ep0)
+          Right (EnvPropGoodNext next) -> GoodN $ mergeEnvPropSteps PcOr next (EnvPropStepSingle ep0)
         -- Similarly, here we use PropAnd to connect
-        Right (EnvPropGoodNext next) -> GoodN $ mergeEnvPropSteps PropOr next (EnvPropStepSingle ep0)
+        Right (EnvPropGoodNext next) -> GoodN $ mergeEnvPropSteps PcAnd next (EnvPropStepSingle ep0)
       PropForAll (Binder varName tyName) bodyProp ->
         case bridgeQuantify world tyName of
           Left err -> Left (EnvPropBadErr err)
@@ -294,101 +305,25 @@ envPropEval ep0@(EnvProp env0 prop0) world = go env0 prop0 where
             let results = fmap (\val -> go (insertEnv env varName val) bodyProp) vals
             in sequenceExistsRes results
 
--- -- | Negates the result
--- propResNot :: PropRes (Prop p) -> PropRes (Prop p)
--- propResNot = \case
---   PropResTrue -> PropResFalse
---   PropResFalse -> PropResTrue
---   PropResNext r -> PropResNext (Prop (PropNotF r))
-
--- -- | Evaluate the proposition at the current timestep with the given evaluation function.
--- -- (See also graphEval.)
--- propEval :: (p -> Bool) -> Prop p -> PropRes (Prop p)
--- propEval f = go where
---   go p0@(Prop f0) =
---     case f0 of
---       PropAtomF p -> if f p then PropResTrue else PropResFalse
---       PropTrueF -> PropResTrue
---       PropFalseF -> PropResFalse
---       PropNotF r -> propResNot (go r)
---       PropAndF r1 r2 ->
---         case go r1 of
---           PropResTrue -> go r2
---           PropResFalse -> PropResFalse
---           n@(PropResNext r1') ->
---             case go r2 of
---               PropResTrue -> n
---               PropResFalse -> PropResFalse
---               PropResNext r2' -> PropResNext (Prop (PropAndF r1' r2'))
---       PropOrF r1 r2 ->
---         case go r1 of
---           PropResTrue -> PropResTrue
---           PropResFalse -> go r1
---           n@(PropResNext r1') ->
---             case go r2 of
---               PropResTrue -> PropResTrue
---               PropResFalse -> n
---               PropResNext r2' -> PropResNext (Prop (PropOrF r1' r2'))
---       PropNextF r -> PropResNext r
---       -- See "Until" logic from "Runtime Verification of Concurrent Haskell Programs" s3.2, p7.
---       PropUntilF r1 r2 ->
---         case go r2 of
---           -- Once r2 holds, the proposition is satisfied
---           PropResTrue -> PropResTrue
---           -- If r2 does not hold,
---           PropResFalse ->
---             case go r1 of
---               -- If r1 does not hold, the proposition is falsified
---               PropResFalse -> PropResFalse
---               -- If r1 holds, we are still in the until
---               PropResTrue -> PropResNext p0
---               -- If r1 advances, we need to satisfy the new prop and the existing until prop
---               PropResNext r1' -> PropResNext (Prop (PropAndF r1' p0))
---           -- If r2 advances,
---           PropResNext r2' ->
---             case go r1 of
---               -- If r1 does not hold, then we are absolved of the until only if r2' holds
---               PropResFalse -> PropResNext r2'
---               -- If r1 does hold, then we can either wait for absolution or keep on with the until
---               PropResTrue -> PropResNext (Prop (PropOrF r2' p0))
---               -- If r1 advances, we follow similar logic
---               PropResNext r1' -> PropResNext (Prop (PropOrF r2' (Prop (PropAndF r1' p0))))
---       PropReleaseF r1 r2 ->
---         case go r2 of
---           -- If r2 does not hold, the proposition is falsified
---           PropResFalse -> PropResFalse
---           -- If r2 holds,
---           PropResTrue ->
---             case go r1 of
---               -- If r1 does not hold, we are still in the release
---               PropResFalse -> PropResNext p0
---               -- If r1 holds, the proposition is satisfied
---               PropResTrue -> PropResTrue
---               -- If r1 advances, we need to satisfy the new prop and the existing release prop
---               PropResNext _ -> error "TODO" -- PropResNext (Prop (PropAndF [r1', p0]))
---           -- If r2 advances,
---           PropResNext _ ->
---             case go r1 of
---               PropResFalse -> error "TODO"
---               PropResTrue -> error "TODO"
---               PropResNext _ -> error "TODO"
+evalEnvPropRes :: Bridge e v w => (Int, EnvPropRes e v) -> w -> (Int, EnvPropRes e v)
+evalEnvPropRes (i, res) world = case res of
+  Left _ -> (i+1, res)
+  Right (EnvPropGoodBool _) -> (i+1, res)
+  Right (EnvPropGoodNext (EnvPropStepSingle p)) -> (i+1, envPropEval p world)
+  Right (EnvPropGoodNext (EnvPropStepParallel qt ps)) ->
+    let
+      allRes = fmap (\x -> evalEnvPropRes (i, Right (EnvPropGoodNext x)) world) ps
+      results = foldl (\rs (_, r) -> r : rs) [] allRes
+      result = case qt of
+        QuantifierForAll -> sequenceForAllRes results
+        QuantifierExists -> sequenceExistsRes results
+    in (i+1, result)
 
 -- | Evaluate the prop at every timestep until true/false or there are no more inputs.
 -- Also returns the number of timesteps evaluated.
+-- NOTE: the first world is the leftmost one in the list
 envPropFold :: Bridge e v w => EnvProp v -> [w] -> (Int, EnvPropRes e v)
-envPropFold = go 0 where
-  go i p ws =
-    case ws of
-      [] -> (i, Right (EnvPropGoodNext (EnvPropStepSingle p)))
-      w:_ ->
-        let i' = i + 1
-            r = envPropEval p w
-        in case r of
-          Left _ -> (i', r)
-          Right q ->
-            case q of
-              EnvPropGoodBool _ -> (i', r)
-              EnvPropGoodNext _ -> error "TODO"
+envPropFold p ws = foldl evalEnvPropRes (0, Right (EnvPropGoodNext (EnvPropStepSingle p))) ws
 
 -- | Scan a list of actions into a list of SAS
 scanSAS :: (a -> s -> s) -> s -> [a] -> [SAS s a]

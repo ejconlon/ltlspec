@@ -141,7 +141,7 @@ data SAS s a = SAS
 -- Typeclass-wise we associate instances with the world type. `w -> e v` means
 -- the world type determines the others.
 -- This is an "interpretation" in the logic sense.
-class Bridge e v w | w -> e v where
+class Eq v => Bridge e v w | w -> e v where
   -- | Evaluate the atomic proposition or fail.
   bridgeEvalProp :: w -> Atom v -> Either e Prop
   -- | Quantify over all values of the given type or fail.

@@ -83,14 +83,14 @@ testEqCase (EqCase name worlds prop expectedSteps expectedRes) = testCase name $
 
 eqCases :: [EqCase Char]
 eqCases =
-  [ EqCase "null world false" [] PropFalse 0 (Right (EnvPropGoodNext (EnvPropStepSingle (EnvProp mempty PropFalse))))
-  , EqCase "null world true" [] PropTrue 0 (Right (EnvPropGoodNext (EnvPropStepSingle (EnvProp mempty PropTrue))))
-  , EqCase "1-empty world false" [EqWorld []] PropFalse 1 (Right (EnvPropGoodBool False))
-  , EqCase "1-empty world true" [EqWorld []] PropTrue 1 (Right (EnvPropGoodBool True))
-  , EqCase "1-empty world and1" [EqWorld []] (PropAnd PropTrue PropTrue) 1 (Right (EnvPropGoodBool True))
-  , EqCase "1-empty world and2" [EqWorld []] (PropAnd PropTrue PropFalse) 1 (Right (EnvPropGoodBool False))
-  , EqCase "1-empty world or1" [EqWorld []] (PropOr PropTrue PropFalse) 1 (Right (EnvPropGoodBool True))
-  , EqCase "1-empty world or2" [EqWorld []] (PropOr PropFalse PropFalse) 1 (Right (EnvPropGoodBool False))
+  [ EqCase "0 world; false" [] PropFalse 0 (Right (EnvPropGoodNext (EnvPropStepSingle (EnvProp mempty PropFalse))))
+  , EqCase "0 world; true" [] PropTrue 0 (Right (EnvPropGoodNext (EnvPropStepSingle (EnvProp mempty PropTrue))))
+  , EqCase "1 world; false" [EqWorld []] PropFalse 1 (Right (EnvPropGoodBool False))
+  , EqCase "1 world; true" [EqWorld []] PropTrue 1 (Right (EnvPropGoodBool True))
+  , EqCase "1 world; and1" [EqWorld []] (PropAnd PropTrue PropTrue) 1 (Right (EnvPropGoodBool True))
+  , EqCase "1 world; and2" [EqWorld []] (PropAnd PropTrue PropFalse) 1 (Right (EnvPropGoodBool False))
+  , EqCase "1 world; or1" [EqWorld []] (PropOr PropTrue PropFalse) 1 (Right (EnvPropGoodBool True))
+  , EqCase "1 world; or2" [EqWorld []] (PropOr PropFalse PropFalse) 1 (Right (EnvPropGoodBool False))
   ]
 
 testEqCases :: TestTree
