@@ -259,7 +259,7 @@ generateTraceGivenMessages :: [SystemEvent] -> [ChatWorld]
 generateTraceGivenMessages (e:es) = List.foldl func [SAS (initialChatState 3) e (processEvent e (initialChatState 3)) ] es
     where func sass ev = sass ++ [SAS (sasAfter (last sass)) ev (processEvent ev (sasAfter (last sass)))]
 
--- TODO(tarcisio) Implement bridge for this theory with unit tests
+-- TODO(tarcisio) Implement unit tests
 
 
 instance Bridge Error ChatVal ChatWorld where
@@ -273,13 +273,18 @@ instance Bridge Error ChatVal ChatWorld where
                                                                                         Left (Send a c _ ch) -> if a==aid && c==cid && ch==chid then Right PropTrue  else Right PropFalse
                                                                                         _ -> Right PropFalse
             ("ListRequested", [ChatValAction aid, ChatValClient cid]) -> if e == Left (List aid cid) then Right PropTrue else Right PropFalse
-            ("Shared", [ChatValAction aid, ChatValClient sid, ChatValClient rid]) -> case e of 
+            ("Shared", [ChatValAction aid, ChatValClient sid, ChatValClient rid]) -> case e of
                                                                                         Right (Share a s _ r) -> if a==aid && s==sid && r==rid then Right PropTrue else Right PropFalse
                                                                                         _ -> Right PropFalse
             ("NewJoinNote", [ChatValAction aid, ChatValClient cid1, ChatValChannel chid, ChatValClient cid2]) -> if e == Right (NewJoin aid cid1 chid cid2) then Right PropTrue else Right PropFalse
             ("NewLeaveNote", [ChatValAction aid, ChatValClient cid1, ChatValChannel chid, ChatValClient cid2]) -> if e == Right (NewLeave aid cid1 chid cid2) then Right PropTrue else Right PropFalse
             ("ChannelListNote", [ChatValAction aid, ChatValClient cid, ChatValChannel chid]) -> if e == Right (ChannelList aid cid chid) then Right PropTrue else Right PropFalse
             _ -> Left ("Could not eval " <> propName <> " on " <> show vals)
-    
-    bridgeQuantify = error "TODO"
+
+    bridgeQuantify (SAS _ _ s2) tyname =
+        case tyname of
+            "ClientID" -> Right (map ChatValClient (Map.keys (fst s2)))
+            "ChannelID" -> Right (map ChatValChannel (Set.toList (Set.fromList (concat (Map.elems (fst s2))))))
+            "ActionID" -> Right (map  ChatValAction [0..(snd s2)] )
+            _ -> Left ("Could not quantify over " <> tyname)
 
