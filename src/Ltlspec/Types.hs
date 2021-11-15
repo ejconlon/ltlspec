@@ -81,14 +81,15 @@ deriving anyclass instance Hashable a => (Hashable (PropF a))
 deriving anyclass instance NFData a => (NFData (PropF a))
 
 -- | Variables bound during prop eval
-type Env v = Seq (VarName, v)
+type Env v = Map VarName v
 
--- | Just a named tuple of environment and prop
-data EnvProp v = EnvProp
-  { epEnv :: !(Env v)
-  , epProp :: !Prop
-  } deriving stock (Eq, Show, Generic)
-    deriving anyclass (NFData)
+-- | Named tuple of environment and prop
+-- NOTE: only propAtom needs environment
+-- All other composed props just need to carry child props with correct environments
+data EnvProp v =
+    EnvProp !(Env v) !Prop
+  deriving stock (Eq, Show, Generic)
+  deriving anyclass (NFData)
 
 -- | Quantifiers: we have forall and exists
 data Quantifier =
@@ -101,7 +102,7 @@ data Quantifier =
 data EnvPropStep v =
     EnvPropStepSingle !(EnvProp v)
   -- ^ A non-quantified step
-  | EnvPropStepQuant !Quantifier !(Seq (EnvPropStep v))
+  | EnvPropStepParallel !Quantifier !(Seq (EnvPropStep v))
   -- ^ A quantified step
   deriving stock (Eq, Show, Generic)
   deriving anyclass (NFData)
