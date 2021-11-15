@@ -302,7 +302,7 @@ evalEnvPropGood res world = case res of
 
 -- | Evaluate the prop at every timestep until true/false or there are no more inputs.
 -- Also returns the number of timesteps evaluated.
--- NOTE: the first world is the leftmost one in the list
+-- NOTE: Worlds start from the leftmost one in the list
 envPropFold :: Bridge e v w => EnvProp v -> [w] -> (Int, EnvPropRes e v)
 envPropFold p = go 0 (Right (EnvPropGoodNext (EnvPropStepSingle p))) where
   go i r [] = (i, r)
