@@ -12,6 +12,15 @@ import Ltlspec.Types (Atom (..), AtomVar, Binder (..), Bridge (..), Env, EnvProp
                       EnvPropGood (..), EnvPropRes, EnvPropStep (..), Prop (..), PropF (..), PropName, Quantifier (..),
                       SAS (..), TyName, VarName)
 
+-- | Scan a list of actions into a list of SAS
+scanSAS :: (a -> s -> s) -> s -> [a] -> [SAS s a]
+scanSAS update initState actions = result where
+  result = case actions  of
+    [] -> []
+    a:as -> scanr go (initWorld a) as
+  initWorld a = SAS initState a (update a initState)
+  go a (SAS _ _ after) = SAS after a (update a after)
+
 -- | Put the prop in negation normal form, which basically involves
 -- pushing negations to the bottom.
 --
@@ -311,12 +320,3 @@ envPropFold p = go 0 (Right (EnvPropGoodNext (EnvPropStepSingle p))) where
       Left _ -> (i, r)
       Right (EnvPropGoodBool _) -> (i, r)
       Right good -> go (i+1) (evalEnvPropGood good w) ws
-
--- | Scan a list of actions into a list of SAS
-scanSAS :: (a -> s -> s) -> s -> [a] -> [SAS s a]
-scanSAS update initState actions = result where
-  result = case actions  of
-    [] -> []
-    a:as -> scanr go (initWorld a) as
-  initWorld a = SAS initState a (update a initState)
-  go a (SAS _ _ after) = SAS after a (update a after)
