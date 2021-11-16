@@ -40,4 +40,4 @@ We have implemented a basic LTL verifier:
 * An LTL proposition verifier for a single world ([link](https://github.com/ejconlon/ltlspec/blob/790de377d53d132f43bc96e6d7d45060558f744c/src/Ltlspec.hs#L199))
 * Folding over a sequence of worlds to evaluate a proposition ([link](https://github.com/ejconlon/ltlspec/blob/790de377d53d132f43bc96e6d7d45060558f744c/src/Ltlspec.hs#L315))
 * A simple bridge for testing ([link](https://github.com/ejconlon/ltlspec/blob/790de377d53d132f43bc96e6d7d45060558f744c/src/Ltlspec/Test/Main.hs#L61))
-* Test cases for some simple scenarios ([link](https://github.com/ejconlon/ltlspec/blob/790de377d53d132f43bc96e6d7d45060558f744c/src/Ltlspec/Test/Main.hs#L84))
+* Test cases for some simple scenarios ([link](https://github.com/ejconlon/ltlspec/blob/e0013fcf825f37d9e1bc7c40e33fc2279095792f/src/Ltlspec/Test/Main.hs#L103))
