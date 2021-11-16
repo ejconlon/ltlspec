@@ -152,7 +152,11 @@ lookupEnvAtom env = traverse (\n -> maybe (Left n) Right (lookupEnvName env n))
 sequenceForAllRes :: [EnvPropRes e v] -> EnvPropRes e v
 sequenceForAllRes rs = sequenceA rs >>= go Empty where
   go !acc = \case
-    [] -> Right (EnvPropGoodNext (EnvPropStepParallel QuantifierForAll acc))
+    [] -> case acc of
+      -- Acc will be empty when all prop eval results are True
+      -- Thus the ForAll prop is True
+      Empty -> Right (EnvPropGoodBool True)
+      _ -> Right (EnvPropGoodNext (EnvPropStepParallel QuantifierForAll acc))
     p:ps ->
       case p of
         EnvPropGoodBool b -> if b then go acc ps else Right p
@@ -162,7 +166,11 @@ sequenceForAllRes rs = sequenceA rs >>= go Empty where
 sequenceExistsRes :: [EnvPropRes e v] -> EnvPropRes e v
 sequenceExistsRes rs = sequenceA rs >>= go Empty where
   go !acc = \case
-    [] -> Right (EnvPropGoodNext (EnvPropStepParallel QuantifierExists acc))
+    [] -> case acc of
+      -- Similarly, acc will be empty when all prop eval results are False
+      -- Thus the Exists prop is False
+      Empty -> Right (EnvPropGoodBool False)
+      _ -> Right (EnvPropGoodNext (EnvPropStepParallel QuantifierExists acc))
     p:ps ->
       case p of
         EnvPropGoodBool b -> if b then Right p else go acc ps

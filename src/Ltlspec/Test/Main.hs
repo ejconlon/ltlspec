@@ -2,8 +2,8 @@ module Ltlspec.Test.Main (main) where
 
 import qualified Data.Map.Strict as Map
 import Ltlspec (envPropFold, propForAllNested, propIf, propIfNested)
-import Ltlspec.Types (Atom (..), Bridge (..), EnvProp (..), EnvPropGood (..), EnvPropRes, EnvPropStep (..), Prop (..),
-                      Theory (..), VarName)
+import Ltlspec.Types (Atom (..), Binder (..), Bridge (..), EnvProp (..), EnvPropBad (..), EnvPropGood (..), EnvPropRes,
+                      EnvPropStep (..), Prop (..), Theory (..), VarName)
 import Test.Tasty (TestTree, defaultMain, testGroup)
 import Test.Tasty.HUnit (testCase, (@?=))
 -- import Data.Sequence (Seq)
@@ -81,16 +81,44 @@ testEqCase (EqCase name worlds prop expectedSteps expectedRes) = testCase name $
   let actualPair = envPropFold (EnvProp mempty prop) worlds
   actualPair @?= (expectedSteps, expectedRes)
 
-eqCases :: [EqCase Char]
+defaultErr :: EqErr
+defaultErr = EqErr "You are doomed!"
+
+-- A good fake world
+fakeWorld1 :: EqWorld Int
+fakeWorld1 = EqWorld [EqValueNormal 1, EqValueNormal 2, EqValueNormal 3]
+
+-- A bad fake world, EqValueNever does not equal to itself!
+fakeWorld2 :: EqWorld Int
+fakeWorld2 = EqWorld [EqValueNormal 1, EqValueNormal 2, EqValueNormal 3, EqValueNever]
+
+-- You cannot be more badass than this ;-)
+fakeWorld3 :: EqWorld Int
+fakeWorld3 = EqWorld [EqValueNever, EqValueNever, EqValueNever]
+
+-- Turns out you can...
+fakeWorld4 :: EqWorld Int
+fakeWorld4 = EqWorld [EqValueErr defaultErr, EqValueErr defaultErr]
+
+eqCases :: [EqCase Int]
 eqCases =
-  [ EqCase "0 world; false" [] PropFalse 0 (Right (EnvPropGoodNext (EnvPropStepSingle (EnvProp mempty PropFalse))))
-  , EqCase "0 world; true" [] PropTrue 0 (Right (EnvPropGoodNext (EnvPropStepSingle (EnvProp mempty PropTrue))))
-  , EqCase "1 world; false" [EqWorld []] PropFalse 1 (Right (EnvPropGoodBool False))
-  , EqCase "1 world; true" [EqWorld []] PropTrue 1 (Right (EnvPropGoodBool True))
-  , EqCase "1 world; and1" [EqWorld []] (PropAnd PropTrue PropTrue) 1 (Right (EnvPropGoodBool True))
-  , EqCase "1 world; and2" [EqWorld []] (PropAnd PropTrue PropFalse) 1 (Right (EnvPropGoodBool False))
-  , EqCase "1 world; or1" [EqWorld []] (PropOr PropTrue PropFalse) 1 (Right (EnvPropGoodBool True))
-  , EqCase "1 world; or2" [EqWorld []] (PropOr PropFalse PropFalse) 1 (Right (EnvPropGoodBool False))
+  [ EqCase "0 world; no eval1 #?" [] PropFalse 0 (Right (EnvPropGoodNext (EnvPropStepSingle (EnvProp mempty PropFalse))))
+  , EqCase "0 world; no eval2 #?" [] PropTrue 0 (Right (EnvPropGoodNext (EnvPropStepSingle (EnvProp mempty PropTrue))))
+  , EqCase "1 world; true #t" [EqWorld []] PropTrue 1 (Right (EnvPropGoodBool True))
+  , EqCase "1 world; false #f" [EqWorld []] PropFalse 1 (Right (EnvPropGoodBool False))
+  , EqCase "1 world; and1 #t" [EqWorld []] (PropAnd PropTrue PropTrue) 1 (Right (EnvPropGoodBool True))
+  , EqCase "1 world; and2 #f" [EqWorld []] (PropAnd PropTrue PropFalse) 1 (Right (EnvPropGoodBool False))
+  , EqCase "1 world; or1 #t" [EqWorld []] (PropOr PropTrue PropFalse) 1 (Right (EnvPropGoodBool True))
+  , EqCase "1 world; or2 #f" [EqWorld []] (PropOr PropFalse PropFalse) 1 (Right (EnvPropGoodBool False))
+  , EqCase "1 world; next1 #t" [EqWorld []] (PropNext (PropTrue)) 1 (Right (EnvPropGoodNext (EnvPropStepSingle (EnvProp mempty PropTrue))))
+  , EqCase "3 world; next2 #t" [EqWorld [], EqWorld [], EqWorld []] (PropNext (PropTrue)) 2 (Right (EnvPropGoodBool True))
+  , EqCase "3 world; next3 #?" [EqWorld [], EqWorld [], EqWorld []] (PropNext (PropNext (PropTrue))) 3 (Right (EnvPropGoodBool True))
+  , EqCase "1 world; forall1 #t" [fakeWorld1] (PropForAll (Binder "a" "Value") (PropAtom (Atom "IsEq" ["a", "a"]))) 1 (Right (EnvPropGoodBool True))
+  , EqCase "1 world; forall2 #f" [fakeWorld2] (PropForAll (Binder "a" "Value") (PropAtom (Atom "IsEq" ["a", "a"]))) 1 (Right (EnvPropGoodBool False))
+  , EqCase "1 world; forall3 #e" [fakeWorld4] (PropForAll (Binder "a" "Value") (PropAtom (Atom "IsEq" ["a", "a"]))) 1 (Left (EnvPropBadErr defaultErr))
+  , EqCase "1 world; forall4 #e" [fakeWorld1] (PropForAll (Binder "a" "Value") (PropAtom (Atom "IsEq" ["b", "b"]))) 1 (Left (EnvPropBadMissing "b"))
+  , EqCase "1 world; exists1 #t" [fakeWorld1] (PropExists (Binder "a" "Value") (PropAtom (Atom "IsEq" ["a", "a"]))) 1 (Right (EnvPropGoodBool True))
+  , EqCase "1 world; exists2 #f" [fakeWorld3] (PropForAll (Binder "a" "Value") (PropAtom (Atom "IsEq" ["a", "a"]))) 1 (Right (EnvPropGoodBool False))
   ]
 
 testEqCases :: TestTree
