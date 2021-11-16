@@ -14,7 +14,7 @@ We have delivered both items in this milestone as detailed below.
 
 ## Bridge interface
 
-We use this interface for the bridge (present [here](https://github.com/ejconlon/ltlspec/blob/18489478c18e564184d11b5ed54e2d80c71676d9/src/Ltlspec/Types.hs#L143)):
+We use this interface for the bridge (present [here](https://github.com/ejconlon/ltlspec/blob/master/src/Ltlspec/Types.hs#L144)):
 
 ```haskell
 -- | A 'Bridge' is something that can eval props and quantify in a given world.
@@ -37,7 +37,7 @@ An example implementation for the "Chat" domain that was introduced last milesto
 
 We have implemented a basic LTL verifier:
 
-* An LTL proposition verifier for a single world ([link](https://github.com/ejconlon/ltlspec/blob/790de377d53d132f43bc96e6d7d45060558f744c/src/Ltlspec.hs#L199))
-* Folding over a sequence of worlds to evaluate a proposition ([link](https://github.com/ejconlon/ltlspec/blob/790de377d53d132f43bc96e6d7d45060558f744c/src/Ltlspec.hs#L315))
-* A simple bridge for testing ([link](https://github.com/ejconlon/ltlspec/blob/790de377d53d132f43bc96e6d7d45060558f744c/src/Ltlspec/Test/Main.hs#L61))
-* Test cases for some simple scenarios ([link](https://github.com/ejconlon/ltlspec/blob/e0013fcf825f37d9e1bc7c40e33fc2279095792f/src/Ltlspec/Test/Main.hs#L103))
+* An LTL proposition verifier for a single world ([link](https://github.com/ejconlon/ltlspec/blob/master/src/Ltlspec.hs#L206))
+* Folding over a sequence of worlds to evaluate a proposition ([link](https://github.com/ejconlon/ltlspec/blob/master/src/Ltlspec.hs#L322))
+* A simple bridge for testing ([link](https://github.com/ejconlon/ltlspec/blob/master/src/Ltlspec/Test/Main.hs#L61))
+* Test cases for some simple scenarios ([link](https://github.com/ejconlon/ltlspec/blob/master/src/Ltlspec/Test/Main.hs#L103))
