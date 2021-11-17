@@ -142,7 +142,7 @@ lookupEnvName zs x = M.lookup x zs
 -- We should report an error for the case below
 -- case2: (∀a:T.(∀a:R. p(a)))
 insertEnv :: Env v -> VarName -> v -> Env v
-insertEnv env name val = M.insertWithKey (\k _ -> error ("Data variable " ++ k ++ " was bound twice! (during insertion)")) name val env
+insertEnv env name val = M.insertWithKey (\k _ -> error ("Data variable " ++ k ++ " was bound twice!")) name val env
 
 -- | Looks up all atom variables in the environment ('Left' means missing)
 lookupEnvAtom :: Env v -> AtomVar -> Either VarName (Atom v)
@@ -155,6 +155,7 @@ sequenceForAllRes rs = sequenceA rs >>= go Empty where
     [] -> case acc of
       -- Acc will be empty when all prop eval results are True
       -- Thus the ForAll prop is True
+      -- This case also stands for vacuous truth
       Empty -> Right (EnvPropGoodBool True)
       _ -> Right (EnvPropGoodNext (EnvPropStepParallel QuantifierForAll acc))
     p:ps ->
@@ -169,6 +170,7 @@ sequenceExistsRes rs = sequenceA rs >>= go Empty where
     [] -> case acc of
       -- Similarly, acc will be empty when all prop eval results are False
       -- Thus the Exists prop is False
+      -- This case also stands for vacuous false
       Empty -> Right (EnvPropGoodBool False)
       _ -> Right (EnvPropGoodNext (EnvPropStepParallel QuantifierExists acc))
     p:ps ->

@@ -37,7 +37,7 @@ An example implementation for the "Chat" domain that was introduced last milesto
 
 We have implemented a basic LTL verifier:
 
-* An LTL proposition verifier for a single world ([link](https://github.com/ejconlon/ltlspec/blob/master/src/Ltlspec.hs#L206))
-* Folding over a sequence of worlds to evaluate a proposition ([link](https://github.com/ejconlon/ltlspec/blob/master/src/Ltlspec.hs#L322))
+* An LTL proposition verifier for a single world ([link](https://github.com/ejconlon/ltlspec/blob/master/src/Ltlspec.hs#L208))
+* Folding over a sequence of worlds to evaluate a proposition ([link](https://github.com/ejconlon/ltlspec/blob/master/src/Ltlspec.hs#L324))
 * A simple bridge for testing ([link](https://github.com/ejconlon/ltlspec/blob/master/src/Ltlspec/Test/Main.hs#L61))
-* Test cases for some simple scenarios ([link](https://github.com/ejconlon/ltlspec/blob/master/src/Ltlspec/Test/Main.hs#L103))
+* Test cases for some simple scenarios ([link](https://github.com/ejconlon/ltlspec/blob/master/src/Ltlspec/Test/Main.hs#L112))
