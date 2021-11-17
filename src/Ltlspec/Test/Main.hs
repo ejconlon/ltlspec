@@ -137,6 +137,9 @@ eqCases =
   , EqCase "1 world; and forall #t" [fakeWorld1] (PropAnd (PropForAll (Binder "a" "Value") (PropAtom (Atom "IsEq" ["a", "a"]))) (PropForAll (Binder "a" "Value") (PropAtom (Atom "IsEq" ["a", "a"])))) 1 (Right (EnvPropGoodBool True))
   , EqCase "8 world; eventually #t" longWorlds1 (propEventually (PropForAll (Binder "a" "Value") (PropAtom (Atom "IsEq" ["a", "a"])))) 8 (Right (EnvPropGoodBool True))
   , EqCase "8 world; always #f" longWorlds2 (propAlways (PropForAll (Binder "a" "Value") (PropAtom (Atom "IsEq" ["a", "a"])))) 5 (Right (EnvPropGoodBool False))
+  , EqCase "2 world; and next forall1 #t" [fakeWorld3, fakeWorld1] (PropAnd (PropNext (PropForAll (Binder "a" "Value") (PropAtom (Atom "IsEq" ["a", "a"])))) (PropNext (PropForAll (Binder "a" "Value") (PropAtom (Atom "IsEq" ["a", "a"]))))) 2 (Right (EnvPropGoodBool True))
+  , EqCase "2 world; and next forall2 #f" [fakeWorld3, fakeWorld2] (PropAnd (PropNext (PropForAll (Binder "a" "Value") (PropAtom (Atom "IsEq" ["a", "a"])))) (PropNext (PropForAll (Binder "a" "Value") (PropAtom (Atom "IsEq" ["a", "a"]))))) 2 (Right (EnvPropGoodBool False))
+  , EqCase "2 world; or next forall exist #t" [fakeWorld3, fakeWorld2] (PropOr (PropNext (PropForAll (Binder "a" "Value") (PropAtom (Atom "IsEq" ["a", "a"])))) (PropNext (PropExists (Binder "a" "Value") (PropAtom (Atom "IsEq" ["a", "a"]))))) 2 (Right (EnvPropGoodBool True))
   ]
 
 testEqCases :: TestTree
