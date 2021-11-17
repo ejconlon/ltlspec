@@ -170,7 +170,6 @@ sequenceExistsRes rs = sequenceA rs >>= go Empty where
     [] -> case acc of
       -- Similarly, acc will be empty when all prop eval results are False
       -- Thus the Exists prop is False
-      -- This case also stands for vacuous false
       Empty -> Right (EnvPropGoodBool False)
       _ -> Right (EnvPropGoodNext (EnvPropStepParallel QuantifierExists acc))
     p:ps ->
