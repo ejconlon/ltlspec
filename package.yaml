@@ -22,6 +22,7 @@ dependencies:
 - mtl
 - random
 - recursion-schemes
+- stm
 - unordered-containers
 # test deps - these are here to make HLS work better
 # TODO move back out to test package

@@ -25,11 +25,13 @@ source-repository head
 library
   exposed-modules:
       Ltlspec
+      Ltlspec.Actors
       Ltlspec.Models.Chat
       Ltlspec.Models.DinningHakker
       Ltlspec.Models.Ping
       Ltlspec.Recursion
       Ltlspec.Test.Main
+      Ltlspec.TEvent
       Ltlspec.Types
   other-modules:
       Paths_ltlspec
@@ -72,6 +74,7 @@ library
     , mtl
     , random
     , recursion-schemes
+    , stm
     , tasty
     , tasty-hunit
     , unordered-containers
@@ -121,6 +124,7 @@ executable ltlspec-exe
     , mtl
     , random
     , recursion-schemes
+    , stm
     , tasty
     , tasty-hunit
     , unordered-containers
@@ -172,6 +176,7 @@ test-suite ltlspec-doctest
     , mtl
     , random
     , recursion-schemes
+    , stm
     , tasty
     , tasty-hunit
     , unordered-containers
@@ -222,6 +227,7 @@ test-suite ltlspec-test
     , mtl
     , random
     , recursion-schemes
+    , stm
     , tasty
     , tasty-hunit
     , unordered-containers
