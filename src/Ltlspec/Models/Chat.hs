@@ -6,13 +6,14 @@
 module Ltlspec.Models.Chat where
 
 import Data.Aeson (ToJSON (..), object, (.=))
+import qualified Data.Bifunctor
 import qualified Data.List as List
 import qualified Data.Map as Map
 import qualified Data.Set as Set
 import Ltlspec (propAlways, propAndAll, propEventually, propExistsNested, propForAllNested, propIf, scanSAS)
-import Ltlspec.Types (Atom (..), Prop (..), Theory (..), SAS (SAS, sasAfter), Bridge (bridgeEvalProp, bridgeQuantify), Error)
+import Ltlspec.Types (Atom (..), Bridge (bridgeEvalProp, bridgeQuantify), Error, Prop (..), SAS (SAS, sasAfter),
+                      Theory (..))
 import System.Random (StdGen, mkStdGen, randomR)
-import qualified Data.Bifunctor
 
 chatTheory :: Theory
 chatTheory = Theory

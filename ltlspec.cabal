@@ -25,13 +25,15 @@ source-repository head
 library
   exposed-modules:
       Ltlspec
-      Ltlspec.Actors
       Ltlspec.Models.Chat
       Ltlspec.Models.DinningHakker
       Ltlspec.Models.Ping
       Ltlspec.Recursion
+      Ltlspec.System.Actors
+      Ltlspec.System.TBarrier
+      Ltlspec.System.TEvent
+      Ltlspec.System.Time
       Ltlspec.Test.Main
-      Ltlspec.TEvent
       Ltlspec.Types
   other-modules:
       Paths_ltlspec
