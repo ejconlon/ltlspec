@@ -28,6 +28,7 @@ import Data.Foldable (for_)
 import Data.Functor (($>))
 import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as Map
+import Data.Set (Set)
 import qualified Data.Set as Set
 import Data.Traversable (for)
 import Ltlspec.System.Logging (LogLevel (..), Logger (..), consoleLogger)
@@ -123,11 +124,42 @@ allocSeqNum snVar = stateTVar snVar (\m -> (m, m + 1))
 
 -- | Log events
 data LogEvent msg =
-    LogEventUndeliverable !(NetMessage msg)
-  | LogEventDelivered !(NetMessage msg)
+    LogEventUndeliverable !ActorId !MessageId
+  -- ^ Emitted by network when it cannot deliver message (recv, mid)
+  | LogEventDelivered !ActorId !MessageId
+  -- ^ Emitted by network when it delivers message to actor (recv, mid)
+  | LogEventReceived !(NetMessage msg)
+  -- ^ Emitted by actor when it dequeues a correctly-delivered message from the queue
   | LogEventProcessed !ActorId !MessageId
+  -- ^ Emitted by actor when it finishes processing a message from the queue (self, mid)
   | LogEventMisdelivered !ActorId !MessageId !ActorId
+  -- ^ Emitted by actor when it dequeues an incorrectly-delivered message from the queue (self, mid, recv)
+  | LogEventSent !(NetMessage msg)
+  -- ^ Emitted by actor when it sends a message
   deriving stock (Eq, Show, Functor, Foldable, Traversable)
+
+filterLogEvent :: (msg -> Maybe etc) -> Set MessageId -> LogEvent msg -> Maybe (LogEvent etc, Set MessageId)
+filterLogEvent f s = \case
+  LogEventUndeliverable recv mid ->
+    if Set.member mid s then Just (LogEventUndeliverable recv mid, s) else Nothing
+  LogEventDelivered recv mid ->
+    if Set.member mid s then Just (LogEventDelivered recv mid, s) else Nothing
+  LogEventReceived (NetMessage mid (AppMessage recv msg)) ->
+    case f msg of
+      Nothing -> Nothing
+      Just etc ->
+        let nm = NetMessage mid (AppMessage recv etc)
+        in Just (LogEventReceived nm, Set.insert mid s)
+  LogEventProcessed self mid ->
+    if Set.member mid s then Just (LogEventProcessed self mid, s) else Nothing
+  LogEventMisdelivered self mid recv ->
+    if Set.member mid s then Just (LogEventMisdelivered self mid recv, s) else Nothing
+  LogEventSent (NetMessage mid (AppMessage recv msg)) ->
+    case f msg of
+      Nothing -> Nothing
+      Just etc ->
+        let nm = NetMessage mid (AppMessage recv etc)
+        in Just (LogEventSent nm, Set.insert mid s)
 
 -- | Filter log events by message value (keeping relevant administrative messages)
 filterLogEvents :: (msg -> Maybe etc) -> [LogEvent msg] -> [LogEvent etc]
@@ -135,46 +167,22 @@ filterLogEvents f = go Set.empty where
   go !s = \case
     [] -> []
     hd:tl ->
-      case hd of
-        LogEventUndeliverable (NetMessage mid (AppMessage aid msg)) ->
-          case f msg of
-            Nothing -> go s tl
-            Just etc ->
-              let hd' = LogEventUndeliverable (NetMessage mid (AppMessage aid etc))
-                  tl' = go (Set.insert mid s) tl
-              in hd':tl'
-        LogEventDelivered (NetMessage mid (AppMessage aid msg)) ->
-          case f msg of
-            Nothing -> go s tl
-            Just etc ->
-              let hd' = LogEventDelivered (NetMessage mid (AppMessage aid etc))
-                  tl' = go (Set.insert mid s) tl
-              in hd':tl'
-        LogEventProcessed a mid ->
-          if Set.member mid s
-            then
-              let hd' = LogEventProcessed a mid
-                  tl' = go s tl
-              in hd':tl'
-            else go s tl
-        LogEventMisdelivered a mid b ->
-          if Set.member mid s
-            then
-              let hd' = LogEventMisdelivered a mid b
-                  tl' = go s tl
-              in hd':tl'
-            else go s tl
+      case filterLogEvent f s hd of
+        Nothing -> go s tl
+        Just (hd', s') ->
+          let tl' = go s' tl
+          in hd':tl'
 
 -- | The body of the network thread. Reads messages from the global queue and delivers them.
 -- On termination flushes the log.
-networkBody :: Logger -> TEvent -> TQueue (NetMessage msg) -> TQueue (LogEvent msg) -> Map ActorId (TQueue (NetMessage msg)) -> MVar [LogEvent msg] -> IO ()
-networkBody logger doneEvent globalQueue logQueue actorQueues outVar = do
+mkNetworkBody :: Logger -> TEvent -> TQueue (NetMessage msg) -> TQueue (LogEvent msg) -> Map ActorId (TQueue (NetMessage msg)) -> MVar [LogEvent msg] -> IO ()
+mkNetworkBody logger doneEvent globalQueue logQueue actorQueues outVar = do
   runLogger logger LogLevelDebug "network started"
-  processUntilDone doneEvent globalQueue $ \netMsg@(NetMessage _ (AppMessage recvAid _)) -> do
+  processUntilDone doneEvent globalQueue $ \netMsg@(NetMessage mid (AppMessage recvAid _)) -> do
     case Map.lookup recvAid actorQueues of
-      Nothing -> writeTQueue logQueue (LogEventUndeliverable netMsg)
+      Nothing -> writeTQueue logQueue (LogEventUndeliverable recvAid mid)
       Just actorQueue -> do
-        writeTQueue logQueue (LogEventDelivered netMsg)
+        writeTQueue logQueue (LogEventDelivered recvAid mid)
         writeTQueue actorQueue netMsg
   runLogger logger LogLevelDebug "network done processing"
   logEvents <- atomically (flushTQueue logQueue)
@@ -183,8 +191,8 @@ networkBody logger doneEvent globalQueue logQueue actorQueues outVar = do
   runLogger logger LogLevelDebug "network stopped"
 
 -- | The body of the monitor thread. On quiescence sets the done event to stop all threads.
-monitorBody :: Logger -> TEvent -> TQueue (NetMessage msg) -> Map ActorId (TQueue (NetMessage msg)) -> TBarrier -> IO ()
-monitorBody logger doneEvent globalQueue actorQueues timerBarrier = go where
+mkMonitorBody :: Logger -> TEvent -> TQueue (NetMessage msg) -> Map ActorId (TQueue (NetMessage msg)) -> TBarrier -> IO ()
+mkMonitorBody logger doneEvent globalQueue actorQueues timerBarrier = go where
   go = do
     runLogger logger LogLevelDebug "monitor started"
     atomically monitor
@@ -207,8 +215,8 @@ monitorBody logger doneEvent globalQueue actorQueues timerBarrier = go where
                   else retry
               else retry
 
-timerBody :: Logger -> TimerId -> ActorId -> TimerConfig msg -> TEvent -> TVar SeqNum -> TBarrier -> TQueue (NetMessage msg) -> IO ()
-timerBody logger timerId sendAid (TimerConfig mayDelay mayPeriod recvAids pay) doneEvent snVar timerBarrier globalQueue = go where
+mkTimerBody :: Logger -> TimerId -> ActorId -> TimerConfig msg -> TEvent -> TBarrier -> Handler msg -> IO ()
+mkTimerBody logger timerId sendAid (TimerConfig mayDelay mayPeriod recvAids pay) doneEvent timerBarrier netHandler = go where
   tstr = "timer " ++ show (unTimerId timerId) ++ " (actor " ++ show (unActorId sendAid) ++ ")"
   go = do
     runLogger logger LogLevelDebug $ tstr ++ " started"
@@ -232,11 +240,8 @@ timerBody logger timerId sendAid (TimerConfig mayDelay mayPeriod recvAids pay) d
         then pure True
         else do
           for_ recvAids $ \recvAid -> do
-            sn <- allocSeqNum snVar
-            let mid = MessageId sendAid sn
-                appMsg = AppMessage recvAid pay
-                netMsg = NetMessage mid appMsg
-            writeTQueue globalQueue netMsg
+            let appMsg = AppMessage recvAid pay
+            netHandler appMsg
           pure False
     if eventDone
       then pure ()
@@ -255,23 +260,25 @@ timerBody logger timerId sendAid (TimerConfig mayDelay mayPeriod recvAids pay) d
           then pure ()
           else recur (count + 1)
 
-networkHandler :: ActorId -> TVar SeqNum -> TQueue (NetMessage msg) -> Handler msg
-networkHandler sendAid snVar globalQueue appMsg = do
+mkNetworkHandler :: ActorId -> TVar SeqNum -> TQueue (NetMessage msg) -> TQueue (LogEvent msg) -> Handler msg
+mkNetworkHandler sendAid snVar globalQueue logQueue appMsg = do
   sn <- allocSeqNum snVar
   let mid = MessageId sendAid sn
       netMsg = NetMessage mid appMsg
   writeTQueue globalQueue netMsg
+  writeTQueue logQueue (LogEventSent netMsg)
 
-actorBody :: Logger -> ActorId -> TEvent -> TQueue (NetMessage msg) -> TQueue (LogEvent msg) -> Handler msg -> IO ()
-actorBody logger aid doneEvent actorQueue logQueue handler = do
+mkActorBody :: Logger -> ActorId -> TEvent -> TQueue (NetMessage msg) -> TQueue (LogEvent msg) -> Handler msg -> IO ()
+mkActorBody logger aid doneEvent actorQueue logQueue handler = do
   let astr = "actor " ++ show (unActorId aid)
   runLogger logger LogLevelDebug $ astr ++ " started"
-  processUntilDone doneEvent actorQueue $ \(NetMessage mid appMsg@(AppMessage recvAid _)) -> do
+  processUntilDone doneEvent actorQueue $ \nm@(NetMessage mid appMsg@(AppMessage recvAid _)) -> do
     if aid == recvAid
       then do
+        writeTQueue logQueue (LogEventReceived nm)
         handler appMsg
         writeTQueue logQueue (LogEventProcessed aid mid)
-      else writeTQueue logQueue (LogEventMisdelivered aid mid aid)
+      else writeTQueue logQueue (LogEventMisdelivered aid mid recvAid)
   runLogger logger LogLevelDebug $ astr ++ " stopped"
 
 -- | Run the actor system
@@ -295,16 +302,22 @@ runActorSystem logger mayLimit ctor configs = do
   -- Now that we know how many timers, create a barrier of that size
   timerBarrier <- newTBarrierIO (length timerSet)
   -- Spawn threads
-  networkThreadId <- forkIO (networkBody logger doneEvent globalQueue logQueue actorQueues outVar)
-  monitorThreadId <- forkIO (monitorBody logger doneEvent globalQueue actorQueues timerBarrier)
+  let networkBody = mkNetworkBody logger doneEvent globalQueue logQueue actorQueues outVar
+      monitorBody = mkMonitorBody logger doneEvent globalQueue actorQueues timerBarrier
+  networkThreadId <- forkIO networkBody
+  monitorThreadId <- forkIO monitorBody
   timerThreadIds <- for timerSet $ \(tid, (aid, tconfig)) ->
     let snVar = actorSnVars Map.! aid
-    in forkIO (timerBody logger tid aid tconfig doneEvent snVar timerBarrier globalQueue)
+        networkHandler = mkNetworkHandler aid snVar globalQueue logQueue
+        timerBody = mkTimerBody logger tid aid tconfig doneEvent timerBarrier networkHandler
+    in forkIO timerBody
   actorThreadIds <- for actorSet $ \(aid, behavior) ->
     let snVar = actorSnVars Map.! aid
         actorQueue = actorQueues Map.! aid
-        handler = behavior (networkHandler aid snVar globalQueue)
-    in forkIO (actorBody logger aid doneEvent actorQueue logQueue handler)
+        networkHandler = mkNetworkHandler aid snVar globalQueue logQueue
+        handler = behavior networkHandler
+        actorBody = mkActorBody logger aid doneEvent actorQueue logQueue handler
+    in forkIO actorBody
   let allThreadIds = [networkThreadId, monitorThreadId] ++ timerThreadIds ++ actorThreadIds
   pure (doneEvent, allThreadIds, outVar)
 
