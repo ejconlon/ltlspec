@@ -20,11 +20,10 @@ module Ltlspec.System.Actors
 
 import Control.Concurrent (ThreadId, forkIO)
 import Control.Concurrent.MVar (MVar, newEmptyMVar, putMVar, readMVar)
-import Control.Concurrent.STM (STM, retry)
+import Control.Concurrent.STM (STM, atomically, retry)
 import Control.Concurrent.STM.TQueue (TQueue, flushTQueue, isEmptyTQueue, newTQueueIO, tryReadTQueue, writeTQueue)
 import Control.Concurrent.STM.TVar (TVar, newTVarIO, stateTVar)
 import Control.Monad (foldM)
-import Control.Monad.STM (atomically)
 import Data.Foldable (for_)
 import Data.Functor (($>))
 import Data.Map.Strict (Map)
@@ -210,14 +209,14 @@ monitorBody logger doneEvent globalQueue actorQueues timerBarrier = go where
 
 timerBody :: Logger -> TimerId -> ActorId -> TimerConfig msg -> TEvent -> TVar SeqNum -> TBarrier -> TQueue (NetMessage msg) -> IO ()
 timerBody logger timerId sendAid (TimerConfig mayDelay mayPeriod recvAids pay) doneEvent snVar timerBarrier globalQueue = go where
-  tstr = "timer " ++ show timerId ++ " (" ++ show sendAid ++ ")"
+  tstr = "timer " ++ show (unTimerId timerId) ++ " (actor " ++ show (unActorId sendAid) ++ ")"
   go = do
     runLogger logger LogLevelDebug $ tstr ++ " started"
     -- Delay initially if configured to do so
     case mayDelay of
       Nothing -> pure ()
       Just delay -> do
-        runLogger logger LogLevelDebug $ tstr ++ " delaying (initial)"
+        runLogger logger LogLevelDebug $ tstr ++ " initial delay"
         threadDelayDelta delay
     -- Enter the timer loop
     recur 0
@@ -250,7 +249,7 @@ timerBody logger timerId sendAid (TimerConfig mayDelay mayPeriod recvAids pay) d
               case mayLim of
                 Just lim | lim <= count -> pure True
                 _ -> do
-                  runLogger logger LogLevelDebug $ tstr ++ " delaying (periodic)"
+                  runLogger logger LogLevelDebug $ tstr ++ " periodic delay"
                   threadDelayDelta interval $> False
         if periodDone
           then pure ()
@@ -265,7 +264,7 @@ networkHandler sendAid snVar globalQueue appMsg = do
 
 actorBody :: Logger -> ActorId -> TEvent -> TQueue (NetMessage msg) -> TQueue (LogEvent msg) -> Handler msg -> IO ()
 actorBody logger aid doneEvent actorQueue logQueue handler = do
-  let astr = "actor " ++ show aid
+  let astr = "actor " ++ show (unActorId aid)
   runLogger logger LogLevelDebug $ astr ++ " started"
   processUntilDone doneEvent actorQueue $ \(NetMessage mid appMsg@(AppMessage recvAid _)) -> do
     if aid == recvAid

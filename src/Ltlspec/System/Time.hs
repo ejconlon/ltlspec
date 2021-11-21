@@ -101,6 +101,7 @@ monoTimeToNanos = unMonoTime
 monoTimeToMicros :: MonoTime -> Int
 monoTimeToMicros t = fromIntegral (div (monoTimeToNanos t) 1000)
 
+-- | Get the current monotonic system time
 currentMonoTime :: IO MonoTime
 currentMonoTime = fmap MonoTime getMonotonicTimeNSec
 
@@ -113,8 +114,9 @@ diffMonoTime (MonoTime end) (MonoTime start) =
     then Nothing
     else Just (TimeDelta (end - start))
 
+-- | Sleep the current thread for the given time delta
 threadDelayDelta :: TimeDelta -> IO ()
-threadDelayDelta (TimeDelta td) = threadDelay (fromIntegral (div td 1000))
+threadDelayDelta = threadDelay . timeDeltaToMicros
 
 awaitDelta :: MonoTime -> TimeDelta -> IO MonoTime
 awaitDelta m t = do
