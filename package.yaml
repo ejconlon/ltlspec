@@ -20,6 +20,7 @@ dependencies:
 - deepseq
 - hashable
 - mtl
+- pretty-simple
 - random
 - recursion-schemes
 - stm

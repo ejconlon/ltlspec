@@ -30,6 +30,8 @@ library
       Ltlspec.Models.Ping
       Ltlspec.Recursion
       Ltlspec.System.Actors
+      Ltlspec.System.Example
+      Ltlspec.System.Logging
       Ltlspec.System.TBarrier
       Ltlspec.System.TEvent
       Ltlspec.System.Time
@@ -74,6 +76,7 @@ library
     , deepseq
     , hashable
     , mtl
+    , pretty-simple
     , random
     , recursion-schemes
     , stm
@@ -124,6 +127,7 @@ executable ltlspec-exe
     , hashable
     , ltlspec
     , mtl
+    , pretty-simple
     , random
     , recursion-schemes
     , stm
@@ -176,6 +180,7 @@ test-suite ltlspec-doctest
     , hashable
     , ltlspec
     , mtl
+    , pretty-simple
     , random
     , recursion-schemes
     , stm
@@ -227,6 +232,7 @@ test-suite ltlspec-test
     , hashable
     , ltlspec
     , mtl
+    , pretty-simple
     , random
     , recursion-schemes
     , stm
