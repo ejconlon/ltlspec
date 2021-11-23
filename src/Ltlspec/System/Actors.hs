@@ -336,9 +336,8 @@ runActorSystem logger mayLimit ctor configs = do
 
 -- | A simpler version - NOTE this only works for systems that go quiescent!
 -- Otherwise will wait forever...
-runActorSystemSimple :: ActorConstructor r msg -> [r] -> IO [LogEvent msg]
-runActorSystemSimple ctor configs = do
-  logger <- consoleLogger
+runActorSystemSimple :: Logger -> ActorConstructor r msg -> [r] -> IO [LogEvent msg]
+runActorSystemSimple logger ctor configs = do
   (_, _, outVar) <- runActorSystem logger Nothing ctor configs
   readMVar outVar
 

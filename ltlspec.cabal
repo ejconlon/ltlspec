@@ -27,10 +27,11 @@ library
       Ltlspec
       Ltlspec.Models.Chat
       Ltlspec.Models.DinningHakker
-      Ltlspec.Models.Ping
+      Ltlspec.Models.Ping.Actors
+      Ltlspec.Models.Ping.Common
+      Ltlspec.Models.Ping.Verification
       Ltlspec.Recursion
       Ltlspec.System.Actors
-      Ltlspec.System.Example
       Ltlspec.System.Logging
       Ltlspec.System.TBarrier
       Ltlspec.System.TEvent

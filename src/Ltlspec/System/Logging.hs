@@ -52,8 +52,12 @@ disabledLogger = Logger (\_ _ -> pure ())
 
 -- | Change the allowed log level with this. `filterLogger LogLevelWarn`
 -- will allow WARN and ERROR messages but no others.
+-- `filterLogger LogLevelTrace` is a no-op
 filterLogger :: LogLevel -> Logger -> Logger
-filterLogger ll0 (Logger f) = Logger (\ll1 s -> if ll1 >= ll0 then f ll1 s else pure ())
+filterLogger ll0 logger =
+  case ll0 of
+    LogLevelTrace -> logger
+    _ ->Logger (\ll1 s -> if ll1 >= ll0 then runLogger logger ll1 s else pure ())
 
 -- | A printf logger that LOCKS to avoid concurrent access to stdout.
 -- Note that other threads may still print and make things ugly.

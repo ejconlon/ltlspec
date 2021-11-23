@@ -145,23 +145,6 @@ eqCases =
 testEqCases :: TestTree
 testEqCases = testGroup "Eq cases" (fmap testEqCase eqCases)
 
--- testEventually :: TestTree
--- testEventually = testCase "eventually" $ do
---   let prop = propEventually (PropAtom (OrdPred CompEQ 'e'))
---   toList (propAtoms prop) @?= [OrdPred CompEQ 'e']
---   ordPredPropEval 'a' prop @?= PropResNext prop
---   ordPredPropFold prop "abcdefg" @?= (5, PropResTrue)
-
--- testAlways :: TestTree
--- testAlways = testCase "always" $ do
---   let prop = propAlways (PropAtom (OrdPred CompLT 'z'))
---   toList (propAtoms prop) @?= [OrdPred CompLT 'z']
---   ordPredPropEval 'a' prop @?= PropResNext prop
---   ordPredPropFold prop "abcdefg" @?= (7, PropResNext prop)
-
--- testProp :: TestTree
--- testProp = testGroup "Prop" [testEventually, testAlways]
-
 main :: IO ()
 main = do
   mayDebugStr <- lookupEnv "DEBUG"
