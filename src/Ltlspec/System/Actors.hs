@@ -39,7 +39,7 @@ import Data.Set (Set)
 import qualified Data.Set as Set
 import Data.Traversable (for)
 import GHC.Generics (Generic)
-import Ltlspec.System.Logging (LogLevel (..), Logger (..), consoleLogger)
+import Ltlspec.System.Logging (LogLevel (..), Logger (..))
 import Ltlspec.System.TBarrier (TBarrier, newTBarrierIO, signalTBarrier, waitingTBarrier)
 import Ltlspec.System.TEvent (TEvent, isSetTEvent, newTEventDelay, newTEventIO, setTEvent)
 import Ltlspec.System.Time (TimeDelta, threadDelayDelta)
