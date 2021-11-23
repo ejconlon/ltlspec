@@ -1,3 +1,5 @@
+{-# LANGUAGE DeriveAnyClass #-}
+
 module Ltlspec.System.Actors
   ( ActorId
   , SeqNum
@@ -16,6 +18,7 @@ module Ltlspec.System.Actors
   , TickMessage (..)
   , mkTickConfig
   , filterTickEvents
+  , Message (..)
   ) where
 
 import Control.Concurrent (ThreadId, forkIO)
@@ -23,14 +26,18 @@ import Control.Concurrent.MVar (MVar, newEmptyMVar, putMVar, readMVar)
 import Control.Concurrent.STM (STM, atomically, retry)
 import Control.Concurrent.STM.TQueue (TQueue, flushTQueue, isEmptyTQueue, newTQueueIO, tryReadTQueue, writeTQueue)
 import Control.Concurrent.STM.TVar (TVar, newTVarIO, stateTVar)
+import Control.DeepSeq (NFData)
 import Control.Monad (foldM)
 import Data.Foldable (for_)
 import Data.Functor (($>))
+import Data.Hashable (Hashable)
 import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as Map
+import Data.Maybe (mapMaybe)
 import Data.Set (Set)
 import qualified Data.Set as Set
 import Data.Traversable (for)
+import GHC.Generics (Generic)
 import Ltlspec.System.Logging (LogLevel (..), Logger (..), consoleLogger)
 import Ltlspec.System.TBarrier (TBarrier, newTBarrierIO, signalTBarrier, waitingTBarrier)
 import Ltlspec.System.TEvent (TEvent, isSetTEvent, newTEventDelay, newTEventIO, setTEvent)
@@ -39,36 +46,39 @@ import Ltlspec.System.Time (TimeDelta, threadDelayDelta)
 -- | Identifier for an actor
 newtype ActorId = ActorId { unActorId :: Int }
   deriving stock (Show)
-  deriving newtype (Eq, Ord, Num)
+  deriving newtype (Eq, Ord, Num, Hashable, NFData)
 
 -- | Identifier for an timer
 newtype TimerId = TimerId { unTimerId :: Int }
   deriving stock (Show)
-  deriving newtype (Eq, Ord, Num)
+  deriving newtype (Eq, Ord, Num, Hashable, NFData)
 
 -- | Message sequence number - only unique per-actor
 newtype SeqNum = SeqNum { unSeqNum :: Int }
   deriving stock (Show)
-  deriving newtype (Eq, Ord, Num)
+  deriving newtype (Eq, Ord, Num, Hashable, NFData)
 
 -- | Identifying information for a 'NetworkMessage'
 data MessageId = MessageId
   { messageKeyAid :: !ActorId
   , messageKeySeqNum :: !SeqNum
-  } deriving stock (Eq, Ord, Show)
+  } deriving stock (Eq, Ord, Show, Generic)
+    deriving anyclass (Hashable, NFData)
 
 -- | A message as seen from the application layer
 data AppMessage msg = AppMessage
   { appMessageAid :: !ActorId
   -- ^ The sender or the receiver of this message (depending on the context)
   , appMessagePayload :: !msg
-  } deriving stock (Eq, Show, Functor, Foldable, Traversable)
+  } deriving stock (Eq, Show, Functor, Foldable, Traversable, Generic)
+    deriving anyclass (NFData)
 
 -- | A message as seen from the network layer
 data NetMessage msg = NetMessage
   { netMessageId :: !MessageId
   , netMessageBody :: !(AppMessage msg)
-  } deriving stock (Eq, Show, Functor, Foldable, Traversable)
+  } deriving stock (Eq, Show, Functor, Foldable, Traversable, Generic)
+    deriving anyclass (NFData)
 
 -- | An application message handler
 type Handler msg = AppMessage msg -> STM ()
@@ -136,7 +146,8 @@ data LogEvent msg =
   -- ^ Emitted by actor when it dequeues an incorrectly-delivered message from the queue (self, mid, recv)
   | LogEventSent !(NetMessage msg)
   -- ^ Emitted by actor when it sends a message
-  deriving stock (Eq, Show, Functor, Foldable, Traversable)
+  deriving stock (Eq, Show, Functor, Foldable, Traversable, Generic)
+  deriving anyclass (NFData)
 
 filterLogEvent :: (msg -> Maybe etc) -> Set MessageId -> LogEvent msg -> Maybe (LogEvent etc, Set MessageId)
 filterLogEvent f s = \case
@@ -175,8 +186,8 @@ filterLogEvents f = go Set.empty where
 
 -- | The body of the network thread. Reads messages from the global queue and delivers them.
 -- On termination flushes the log.
-mkNetworkBody :: Logger -> TEvent -> TQueue (NetMessage msg) -> TQueue (LogEvent msg) -> Map ActorId (TQueue (NetMessage msg)) -> MVar [LogEvent msg] -> IO ()
-mkNetworkBody logger doneEvent globalQueue logQueue actorQueues outVar = do
+mkNetworkBody :: Logger -> TEvent -> TQueue (NetMessage msg) -> TQueue (LogEvent msg) -> Map ActorId (TQueue (NetMessage msg)) -> IO ()
+mkNetworkBody logger doneEvent globalQueue logQueue actorQueues = do
   runLogger logger LogLevelDebug "network started"
   processUntilDone doneEvent globalQueue $ \netMsg@(NetMessage mid (AppMessage recvAid _)) -> do
     case Map.lookup recvAid actorQueues of
@@ -185,17 +196,18 @@ mkNetworkBody logger doneEvent globalQueue logQueue actorQueues outVar = do
         writeTQueue logQueue (LogEventDelivered recvAid mid)
         writeTQueue actorQueue netMsg
   runLogger logger LogLevelDebug "network done processing"
-  logEvents <- atomically (flushTQueue logQueue)
-  runLogger logger LogLevelDebug "network writing logs"
-  putMVar outVar logEvents
   runLogger logger LogLevelDebug "network stopped"
 
 -- | The body of the monitor thread. On quiescence sets the done event to stop all threads.
-mkMonitorBody :: Logger -> TEvent -> TQueue (NetMessage msg) -> Map ActorId (TQueue (NetMessage msg)) -> TBarrier -> IO ()
-mkMonitorBody logger doneEvent globalQueue actorQueues timerBarrier = go where
+mkMonitorBody :: Logger -> TEvent -> TQueue (NetMessage msg) -> Map ActorId (TQueue (NetMessage msg)) -> TBarrier ->  TQueue (LogEvent msg) -> MVar [LogEvent msg] -> IO ()
+mkMonitorBody logger doneEvent globalQueue actorQueues timerBarrier logQueue outVar = go where
   go = do
     runLogger logger LogLevelDebug "monitor started"
     atomically monitor
+    runLogger logger LogLevelDebug "monitor flushing logs"
+    logEvents <- atomically (flushTQueue logQueue)
+    runLogger logger LogLevelDebug "monitor writing logs"
+    putMVar outVar logEvents
     runLogger logger LogLevelDebug "monitor stopped"
   monitor = do
     isDone <- isSetTEvent doneEvent
@@ -302,8 +314,8 @@ runActorSystem logger mayLimit ctor configs = do
   -- Now that we know how many timers, create a barrier of that size
   timerBarrier <- newTBarrierIO (length timerSet)
   -- Spawn threads
-  let networkBody = mkNetworkBody logger doneEvent globalQueue logQueue actorQueues outVar
-      monitorBody = mkMonitorBody logger doneEvent globalQueue actorQueues timerBarrier
+  let networkBody = mkNetworkBody logger doneEvent globalQueue logQueue actorQueues
+      monitorBody = mkMonitorBody logger doneEvent globalQueue actorQueues timerBarrier logQueue outVar
   networkThreadId <- forkIO networkBody
   monitorThreadId <- forkIO monitorBody
   timerThreadIds <- for timerSet $ \(tid, (aid, tconfig)) ->
@@ -340,6 +352,25 @@ mkTickConfig :: Maybe TimeDelta -> TimeDelta -> Maybe Int -> ActorId -> TimerCon
 mkTickConfig mayDelay interval mayLimit recvAid =
   TimerConfig mayDelay (Just (interval, mayLimit)) [recvAid] TickMessageFire
 
--- | Keep only the embedded (non-fire) events
+-- | Keeps only the embedded (non-fire) events
 filterTickEvents :: [LogEvent (TickMessage msg)] -> [LogEvent msg]
 filterTickEvents = filterLogEvents (\case { TickMessageFire -> Nothing; TickMessageEmbed msg -> Just msg })
+
+-- | A simple message triple (sender, receiver, payload) to use in verification.
+data Message msg = Message
+  { messageSender :: !ActorId
+  , messageReceiver :: !ActorId
+  , messagePayload :: !msg
+  } deriving stock (Eq, Show, Generic)
+    deriving anyclass (NFData)
+
+-- | Extracts a simple message triple from a log events
+extractMessage :: LogEvent msg -> Maybe (Message msg)
+extractMessage = \case
+  LogEventReceived (NetMessage (MessageId sendAid _) (AppMessage recvAid msg)) ->
+    Just (Message sendAid recvAid msg)
+  _ -> Nothing
+
+-- | Keep only message receive events in a simple format.
+filterMessages :: [LogEvent msg] -> [Message msg]
+filterMessages = mapMaybe extractMessage
