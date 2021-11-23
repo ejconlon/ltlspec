@@ -12,8 +12,8 @@ import Ltlspec.System.Actors (ActorId, AnnoMessage (..), AppMessage (..), Messag
 import Ltlspec.Types (Atom (..), Bridge (..), Error, Prop (..), SAS (..), Theory (..))
 
 -- | A proposition encoding responsiveness for ping messages.
--- Textually (but omitting types), this is equivalent to:
--- Always (Forall a1 m1 a2. IsPing a1 m1 a2 -> Eventually (Exists m2. IsPong a2 m2 a1))
+-- Textually, this is equivalent to:
+-- Always (Forall (m1: SentPing). Eventually (Exists (m2: RecvPong). PingPong m1 m2))
 pingResponsiveProp :: Prop
 pingResponsiveProp =
   let prop = propAlways (propForAllNested [("m1", "SentPing")] eventuallyPong)
