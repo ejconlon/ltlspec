@@ -2,8 +2,8 @@ module Ltlspec.System.Example
   ( main
   ) where
 
-import Ltlspec.System.Actors (ActorConstructor, ActorId, AppMessage (..), Behavior, TickMessage (..), filterTickEvents,
-                              findActorsWhere, mkTickConfig, runActorSystemSimple)
+import Ltlspec.System.Actors (ActorConstructor, ActorId, AppMessage (..), Behavior, TickMessage (..),
+                              filterRecvMessages, filterTickEvents, findActorsWhere, mkTickConfig, runActorSystemSimple)
 import Ltlspec.System.Time (TimeDelta, timeDeltaFromFracSecs)
 import Text.Pretty.Simple (pPrint)
 
@@ -62,5 +62,5 @@ main = do
       interval = timeDeltaFromFracSecs (0.02 :: Double)
       ctor = pingCtor limit interval
   logEvents <- runActorSystemSimple ctor pingConfigs
-  let nonTickEvents = filterTickEvents logEvents
-  pPrint nonTickEvents
+  let messages = filterRecvMessages (filterTickEvents logEvents)
+  pPrint messages

@@ -18,7 +18,8 @@ module Ltlspec.System.Actors
   , TickMessage (..)
   , mkTickConfig
   , filterTickEvents
-  , Message (..)
+  , extractRecvMessage
+  , filterRecvMessages
   ) where
 
 import Control.Concurrent (ThreadId, forkIO)
@@ -356,21 +357,12 @@ mkTickConfig mayDelay interval mayLimit recvAid =
 filterTickEvents :: [LogEvent (TickMessage msg)] -> [LogEvent msg]
 filterTickEvents = filterLogEvents (\case { TickMessageFire -> Nothing; TickMessageEmbed msg -> Just msg })
 
--- | A simple message triple (sender, receiver, payload) to use in verification.
-data Message msg = Message
-  { messageSender :: !ActorId
-  , messageReceiver :: !ActorId
-  , messagePayload :: !msg
-  } deriving stock (Eq, Show, Generic)
-    deriving anyclass (NFData)
-
 -- | Extracts a simple message triple from a log events
-extractMessage :: LogEvent msg -> Maybe (Message msg)
-extractMessage = \case
-  LogEventReceived (NetMessage (MessageId sendAid _) (AppMessage recvAid msg)) ->
-    Just (Message sendAid recvAid msg)
+extractRecvMessage :: LogEvent msg -> Maybe (NetMessage msg)
+extractRecvMessage = \case
+  LogEventReceived nm -> Just nm
   _ -> Nothing
 
 -- | Keep only message receive events in a simple format.
-filterMessages :: [LogEvent msg] -> [Message msg]
-filterMessages = mapMaybe extractMessage
+filterRecvMessages :: [LogEvent msg] -> [NetMessage msg]
+filterRecvMessages = mapMaybe extractRecvMessage
