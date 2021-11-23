@@ -1,19 +1,24 @@
 module Ltlspec.Test.Main (main) where
 
+import Control.Monad (when)
 import qualified Data.Map.Strict as Map
 import Ltlspec (envPropFold, propAlways, propEventually, propForAllNested, propIf, propIfNested)
-import Ltlspec.Types (Atom (..), Binder (..), Bridge (..), EnvProp (..), EnvPropBad (..), EnvPropGood (..), EnvPropRes,
-                      EnvPropStep (..), Prop (..), Theory (..), VarName)
-import Test.Tasty (TestTree, defaultMain, testGroup)
-import Test.Tasty.HUnit (testCase, (@?=))
--- import Data.Sequence (Seq)
--- import qualified Data.Sequence as Seq
-import Control.Monad (when)
-import Ltlspec.Driver (driveVerificationIO)
-import Ltlspec.Models.Ping.Verification (pingTheory, pingWorldOk)
-import Ltlspec.System.Logging (flushLogVar, newLogVar, varLogger)
+import Ltlspec.Driver (DriverError, driveVerificationIO)
+import Ltlspec.Models.Ping.Actors (pingCase)
+import Ltlspec.Models.Ping.Verification (PingWorld (PingWorld), emptyPingState, pingTheory, pingWorldOk)
+import Ltlspec.System.Actors (ActorCase, AnnoMessage, runActorCaseSimple)
+import Ltlspec.System.Logging (LogEntry, flushLogVar, newLogVar, varLogger)
+import Ltlspec.System.Time (TimeDelta, timeDeltaFromFracSecs)
+import Ltlspec.Types (ApplyAction (..), Atom (..), Binder (..), Bridge (..), EnvProp (..), EnvPropBad (..),
+                      EnvPropGood (..), EnvPropRes, EnvPropStep (..), Prop (..), SAS, Theory (..), VarName, initScanSAS)
 import System.Environment (lookupEnv, setEnv)
 import System.IO (BufferMode (NoBuffering), hSetBuffering, stderr, stdout)
+import Test.Tasty (TestTree, defaultMain, testGroup)
+import Test.Tasty.HUnit (testCase, (@?=))
+
+-- | A tick interval for actor tests
+shortTickInterval :: TimeDelta
+shortTickInterval = timeDeltaFromFracSecs (0.01 :: Double)
 
 eqForAll :: [VarName] -> Prop -> Prop
 eqForAll = propForAllNested . fmap (, "Value")
@@ -148,16 +153,46 @@ eqCases =
 testEqCases :: TestTree
 testEqCases = testGroup "Eq cases" (fmap testEqCase eqCases)
 
-testPing :: TestTree
-testPing = testCase "Ping" $ do
+data DriverTestError e = DriverTestError !(DriverError e) ![LogEntry] deriving stock (Eq, Show)
+
+runDriverTest :: (Bridge e v w, Show e) => Theory -> [w] -> IO (Maybe (DriverTestError e))
+runDriverTest theory trace = do
   logVar <- newLogVar
   let logger = varLogger logVar
-  res <- driveVerificationIO logger pingTheory pingWorldOk
+  res <- driveVerificationIO logger theory trace
   case res of
     Left err -> do
       logEntries <- flushLogVar logVar
-      fail ("Failed to verify: " <> show err <> " | " <> show logEntries)
+      pure (Just (DriverTestError err logEntries))
+    _ -> pure Nothing
+
+assertDriverTestOk :: (Bridge e v w, Show e) => Theory -> [w] -> IO ()
+assertDriverTestOk theory trace = do
+  res <- runDriverTest theory trace
+  case res of
+    Just (DriverTestError err logEntries) -> fail ("Failed to verify: " <> show err <> " | " <> show logEntries)
     _ -> pure ()
+
+runActorTest :: ApplyAction (AnnoMessage a) s => ActorCase a -> s -> IO ([SAS s (AnnoMessage a)], [LogEntry])
+runActorTest kase initState = do
+  logVar <- newLogVar
+  let logger = varLogger logVar
+  actions <- runActorCaseSimple logger kase
+  let worlds = initScanSAS applyAction initState actions
+  logEntries <- flushLogVar logVar
+  pure (worlds, logEntries)
+
+testPingSimple :: TestTree
+testPingSimple = testCase "Ping simple" (assertDriverTestOk pingTheory pingWorldOk)
+
+testPingActors :: TestTree
+testPingActors = testCase "Ping actors" $ do
+  let limit = 5
+  (xs, _) <- runActorTest (pingCase limit shortTickInterval) emptyPingState
+  assertDriverTestOk pingTheory (fmap PingWorld xs)
+
+testPing :: TestTree
+testPing = testGroup "Ping" [testPingSimple, testPingActors]
 
 main :: IO ()
 main = do

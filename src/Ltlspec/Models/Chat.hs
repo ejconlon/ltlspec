@@ -1,7 +1,4 @@
 {-# LANGUAGE OverloadedStrings #-}
-{-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
-{-# OPTIONS_GHC -Wno-incomplete-patterns #-}
-{-# OPTIONS_GHC -Wno-name-shadowing #-}
 
 module Ltlspec.Models.Chat where
 
@@ -10,9 +7,8 @@ import qualified Data.Bifunctor
 import qualified Data.List as List
 import qualified Data.Map as Map
 import qualified Data.Set as Set
-import Ltlspec (propAlways, propAndAll, propEventually, propExistsNested, propForAllNested, propIf, scanSAS)
-import Ltlspec.Types (Atom (..), Bridge (bridgeEvalProp, bridgeQuantify), Error, Prop (..), SAS (SAS, sasAfter),
-                      Theory (..))
+import Ltlspec (propAlways, propAndAll, propEventually, propExistsNested, propForAllNested, propIf)
+import Ltlspec.Types (Atom (..), Bridge (..), Error, Prop (..), SAS (..), Theory (..), initScanSAS)
 import System.Random (StdGen, mkStdGen, randomR)
 
 chatTheory :: Theory
@@ -70,8 +66,6 @@ chatTheory = Theory
     ]
   }
 
-
-
 type ActionID = Integer
 type ClientID = Integer
 type ChannelID = Integer
@@ -83,13 +77,14 @@ data ClientAction =
   | Join ActionID ClientID ChannelID
   | Leave ActionID ClientID ChannelID
   | Send ActionID ClientID MessageContent ChannelID
-  deriving stock (Eq, Show, Ord)
+  deriving stock (Eq, Show)
 
 data ActionRep =
     ActionList
-    | ActionJoin
-    | ActionLeave
-    | ActionSend
+  | ActionJoin
+  | ActionLeave
+  | ActionSend
+  deriving stock (Eq, Show)
 
 instance ToJSON ClientAction where
   toJSON = \case
@@ -97,7 +92,7 @@ instance ToJSON ClientAction where
     Join aid cid cn -> object ["type" .= ("join" :: String), "action" .= aid, "client" .= cid, "channel" .= cn]
     Leave aid cid cn -> object ["type" .= ("leave" :: String), "action" .= aid, "client" .= cid, "channel" .= cn]
     Send aid cid msg cn -> object ["type" .= ("send" :: String), "action" .= aid, "client" .= cid, "message" .= msg, "channel" .= cn]
-
+    NoOp -> object ["type" .= ("noop" :: String)]
 
 data ServerResponse =
     Share ActionID ClientID MessageContent ClientID
@@ -114,7 +109,6 @@ instance ToJSON ServerResponse where
     NewLeave aid sid cn rid -> object ["type" .= ("new-leave" :: String), "correspondent-action" .= aid, "sender" .= sid, "channel" .= cn, "receiver" .= rid]
     Share aid sid msg rid -> object ["type" .= ("share" :: String), "correspondent-action" .= aid, "sender" .= sid, "message" .= msg, "receiver" .= rid]
     StartService -> object ["type" .= ("start-service"::String) ]
-
 
 type SystemEvent = Either ClientAction ServerResponse
 
@@ -181,8 +175,8 @@ randomGen = mkStdGen 137
 getRandomElementOfList :: [a] -> StdGen -> a
 getRandomElementOfList l gen = let randomIndex = fst (randomR (0, length l - 1) gen) in l !! randomIndex
 
-processEvent :: SystemEvent -> ChatState -> ChatState
-processEvent event (cState, seed) =
+processEvent :: ChatState -> SystemEvent -> ChatState
+processEvent (cState, seed) event =
     case event of
         Left NoOp -> (cState, seed)
         Left (List aid _) -> (cState, aid)
@@ -237,7 +231,7 @@ simulation 0 nclients = (initialState nclients, randomGen)
 simulation niterations nclients =  simulationStep (simulation (niterations-1) nclients)
 
 bufferToList :: Buffer -> [SystemEvent]
-bufferToList b = fst (randomEventPick b randomGen)
+bufferToList buf = fst (randomEventPick buf randomGen)
     where {
         randomEventPick b gen
          | null (concat (Map.elems b)) = ([], gen)
@@ -253,15 +247,12 @@ generateSequenceOfMessages :: Integer -> Integer -> [SystemEvent]
 generateSequenceOfMessages a b = (bufferToList . fst3 . fst)  (simulation a b) where fst3 (b,_,_) = b
 
 trace :: [ChatWorld]
-trace = scanSAS processEvent (initialChatState 3) (generateSequenceOfMessages 20 3)
-
+trace = initScanSAS processEvent (initialChatState 3) (generateSequenceOfMessages 20 3)
 
 generateTraceGivenMessages :: [SystemEvent] -> [ChatWorld]
-generateTraceGivenMessages (e:es) = List.foldl func [SAS (initialChatState 3) e (processEvent e (initialChatState 3)) ] es
-    where func sass ev = sass ++ [SAS (sasAfter (last sass)) ev (processEvent ev (sasAfter (last sass)))]
+generateTraceGivenMessages = initScanSAS processEvent (initialChatState 3)
 
 -- TODO(tarcisio) Implement unit tests
-
 
 instance Bridge Error ChatVal ChatWorld where
     bridgeEvalProp (SAS _ e s2) (Atom propName vals) =
@@ -288,4 +279,3 @@ instance Bridge Error ChatVal ChatWorld where
             "ChannelID" -> Right (map ChatValChannel (Set.toList (Set.fromList (concat (Map.elems (fst s2))))))
             "ActionID" -> Right (map  ChatValAction [0..(snd s2)] )
             _ -> Left ("Could not quantify over " <> tyname)
-

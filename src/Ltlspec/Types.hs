@@ -1,4 +1,5 @@
 {-# LANGUAGE DeriveAnyClass #-}
+{-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE FunctionalDependencies #-}
 {-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE TemplateHaskell #-}
@@ -10,6 +11,7 @@ module Ltlspec.Types where
 import Control.DeepSeq (NFData)
 import Data.Functor.Foldable.TH (makeBaseFunctor)
 import Data.Hashable (Hashable)
+import Data.List (scanl')
 import Data.Map.Strict (Map)
 import Data.Sequence (Seq)
 import GHC.Generics (Generic)
@@ -128,6 +130,13 @@ data EnvPropBad e =
 -- | The result of evaluating an 'EnvProp'
 type EnvPropRes e v = Either (EnvPropBad e) (EnvPropGood v)
 
+class ApplyAction a w | w -> a where
+  -- | Apply the action to the given world and yield a new world
+  applyAction :: w -> a -> w
+  -- | Apply a sequence of actions and yield the corresponding sequence of worlds
+  scanActions :: w -> [a] -> [w]
+  scanActions = scanl' applyAction
+
 -- | A (state, action, state) triple - used for defining worlds.
 data SAS s a = SAS
   { sasBefore :: !s
@@ -135,6 +144,24 @@ data SAS s a = SAS
   , sasAfter :: !s
   } deriving stock (Eq, Show, Generic)
     deriving anyclass (NFData)
+
+-- | Lift an apply action on states to an apply action on SAS triples.
+applySAS :: (s -> a -> s) -> (SAS s a -> a -> SAS s a)
+applySAS update (SAS _ _ after) a = SAS after a (update after a)
+
+-- | Creates an initial SAS from an initial state and world
+initSAS :: (s -> a -> s) -> s -> a -> SAS s a
+initSAS update initState a = SAS initState a (update initState a)
+
+-- | Scan a list of actions into a list of SAS
+initScanSAS :: (s -> a -> s) -> s -> [a] -> [SAS s a]
+initScanSAS update initState actions = result where
+  result = case actions of
+    [] -> []
+    a:as -> scanl' (applySAS update) (initSAS update initState a) as
+
+instance ApplyAction a s => ApplyAction a (SAS s a) where
+  applyAction = applySAS applyAction
 
 -- | A 'Bridge' is something that can eval props and quantify in a given world.
 -- `w` is world type, `e` is error type, `v` is value type.

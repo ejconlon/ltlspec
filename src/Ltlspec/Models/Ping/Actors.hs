@@ -1,8 +1,9 @@
 module Ltlspec.Models.Ping.Actors where
 
 import Ltlspec.Models.Ping.Common (PingMessage (..))
-import Ltlspec.System.Actors (ActorConstructor, ActorId, AnnoMessage, AppMessage (..), Behavior, TickMessage (..),
-                              filterAnnoMessages, filterTickEvents, findActorsWhere, mkTickConfig, runActorSystemSimple)
+import Ltlspec.System.Actors (ActorCase (ActorCase), ActorConstructor, ActorId, AnnoMessage, AppMessage (..), Behavior,
+                              TickMessage (..), findActorsWhere, minimalTickMessageFilter, mkTickConfig,
+                              runActorCaseSimple)
 import Ltlspec.System.Logging (Logger, consoleLogger)
 import Ltlspec.System.Time (TimeDelta, timeDeltaFromFracSecs)
 import Text.Pretty.Simple (pPrint)
@@ -48,12 +49,13 @@ pingCtor limit interval pairs myId myRole =
       tickConfig = mkTickConfig Nothing interval (Just limit) myId
   in ([tickConfig], pingBehavior otherId)
 
+-- | Wraps up our ctor and configs to define our ping system.
+pingCase :: Int -> TimeDelta -> ActorCase PingMessage
+pingCase limit interval = ActorCase (pingCtor limit interval) pingConfigs minimalTickMessageFilter
+
 -- | Simulate the ping actor system and return a log of messages
 runPingSim :: Logger -> Int -> TimeDelta -> IO [AnnoMessage PingMessage]
-runPingSim logger limit interval = do
-  let ctor = pingCtor limit interval
-  logEvents <- runActorSystemSimple logger ctor pingConfigs
-  pure (filterAnnoMessages (filterTickEvents logEvents))
+runPingSim logger limit interval = runActorCaseSimple logger (pingCase limit interval)
 
 -- | Runs the actor system with a limit of 5 invocations of all tick timers.
 -- Prints all non-tick-fire events at the end.

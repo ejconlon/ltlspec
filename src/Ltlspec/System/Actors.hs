@@ -11,17 +11,23 @@ module Ltlspec.System.Actors
   , TimerConfig (..)
   , ActorConstructor
   , LogEvent (..)
+  , FilterType (..)
   , filterLogEvents
   , findActorsWhere
   , runActorSystem
   , runActorSystemSimple
   , TickMessage (..)
   , mkTickConfig
-  , filterTickEvents
+  , extractTickEmbed
   , MessageView (..)
   , AnnoMessage (..)
   , extractAnnoMessage
   , filterAnnoMessages
+  , MessageFilter (..)
+  , runMessageFilter
+  , minimalTickMessageFilter
+  , ActorCase (..)
+  , runActorCaseSimple
   ) where
 
 import Control.Concurrent (ThreadId, forkIO)
@@ -152,8 +158,12 @@ data LogEvent msg =
   deriving stock (Eq, Show, Functor, Foldable, Traversable, Generic)
   deriving anyclass (NFData)
 
-filterLogEvent :: (msg -> Maybe etc) -> Set MessageId -> LogEvent msg -> Maybe (LogEvent etc, Set MessageId)
-filterLogEvent f s = \case
+-- | Filter log events by message value only (discarding related administrative messages)
+filterMinimalLogEvents :: (msg -> Maybe etc) -> [LogEvent msg] -> [LogEvent etc]
+filterMinimalLogEvents = mapMaybe . traverse
+
+filterAssocLogEvent :: (msg -> Maybe etc) -> Set MessageId -> LogEvent msg -> Maybe (LogEvent etc, Set MessageId)
+filterAssocLogEvent f s = \case
   LogEventUndeliverable recv mid ->
     if Set.member mid s then Just (LogEventUndeliverable recv mid, s) else Nothing
   LogEventDelivered recv mid ->
@@ -175,17 +185,26 @@ filterLogEvent f s = \case
         let nm = NetMessage mid (AppMessage recv etc)
         in Just (LogEventSent nm, Set.insert mid s)
 
--- | Filter log events by message value (keeping relevant administrative messages)
-filterLogEvents :: (msg -> Maybe etc) -> [LogEvent msg] -> [LogEvent etc]
-filterLogEvents f = go Set.empty where
+-- | Filter log events by message value (keeping related administrative messages)
+filterAssocLogEvents :: (msg -> Maybe etc) -> [LogEvent msg] -> [LogEvent etc]
+filterAssocLogEvents f = go Set.empty where
   go !s = \case
     [] -> []
     hd:tl ->
-      case filterLogEvent f s hd of
+      case filterAssocLogEvent f s hd of
         Nothing -> go s tl
         Just (hd', s') ->
           let tl' = go s' tl
           in hd':tl'
+
+-- | Filter type - keep just extracted events, or also related administrative messages?
+data FilterType = FilterTypeMinimal | FilterTypeAssoc deriving stock (Eq, Show)
+
+-- | Filter events by the given filter type
+filterLogEvents :: FilterType -> (msg -> Maybe etc) -> [LogEvent msg] -> [LogEvent etc]
+filterLogEvents = \case
+  FilterTypeMinimal -> filterMinimalLogEvents
+  FilterTypeAssoc -> filterAssocLogEvents
 
 -- | The body of the network thread. Reads messages from the global queue and delivers them.
 -- On termination flushes the log.
@@ -354,9 +373,9 @@ mkTickConfig :: Maybe TimeDelta -> TimeDelta -> Maybe Int -> ActorId -> TimerCon
 mkTickConfig mayDelay interval mayLimit recvAid =
   TimerConfig mayDelay (Just (interval, mayLimit)) [recvAid] TickMessageFire
 
--- | Keeps only the embedded (non-fire) events
-filterTickEvents :: [LogEvent (TickMessage msg)] -> [LogEvent msg]
-filterTickEvents = filterLogEvents (\case { TickMessageFire -> Nothing; TickMessageEmbed msg -> Just msg })
+-- | Extracts embedded message from a tick message
+extractTickEmbed :: TickMessage msg -> Maybe msg
+extractTickEmbed = \case { TickMessageFire -> Nothing; TickMessageEmbed msg -> Just msg }
 
 -- | Is the annotated message from the sender's view or the receiver's?
 data MessageView =
@@ -382,3 +401,38 @@ extractAnnoMessage = \case
 -- | Keep only message send/receive events from a list of log events.
 filterAnnoMessages :: [LogEvent msg] -> [AnnoMessage msg]
 filterAnnoMessages = mapMaybe extractAnnoMessage
+
+data MessageFilter inMsg outMsg where
+  MessageFilterNone :: MessageFilter msg msg
+  MessageFilterFmap :: (inMsg -> outMsg) -> MessageFilter inMsg outMsg
+  MessageFilterSome :: FilterType -> (inMsg -> Maybe outMsg) -> MessageFilter inMsg outMsg
+
+instance Functor (MessageFilter inMsg) where
+  fmap f = \case
+    MessageFilterNone -> MessageFilterFmap f
+    MessageFilterFmap g -> MessageFilterFmap (f . g)
+    MessageFilterSome ftype g -> MessageFilterSome ftype (fmap f . g)
+
+runMessageFilter :: MessageFilter inMsg outMsg -> [LogEvent inMsg] -> [LogEvent outMsg]
+runMessageFilter mfilt logs =
+  case mfilt of
+    MessageFilterNone -> logs
+    MessageFilterFmap g -> fmap (fmap g) logs
+    MessageFilterSome ftype extract -> filterLogEvents ftype extract logs
+
+minimalTickMessageFilter :: MessageFilter (TickMessage msg) msg
+minimalTickMessageFilter = MessageFilterSome FilterTypeMinimal extractTickEmbed
+
+-- | Brings ctor, config, and extraction into a single definition
+data ActorCase a where
+  ActorCase :: ActorConstructor r msg -> [r] -> MessageFilter msg a -> ActorCase a
+
+instance Functor ActorCase where
+  fmap f (ActorCase ctor config mfilt) = ActorCase ctor config (fmap f mfilt)
+
+-- | Yields all annotated messages resulting from running the (terminating) case
+runActorCaseSimple :: Logger -> ActorCase a -> IO [AnnoMessage a]
+runActorCaseSimple logger (ActorCase ctor config mfilt) = do
+  logs <- runActorSystemSimple logger ctor config
+  let filtLogs = runMessageFilter mfilt logs
+  pure (filterAnnoMessages filtLogs)

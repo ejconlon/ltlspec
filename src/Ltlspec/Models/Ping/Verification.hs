@@ -5,11 +5,11 @@ import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as Map
 import Data.Set (Set)
 import qualified Data.Set as Set
-import Ltlspec (propAlways, propEventually, propExistsNested, propForAllNested, scanSAS)
-import Ltlspec.Models.Ping.Common (PingMessage (..))
+import Ltlspec (propAlways, propEventually, propExistsNested, propForAllNested)
+import Ltlspec.Models.Ping.Common (PingAction, PingMessage (..))
 import Ltlspec.System.Actors (ActorId, AnnoMessage (..), AppMessage (..), MessageId (..), MessageView (..),
                               NetMessage (..))
-import Ltlspec.Types (Atom (..), Bridge (..), Error, Prop (..), SAS (..), Theory (..))
+import Ltlspec.Types (ApplyAction (..), Atom (..), Bridge (..), Error, Prop (..), SAS (..), Theory (..), initScanSAS)
 
 -- | A proposition encoding responsiveness for ping messages.
 -- Textually, this is equivalent to:
@@ -32,25 +32,24 @@ pingTheory = Theory
       ]
   }
 
-type PingData = Set ActorId
-type PingState = Map ActorId PingData
+newtype PingState = PingState { unPingState :: Map ActorId (Set ActorId) }
+  deriving stock (Show)
+  deriving newtype (Eq, NFData)
 
 emptyPingState :: PingState
-emptyPingState = mempty
+emptyPingState = PingState Map.empty
 
-type PingAction = AnnoMessage PingMessage
-
-updatePingState :: PingAction -> PingState -> PingState
-updatePingState (AnnoMessage view (NetMessage (MessageId sendAid _) (AppMessage recvAid pay))) =
-  case (view, pay) of
-    (MessageViewSent, PingMessagePing) -> Map.adjust (Set.insert recvAid) sendAid
-    (MessageViewReceived, PingMessagePong) -> Map.adjust (Set.delete sendAid) recvAid
-    _ -> id
+instance ApplyAction PingAction PingState where
+  applyAction ps@(PingState st) (AnnoMessage view (NetMessage (MessageId sendAid _) (AppMessage recvAid pay))) =
+    case (view, pay) of
+      (MessageViewSent, PingMessagePing) -> PingState (Map.adjust (Set.insert recvAid) sendAid st)
+      (MessageViewReceived, PingMessagePong) -> PingState (Map.adjust (Set.delete sendAid) recvAid st)
+      _ -> ps
 
 -- Note: This is a newtype and not a type synonym to avoid an orphan Bridge instance.
 newtype PingWorld = PingWorld { unPingWorld :: SAS PingState PingAction }
   deriving stock (Eq)
-  deriving newtype (Show, NFData)
+  deriving newtype (Show, NFData, ApplyAction PingAction)
 
 -- | A trace of a sequence of messages that demonstrate responsiveness.
 pingMessagesOk :: [PingAction]
@@ -71,7 +70,7 @@ pingMessagesOk =
 
 -- | A trace of worlds corresponding to the sequence of messages.
 pingWorldOk :: [PingWorld]
-pingWorldOk = fmap PingWorld (scanSAS updatePingState emptyPingState pingMessagesOk)
+pingWorldOk = fmap PingWorld (initScanSAS applyAction emptyPingState pingMessagesOk)
 
 evalPingPong :: PingAction -> PingAction -> Prop
 evalPingPong am1 am2 =
