@@ -18,8 +18,10 @@ module Ltlspec.System.Actors
   , TickMessage (..)
   , mkTickConfig
   , filterTickEvents
-  , extractRecvMessage
-  , filterRecvMessages
+  , MessageView (..)
+  , AnnoMessage (..)
+  , extractAnnoMessage
+  , filterAnnoMessages
   ) where
 
 import Control.Concurrent (ThreadId, forkIO)
@@ -356,12 +358,27 @@ mkTickConfig mayDelay interval mayLimit recvAid =
 filterTickEvents :: [LogEvent (TickMessage msg)] -> [LogEvent msg]
 filterTickEvents = filterLogEvents (\case { TickMessageFire -> Nothing; TickMessageEmbed msg -> Just msg })
 
--- | Extracts a simple message triple from a log events
-extractRecvMessage :: LogEvent msg -> Maybe (NetMessage msg)
-extractRecvMessage = \case
-  LogEventReceived nm -> Just nm
+-- | Is the annotated message from the sender's view or the receiver's?
+data MessageView =
+    MessageViewSent
+  | MessageViewReceived
+  deriving stock (Eq, Show, Generic)
+  deriving anyclass (NFData)
+
+-- | Message annotated with point of view.
+data AnnoMessage msg = AnnoMessage
+  { annoMessageView :: !MessageView
+  , annoMessageBody :: !(NetMessage msg)
+  } deriving stock (Eq, Show, Generic)
+    deriving anyclass (NFData)
+
+-- | Extracts message send/receive event from a log event
+extractAnnoMessage :: LogEvent msg -> Maybe (AnnoMessage msg)
+extractAnnoMessage = \case
+  LogEventReceived nm -> Just (AnnoMessage MessageViewReceived nm)
+  LogEventSent nm -> Just (AnnoMessage MessageViewSent nm)
   _ -> Nothing
 
--- | Keep only message receive events in a simple format.
-filterRecvMessages :: [LogEvent msg] -> [NetMessage msg]
-filterRecvMessages = mapMaybe extractRecvMessage
+-- | Keep only message send/receive events from a list of log events.
+filterAnnoMessages :: [LogEvent msg] -> [AnnoMessage msg]
+filterAnnoMessages = mapMaybe extractAnnoMessage

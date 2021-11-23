@@ -5,49 +5,49 @@ import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as Map
 import Data.Set (Set)
 import qualified Data.Set as Set
-import Ltlspec (propAlways, propEventually, propForAllNested, propIf, scanSAS)
+import Ltlspec (propAlways, propEventually, propExistsNested, propForAllNested, scanSAS)
 import Ltlspec.Models.Ping.Common (PingMessage (..))
-import Ltlspec.System.Actors (ActorId, AppMessage (..), MessageId (..), NetMessage (..))
-import Ltlspec.Types (Atom (..), Binder (..), Bridge (..), Error, Prop (..), SAS (..), Theory (..))
+import Ltlspec.System.Actors (ActorId, AnnoMessage (..), AppMessage (..), MessageId (..), MessageView (..),
+                              NetMessage (..))
+import Ltlspec.Types (Atom (..), Bridge (..), Error, Prop (..), SAS (..), Theory (..))
 
 -- | A proposition encoding responsiveness for ping messages.
 -- Textually (but omitting types), this is equivalent to:
--- Always (Forall x y m. IsMessage x y m -> Eventually (Exists n. IsMessage y x n /\ IsResponse n m))
+-- Always (Forall a1 m1 a2. IsPing a1 m1 a2 -> Eventually (Exists m2. IsPong a2 m2 a1))
 pingResponsiveProp :: Prop
 pingResponsiveProp =
-  let prop = propAlways (propForAllNested [("x", "ActorId"), ("y", "ActorId"), ("m", "MessageId")] ifMessageEventuallyResponse)
-      ifMessageEventuallyResponse = propIf (PropAtom (Atom "IsMessage" ["x", "y", "m"])) eventuallyIsResponse
-      eventuallyIsResponse = propEventually (PropExists (Binder "n" "MessageId") isResponse)
-      isResponse = PropAnd (PropAtom (Atom "IsMessage" ["y", "x", "n"])) (PropAtom (Atom "IsResponse" ["n", "m"]))
+  let prop = propAlways (propForAllNested [("m1", "SentPing")] eventuallyPong)
+      eventuallyPong = propEventually (propExistsNested [("m2", "RecvPong")] pong)
+      pong = PropAtom (Atom "PingPong" ["m1", "m2"])
   in prop
 
 pingTheory :: Theory
 pingTheory = Theory
-  { theoryTypes = ["ActorId", "MessageId"]
+  { theoryTypes = ["SentPing", "RecvPong"]
   , theoryProps = Map.fromList
-      [ ("IsMessage", ["ActorId", "ActorId", "MessageId"])
-      , ("IsResponse", ["MessageId", "MessageId"])
+      [ ("PingPong", ["SentPing", "RecvPong"])
       ]
   , theoryAxioms = Map.fromList
       [ ("isResponsive", pingResponsiveProp)
       ]
   }
 
-type PingData = Set MessageId
+type PingData = Set ActorId
 type PingState = Map ActorId PingData
 
 emptyPingState :: PingState
 emptyPingState = mempty
 
-type PingAction = NetMessage PingMessage
+type PingAction = AnnoMessage PingMessage
 
 updatePingState :: PingAction -> PingState -> PingState
-updatePingState = \case
-  NetMessage mid (AppMessage recvAid pay) ->
-    case pay of
-      PingMessagePing -> Map.adjust (Set.insert mid) recvAid
-      PingMessagePong -> Map.adjust (Set.delete mid) recvAid
+updatePingState (AnnoMessage view (NetMessage (MessageId sendAid _) (AppMessage recvAid pay))) =
+  case (view, pay) of
+    (MessageViewSent, PingMessagePing) -> Map.adjust (Set.insert recvAid) sendAid
+    (MessageViewReceived, PingMessagePong) -> Map.adjust (Set.delete sendAid) recvAid
+    _ -> id
 
+-- Note: This is a newtype and not a type synonym to avoid an orphan Bridge instance.
 newtype PingWorld = PingWorld { unPingWorld :: SAS PingState PingAction }
   deriving stock (Eq)
   deriving newtype (Show, NFData)
@@ -55,33 +55,45 @@ newtype PingWorld = PingWorld { unPingWorld :: SAS PingState PingAction }
 -- | A trace of a sequence of messages that demonstrate responsiveness.
 pingMessagesOk :: [PingAction]
 pingMessagesOk =
-  [ NetMessage (MessageId 0 42) (AppMessage 1 PingMessagePing)
-  , NetMessage (MessageId 1 78) (AppMessage 0 PingMessagePing)
-  , NetMessage (MessageId 1 79) (AppMessage 0 PingMessagePong)
-  , NetMessage (MessageId 0 43) (AppMessage 1 PingMessagePong)
-  ]
+  let ping01 = NetMessage (MessageId 0 42) (AppMessage 1 PingMessagePing)
+      ping10 = NetMessage (MessageId 1 78) (AppMessage 0 PingMessagePing)
+      pong01 = NetMessage (MessageId 1 79) (AppMessage 0 PingMessagePong)
+      pong10 = NetMessage (MessageId 0 43) (AppMessage 1 PingMessagePong)
+  in [ AnnoMessage MessageViewSent ping01
+     , AnnoMessage MessageViewSent ping10
+     , AnnoMessage MessageViewReceived ping01
+     , AnnoMessage MessageViewReceived ping10
+     , AnnoMessage MessageViewSent pong10
+     , AnnoMessage MessageViewReceived pong10
+     , AnnoMessage MessageViewSent pong01
+     , AnnoMessage MessageViewReceived pong01
+     ]
 
 -- | A trace of worlds corresponding to the sequence of messages.
 pingWorldOk :: [PingWorld]
 pingWorldOk = fmap PingWorld (scanSAS updatePingState emptyPingState pingMessagesOk)
 
-data PingVal =
-    PingValMessage !MessageId
-  | PingValActor !ActorId
-  deriving stock (Eq, Show)
+evalPingPong :: PingAction -> PingAction -> Prop
+evalPingPong am1 am2 =
+  let AnnoMessage view1 (NetMessage (MessageId sendAid1 _) (AppMessage recvAid1 msg1)) = am1
+      AnnoMessage view2 (NetMessage (MessageId sendAid2 _) (AppMessage recvAid2 msg2)) = am2
+  in case (view1, msg1, view2, msg2) of
+    (MessageViewSent, PingMessagePing, MessageViewReceived, PingMessagePong) | sendAid1 == recvAid2 && recvAid1 == sendAid2 -> PropTrue
+    _ -> PropFalse
 
--- TODO(ejconlon) Finish bridge and unit test it
-
-evalIsMessage :: PingState -> ActorId -> ActorId -> MessageId -> Either Error Prop
-evalIsMessage _ _ _ _ = error "TODO"
-
-evalIsResponse :: PingState -> MessageId -> MessageId -> Either Error Prop
-evalIsResponse _ _ _ = error "TODO"
-
-instance Bridge Error PingVal PingWorld where
-  bridgeEvalProp (PingWorld (SAS _ _ s)) (Atom propName vals) =
+instance Bridge Error PingAction PingWorld where
+  bridgeEvalProp (PingWorld _) (Atom propName vals) =
     case (propName, vals) of
-      ("IsMessage", [PingValActor x, PingValActor y, PingValMessage m]) -> evalIsMessage s x y m
-      ("IsResponse", [PingValMessage n, PingValMessage m]) -> evalIsResponse s n m
+      ("PingPong", [m1, m2]) -> Right (evalPingPong m1 m2)
       _ -> Left ("Could not eval " <> propName <> " on " <> show vals)
-  bridgeQuantify _ _ = error "TODO"
+  bridgeQuantify (PingWorld (SAS _ a _)) tyName =
+    case tyName of
+      "SentPing" ->
+        case a of
+          AnnoMessage MessageViewSent (NetMessage _ (AppMessage _ PingMessagePing)) -> Right [a]
+          _ -> Right []
+      "RecvPong" ->
+        case a of
+          AnnoMessage MessageViewReceived (NetMessage _ (AppMessage _ PingMessagePong)) -> Right [a]
+          _ -> Right []
+      _ -> Left ("Could not quantify type " <> tyName)
