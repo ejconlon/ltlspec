@@ -74,8 +74,9 @@ type Chopsticks = M.Map ChopstickId Chopstick
 
 type Message = Either HakkerMsg ChopstickMsg
 
-data Network = Network
-  { packets:: [Message] }
+newtype Network = Network
+  { packets :: [Message]
+  }
 
 sendMessage:: Message -> Network -> Network
 sendMessage = error "TODO"
@@ -108,7 +109,7 @@ initState hs = defaultGlobalState {hakkers = hks, chopsticks = chops}
     hks = foldl (\m (i, h) -> M.insert h defaultHakker{hakkerId=h, lchop=i, rchop=(i-1) `mod` l} m) M.empty (zip idx hs)
 
 tick :: GlobalState -> GlobalState
-tick gs = gs {timestamp = (timestamp gs) + 1}
+tick gs = gs {timestamp = timestamp gs + 1}
 
 data Action =
     HakkerThink HakkerId
@@ -178,7 +179,7 @@ stepPerfect (HakkerEat h) gs@GlobalState{hakkers=hs, chopsticks=cs} =
   let hk = hs M.! h in
   case hkState hk of
     Hungry -> case hkRecvs hk of
-      msgs :|> Grant _ _ _ :|> Grant _ _ _  -> let
+      msgs :|> Grant {} :|> Grant {}  -> let
         hk' = hk {hkRecvs=msgs, hkState=Eating}
         hs' = M.insert h hk' hs
         in
@@ -195,10 +196,10 @@ stepPerfect (ChopstickResp c) gs@GlobalState{timestamp=ts, hakkers=hs, chopstick
         hs' = M.adjust (hakkerReceive msg) hid hs
         cs' = M.insert c (chop {chopRecvs=msgs, chopState=Taken}) cs
         in
-        tick gs {hakkers=hs', chopsticks=cs', messages=(Right msg : ms)}
+        tick gs {hakkers=hs', chopsticks=cs', messages=Right msg : ms}
       _ -> tick gs
     Taken -> case chopRecvs chop of
-      msgs :|> Put _ _ _ -> let
+      msgs :|> Put {} -> let
         cs' = M.insert c (chop {chopRecvs=msgs, chopState=Free}) cs
         in
         tick gs {hakkers=hs, chopsticks=cs'}
@@ -206,7 +207,7 @@ stepPerfect (ChopstickResp c) gs@GlobalState{timestamp=ts, hakkers=hs, chopstick
       -- Move the Take message to the end of the list.
       -- This is fine, because there's only two Hakkers knowing the chopstick
       -- And only one of them will send Take message
-      msgs :|> msg@(Take _ _ _) -> let
+      msgs :|> msg@Take {} -> let
         cs' = M.insert c (chop {chopRecvs=msg :<| msgs}) cs
         in
         tick gs {hakkers=hs, chopsticks=cs'}

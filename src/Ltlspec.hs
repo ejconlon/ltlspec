@@ -2,6 +2,7 @@
 module Ltlspec where
 
 import Control.Monad.Writer.Strict (execWriter, tell)
+import Data.Foldable (toList)
 import Data.Functor.Foldable (embed, fold, project)
 import qualified Data.Map.Strict as M
 import Data.Semigroup (Max (..), Sum (..))
@@ -190,11 +191,10 @@ data PropCombinator = PcAnd | PcOr
 -- This merge function will merge single step propositions into a sequence.
 -- The elements in the sequence are *conceptually* running in parallel.
 mergeEnvPropSteps :: PropCombinator -> EnvPropStep v -> EnvPropStep v -> EnvPropStep v
-mergeEnvPropSteps pc step1 step2 = combine pc step1 step2
-  where
-    combine combinator s1 s2 = case combinator of
-      PcAnd -> EnvPropStepParallel QuantifierForAll (fromList [s1, s2])
-      PcOr -> EnvPropStepParallel QuantifierExists (fromList [s1, s2])
+mergeEnvPropSteps pc s1 s2 =
+  case pc of
+    PcAnd -> EnvPropStepParallel QuantifierForAll (fromList [s1, s2])
+    PcOr -> EnvPropStepParallel QuantifierExists (fromList [s1, s2])
 
 negateEnvPropStep :: EnvPropStep v -> EnvPropStep v
 negateEnvPropStep = \case
@@ -283,7 +283,7 @@ envPropEval ep0@(EnvProp env0 prop0) world = go env0 prop0 where
           true@(Right (EnvPropGoodBool True)) -> true
           -- p1 is false, thus p2 cannot be released
           -- the show must go on
-          Right (EnvPropGoodBool False) -> GoodN $ (EnvPropStepSingle ep0)
+          Right (EnvPropGoodBool False) -> GoodN (EnvPropStepSingle ep0)
           -- p1 has some residual for next world
           -- If the residual is true, the prop is proven,
           -- otherwise we need to keep evaluating the prop in next world
@@ -311,7 +311,7 @@ evalEnvPropGood res world = case res of
   EnvPropGoodNext (EnvPropStepParallel qt ps) ->
     let
       allRes = fmap (\x -> evalEnvPropGood (EnvPropGoodNext x) world) ps
-      results = foldr (\r rs -> r : rs) [] allRes
+      results = toList allRes
       result = case qt of
         QuantifierForAll -> sequenceForAllRes results
         QuantifierExists -> sequenceExistsRes results
