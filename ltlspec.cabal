@@ -25,6 +25,7 @@ source-repository head
 library
   exposed-modules:
       Ltlspec
+      Ltlspec.Driver
       Ltlspec.Models.Chat
       Ltlspec.Models.DinningHakker
       Ltlspec.Models.Ping.Actors

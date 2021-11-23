@@ -9,6 +9,9 @@ import Test.Tasty.HUnit (testCase, (@?=))
 -- import Data.Sequence (Seq)
 -- import qualified Data.Sequence as Seq
 import Control.Monad (when)
+import Ltlspec.Driver (driveVerificationIO)
+import Ltlspec.Models.Ping.Verification (pingTheory, pingWorldOk)
+import Ltlspec.System.Logging (flushLogVar, newLogVar, varLogger)
 import System.Environment (lookupEnv, setEnv)
 import System.IO (BufferMode (NoBuffering), hSetBuffering, stderr, stdout)
 
@@ -145,6 +148,17 @@ eqCases =
 testEqCases :: TestTree
 testEqCases = testGroup "Eq cases" (fmap testEqCase eqCases)
 
+testPing :: TestTree
+testPing = testCase "Ping" $ do
+  logVar <- newLogVar
+  let logger = varLogger logVar
+  res <- driveVerificationIO logger pingTheory pingWorldOk
+  case res of
+    Left err -> do
+      logEntries <- flushLogVar logVar
+      fail ("Failed to verify: " <> show err <> " | " <> show logEntries)
+    _ -> pure ()
+
 main :: IO ()
 main = do
   mayDebugStr <- lookupEnv "DEBUG"
@@ -155,4 +169,5 @@ main = do
     hSetBuffering stderr NoBuffering
   defaultMain $ testGroup "Ltlspec"
     [ testEqCases
+    , testPing
     ]

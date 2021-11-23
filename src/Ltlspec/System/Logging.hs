@@ -3,6 +3,7 @@ module Ltlspec.System.Logging
   , logLevelToStr
   , strToLogLevel
   , Logger (..)
+  , runLogger
   , disabledLogger
   , filterLogger
   , consoleLogger
@@ -14,6 +15,7 @@ module Ltlspec.System.Logging
   ) where
 
 import Control.Concurrent.MVar (MVar, modifyMVarMasked_, newMVar, swapMVar)
+import Control.Monad.IO.Class (MonadIO (..))
 import Ltlspec.System.Time (MonoTime, currentMonoTime, monoTimeToNanos)
 
 -- | Log level... TRACE is most verbose, ERROR is least
@@ -43,8 +45,12 @@ strToLogLevel = \case
   _ -> Nothing
 
 -- | A Logger is any action given a log level and message.
--- Use like `runLogger logger LogLevelInfo "hello"`
-newtype Logger = Logger { runLogger :: LogLevel -> String -> IO () }
+-- Use `runLoggerIO logger LogLevelInfo "hello"`
+newtype Logger = Logger { runLoggerIO :: LogLevel -> String -> IO () }
+
+-- | Because wrapping in liftIO is a pain!
+runLogger :: MonadIO m => Logger -> LogLevel -> String -> m ()
+runLogger logger ll s = liftIO (runLoggerIO logger ll s)
 
 -- | A logger that does nothing.
 disabledLogger :: Logger
@@ -57,7 +63,7 @@ filterLogger :: LogLevel -> Logger -> Logger
 filterLogger ll0 logger =
   case ll0 of
     LogLevelTrace -> logger
-    _ ->Logger (\ll1 s -> if ll1 >= ll0 then runLogger logger ll1 s else pure ())
+    _ ->Logger (\ll1 s -> if ll1 >= ll0 then runLoggerIO logger ll1 s else pure ())
 
 -- | A printf logger that LOCKS to avoid concurrent access to stdout.
 -- Note that other threads may still print and make things ugly.
