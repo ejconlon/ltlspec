@@ -7,7 +7,11 @@ import Data.Functor.Foldable (embed, fold, project)
 import qualified Data.Map.Strict as M
 import Data.Semigroup (Max (..), Sum (..))
 import Data.Sequence (Seq (..), fromList)
+import Data.Set (Set)
+import qualified Data.Set as Set
 import Ltlspec.Recursion (foldUpM)
+import Ltlspec.TriBool (TriBool (..), triBoolAnd, triBoolAndAll, triBoolNot, triBoolOr, triBoolOrAll, triBoolRelease,
+                        triBoolUntil)
 import Ltlspec.Types (Atom (..), AtomVar, Binder (..), Bridge (..), Env, EnvProp (..), EnvPropBad (..),
                       EnvPropGood (..), EnvPropRes, EnvPropStep (..), Prop (..), PropF (..), PropName, Quantifier (..),
                       TyName, VarName)
@@ -319,3 +323,28 @@ envPropFold p = go 0 (Right (EnvPropGoodNext (EnvPropStepSingle p))) where
       Left _ -> (i, r)
       Right (EnvPropGoodBool _) -> (i, r)
       Right good -> go (i+1) (evalEnvPropGood good w) ws
+
+-- | Given a set of types that we assert will never be inhabited
+-- in any future world, evaluate the (3-valued) truth of the proposition.
+-- 'Left' indicates an unbound var, 'Right' indicates a valid result.
+truncateEnvPropStep :: Set TyName -> (Atom v -> TriBool) -> EnvPropStep v -> Either VarName TriBool
+truncateEnvPropStep emptyTys oracle = goStep where
+  goStep = \case
+    EnvPropStepSingle (EnvProp e p) -> goProp e p
+    EnvPropStepParallel quant steps -> fmap (goQuant quant) (traverse goStep steps)
+  goQuant quant res =
+    case quant of
+      QuantifierForAll -> triBoolAndAll res
+      QuantifierExists -> triBoolOrAll res
+  goProp e = \case
+    PropAtom av -> fmap oracle (lookupEnvAtom e av)
+    PropTrue -> Right TriBoolTrue
+    PropFalse -> Right TriBoolFalse
+    PropNot p -> fmap triBoolNot (goProp e p)
+    PropAnd p1 p2 -> triBoolAnd <$> goProp e p1 <*> goProp e p2
+    PropOr p1 p2 -> triBoolOr <$> goProp e p1 <*> goProp e p2
+    PropNext p -> goProp e p
+    PropUntil p1 p2 -> triBoolUntil <$> goProp e p1 <*> goProp e p2
+    PropRelease p1 p2 -> triBoolRelease <$> goProp e p1 <*> goProp e p2
+    PropForAll (Binder _ ty) _ -> Right (if Set.member ty emptyTys then TriBoolTrue else TriBoolUnknown)
+    PropExists (Binder _ ty) _ -> Right (if Set.member ty emptyTys then TriBoolFalse else TriBoolUnknown)

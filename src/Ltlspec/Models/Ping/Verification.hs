@@ -81,7 +81,7 @@ evalPingPong am1 am2 =
     _ -> PropFalse
 
 instance Bridge Error PingAction PingWorld where
-  bridgeEvalProp (PingWorld _) (Atom propName vals) =
+  bridgeEvalProp _ (Atom propName vals) =
     case (propName, vals) of
       ("PingPong", [m1, m2]) -> Right (evalPingPong m1 m2)
       _ -> Left ("Could not eval " <> propName <> " on " <> show vals)
