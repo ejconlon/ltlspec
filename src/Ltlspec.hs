@@ -222,7 +222,7 @@ negateEnvPropStep = \case
 
 -- TODO(yanze) implement this and resurrect unit tests!
 envPropEval :: Bridge e v w => EnvProp v -> w -> EnvPropRes e v
-envPropEval ep0@(EnvProp env0 prop0) world = go env0 prop0 where
+envPropEval (EnvProp env0 prop0) world = go env0 prop0 where
   go env prop =
     case prop of
       PropAtom atomVar ->
@@ -275,7 +275,7 @@ envPropEval ep0@(EnvProp env0 prop0) world = go env0 prop0 where
         Right (EnvPropGoodBool False) -> case go env p1 of
           bad@(Left _) -> bad
           -- p1 is true, so we need to check the prop against the next world
-          Right (EnvPropGoodBool True) -> GoodN $ EnvPropStepSingle ep0
+          Right (EnvPropGoodBool True) -> GoodN $ EnvPropStepSingle (EnvProp env prop)
           -- p1 is false, the whole prop fails
           false@(Right (EnvPropGoodBool False)) -> false
           -- p1 has some residual for next world
@@ -283,12 +283,12 @@ envPropEval ep0@(EnvProp env0 prop0) world = go env0 prop0 where
           -- Therefore we use PropAnd to connect the residual and the original prop.
           -- the residual will be evaluate first, and if it's true, the proposition is proven;
           -- otherwise, we need to evaluate the same prop in the next world (next time tick)
-          Right (EnvPropGoodNext next) -> GoodN $ mergeEnvPropSteps QuantifierForAll next (EnvPropStepSingle ep0)
+          Right (EnvPropGoodNext next) -> GoodN $ mergeEnvPropSteps QuantifierForAll next (EnvPropStepSingle (EnvProp env prop))
         -- p2 has some residual for next world
         -- If p2 is evaluate to be true in the next world,
         -- the whole prop is true in the *current* world.
         -- Therefore, we use PropOr to connect.
-        Right (EnvPropGoodNext next) -> GoodN $ mergeEnvPropSteps QuantifierExists next (EnvPropStepSingle ep0)
+        Right (EnvPropGoodNext next) -> GoodN $ mergeEnvPropSteps QuantifierExists next (EnvPropStepSingle (EnvProp env prop))
       PropRelease p1 p2 -> case go env p2 of
         bad@(Left _) -> bad
         -- p2 is false, the prop is false!
@@ -300,14 +300,14 @@ envPropEval ep0@(EnvProp env0 prop0) world = go env0 prop0 where
           true@(Right (EnvPropGoodBool True)) -> true
           -- p1 is false, thus p2 cannot be released
           -- the show must go on
-          Right (EnvPropGoodBool False) -> GoodN (EnvPropStepSingle ep0)
+          Right (EnvPropGoodBool False) -> GoodN (EnvPropStepSingle (EnvProp env prop))
           -- p1 has some residual for next world
           -- If the residual is true, the prop is proven,
           -- otherwise we need to keep evaluating the prop in next world
           -- Therefore we use PropOr to connect the residual and the original prop.
-          Right (EnvPropGoodNext next) -> GoodN $ mergeEnvPropSteps QuantifierExists next (EnvPropStepSingle ep0)
+          Right (EnvPropGoodNext next) -> GoodN $ mergeEnvPropSteps QuantifierExists next (EnvPropStepSingle (EnvProp env prop))
         -- Similarly, here we use PropAnd to connect
-        Right (EnvPropGoodNext next) -> GoodN $ mergeEnvPropSteps QuantifierForAll next (EnvPropStepSingle ep0)
+        Right (EnvPropGoodNext next) -> GoodN $ mergeEnvPropSteps QuantifierForAll next (EnvPropStepSingle (EnvProp env prop))
       PropForAll (Binder varName tyName) bodyProp ->
         case bridgeQuantify world tyName of
           Left err -> Left (EnvPropBadErr err)
