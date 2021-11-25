@@ -306,11 +306,12 @@ mkActorBody :: Logger -> ActorId -> TEvent -> TQueue (NetMessage msg) -> TQueue 
 mkActorBody logger aid doneEvent actorQueue logQueue handler = do
   let astr = "actor " ++ show (unActorId aid)
   logDebug logger $ astr ++ " started"
-  processUntilDone doneEvent actorQueue $ \nm@(NetMessage mid appMsg@(AppMessage recvAid _)) -> do
+  processUntilDone doneEvent actorQueue $ \nm@(NetMessage mid@(MessageId sendAid _) (AppMessage recvAid pay)) -> do
     if aid == recvAid
       then do
         writeTQueue logQueue (LogEventReceived nm)
-        handler appMsg
+        let flipAppMsg = AppMessage sendAid pay
+        handler flipAppMsg
         writeTQueue logQueue (LogEventProcessed aid mid)
       else writeTQueue logQueue (LogEventMisdelivered aid mid recvAid)
   logDebug logger $ astr ++ " stopped"

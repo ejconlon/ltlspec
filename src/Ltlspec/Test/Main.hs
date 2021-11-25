@@ -242,8 +242,7 @@ testPingActors = testCase "Ping actors" $ runLogM $ do
 testPing :: TestTree
 testPing = testGroup "Ping"
   [ testPingTraceOk
-  -- TODO fix this test!
-  -- , testPingTraceNotOk
+  , testPingTraceNotOk
   , testPingActors
   ]
 

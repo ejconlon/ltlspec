@@ -12,18 +12,19 @@ import Text.Pretty.Simple (pPrint)
 data PingConfig =
     PingConfigRoleA
   | PingConfigRoleB
+  | PingConfigRoleC
   deriving stock (Eq, Show, Enum, Bounded)
 
 -- | Our roles are in a circle.
 nextRole :: PingConfig -> PingConfig
 nextRole = \case
   PingConfigRoleA -> PingConfigRoleB
-  PingConfigRoleB -> PingConfigRoleA
-  -- PingConfigRoleC -> PingConfigRoleA
+  PingConfigRoleB -> PingConfigRoleC
+  PingConfigRoleC -> PingConfigRoleA
 
 -- | We'll instantiate one of each role.
 pingConfigs :: [PingConfig]
-pingConfigs = [PingConfigRoleA, PingConfigRoleB]
+pingConfigs = [PingConfigRoleA, PingConfigRoleB, PingConfigRoleC]
 
 -- | Finds the actor id of the next role.
 findNextRoleId :: PingConfig -> [(ActorId, PingConfig)] -> ActorId
@@ -38,7 +39,7 @@ pingBehavior nextId sendMsg (AppMessage sendAid tm) =
     TickMessageFire -> sendMsg (AppMessage nextId (TickMessageEmbed PingMessagePing))
     TickMessageEmbed msg ->
       case msg of
-        PingMessagePing -> sendMsg (AppMessage nextId (TickMessageEmbed PingMessagePong))
+        PingMessagePing -> sendMsg (AppMessage sendAid (TickMessageEmbed PingMessagePong))
         _ -> pure ()
 
 -- | Each actor is instantiated with a tick timer and the above behavior.
