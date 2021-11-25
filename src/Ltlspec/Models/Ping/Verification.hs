@@ -9,7 +9,9 @@ import Ltlspec (propAlways, propEventually, propExistsNested, propForAllNested)
 import Ltlspec.Models.Ping.Common (PingAction, PingMessage (..))
 import Ltlspec.System.Actors (ActorId, AnnoMessage (..), AppMessage (..), MessageId (..), MessageView (..),
                               NetMessage (..))
-import Ltlspec.Types (ApplyAction (..), Atom (..), Bridge (..), Error, Prop (..), SAS (..), Theory (..), initScanSAS)
+import Ltlspec.TriBool (TriBool (..))
+import Ltlspec.Types (ApplyAction (..), Atom (..), Bridge (..), Error, Prop (..), SAS (..), Theory (..),
+                      TruncBridge (..), initScanSAS)
 
 -- | A proposition encoding responsiveness for ping messages.
 -- Textually, this is equivalent to:
@@ -68,23 +70,48 @@ pingMessagesOk =
      , AnnoMessage MessageViewReceived pong01
      ]
 
--- | A trace of worlds corresponding to the sequence of messages.
-pingWorldOk :: [PingWorld]
-pingWorldOk = fmap PingWorld (initScanSAS applyAction emptyPingState pingMessagesOk)
+-- | A trace of a sequence of messages that demonstrate responsiveness.
+pingMessagesNotOk :: [PingAction]
+pingMessagesNotOk =
+  let ping01 = NetMessage (MessageId 0 42) (AppMessage 1 PingMessagePing)
+      ping10 = NetMessage (MessageId 1 78) (AppMessage 0 PingMessagePing)
+      pong01 = NetMessage (MessageId 1 79) (AppMessage 0 PingMessagePong)
+  in [ AnnoMessage MessageViewSent ping01
+     , AnnoMessage MessageViewSent ping10
+     , AnnoMessage MessageViewReceived ping01
+     , AnnoMessage MessageViewReceived ping10
+     , AnnoMessage MessageViewSent pong01
+     , AnnoMessage MessageViewReceived pong01
+     ]
 
-evalPingPong :: PingAction -> PingAction -> Prop
+-- | Make a sequence of worlds from a sequence of actions
+mkPingWorlds :: [PingAction] -> [PingWorld]
+mkPingWorlds = fmap PingWorld . initScanSAS applyAction emptyPingState
+
+-- | A trace of worlds corresponding to the ok sequence of messages.
+pingWorldsOk :: [PingWorld]
+pingWorldsOk = mkPingWorlds pingMessagesOk
+
+-- | A trace of worlds corresponding to the not ok sequence of messages.
+pingWorldsNotOk :: [PingWorld]
+pingWorldsNotOk = mkPingWorlds pingMessagesNotOk
+
+evalPingPong :: PingAction -> PingAction -> Bool
 evalPingPong am1 am2 =
   let AnnoMessage view1 (NetMessage (MessageId sendAid1 _) (AppMessage recvAid1 msg1)) = am1
       AnnoMessage view2 (NetMessage (MessageId sendAid2 _) (AppMessage recvAid2 msg2)) = am2
   in case (view1, msg1, view2, msg2) of
-    (MessageViewSent, PingMessagePing, MessageViewReceived, PingMessagePong) | sendAid1 == recvAid2 && recvAid1 == sendAid2 -> PropTrue
-    _ -> PropFalse
+    (MessageViewSent, PingMessagePing, MessageViewReceived, PingMessagePong) | sendAid1 == recvAid2 && recvAid1 == sendAid2 -> True
+    _ -> False
+
+evalPingProp :: Atom PingAction -> Either Error Bool
+evalPingProp (Atom propName vals) =
+  case (propName, vals) of
+    ("PingPong", [m1, m2]) -> Right (evalPingPong m1 m2)
+    _ -> Left ("Could not eval " <> propName <> " on " <> show vals)
 
 instance Bridge Error PingAction PingWorld where
-  bridgeEvalProp _ (Atom propName vals) =
-    case (propName, vals) of
-      ("PingPong", [m1, m2]) -> Right (evalPingPong m1 m2)
-      _ -> Left ("Could not eval " <> propName <> " on " <> show vals)
+  bridgeEvalProp _ = fmap (\b -> if b then PropTrue else PropFalse) . evalPingProp
   bridgeQuantify (PingWorld (SAS _ a _)) tyName =
     case tyName of
       "SentPing" ->
@@ -96,3 +123,7 @@ instance Bridge Error PingAction PingWorld where
           AnnoMessage MessageViewReceived (NetMessage _ (AppMessage _ PingMessagePong)) -> Right [a]
           _ -> Right []
       _ -> Left ("Could not quantify type " <> tyName)
+
+instance TruncBridge Error PingAction PingWorld where
+  truncBridgeEmpty _ = Set.fromList ["SentPing", "RecvPong"]
+  truncBridgeOracle _ = fmap (\b -> if b then TriBoolTrue else TriBoolFalse) . evalPingProp

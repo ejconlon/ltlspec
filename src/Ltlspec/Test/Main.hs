@@ -1,16 +1,20 @@
 module Ltlspec.Test.Main (main) where
 
-import Control.Monad (when)
+import Control.Monad (ap, when)
+import Control.Monad.IO.Class (MonadIO (..))
 import qualified Data.Map.Strict as Map
+import Data.Maybe (isJust)
 import Ltlspec (envPropFold, propAlways, propEventually, propForAllNested, propIf, propIfNested)
-import Ltlspec.Driver (DriverError, driveVerificationIO)
+import Ltlspec.Driver (DriverError (..), driveVerificationIO)
 import Ltlspec.Models.Ping.Actors (pingCase)
-import Ltlspec.Models.Ping.Verification (PingWorld (PingWorld), emptyPingState, pingTheory, pingWorldOk)
+import Ltlspec.Models.Ping.Verification (PingWorld (PingWorld), emptyPingState, pingTheory, pingWorldsNotOk,
+                                         pingWorldsOk)
 import Ltlspec.System.Actors (ActorCase, AnnoMessage, runActorCaseSimple)
-import Ltlspec.System.Logging (LogEntry, flushLogVar, newLogVar, varLogger)
+import Ltlspec.System.Logging (LogEntry, Logger, consoleLogger, flushLogVar, newLogVar, varLogger)
 import Ltlspec.System.Time (TimeDelta, timeDeltaFromFracSecs)
 import Ltlspec.Types (ApplyAction (..), Atom (..), Binder (..), Bridge (..), EnvProp (..), EnvPropBad (..),
-                      EnvPropGood (..), EnvPropRes, EnvPropStep (..), Prop (..), SAS, Theory (..), VarName, initScanSAS)
+                      EnvPropGood (..), EnvPropRes, EnvPropStep (..), Prop (..), SAS, Theory (..), TruncBridge, VarName,
+                      initScanSAS)
 import System.Environment (lookupEnv, setEnv)
 import System.IO (BufferMode (NoBuffering), hSetBuffering, stderr, stdout)
 import Test.Tasty (TestTree, defaultMain, testGroup)
@@ -86,8 +90,11 @@ data EqCase v = EqCase
 
 testEqCase :: (Eq v, Show v) => EqCase v -> TestTree
 testEqCase (EqCase name worlds prop expectedSteps expectedRes) = testCase name $ do
-  let actualPair = envPropFold (EnvProp mempty prop) worlds
-  actualPair @?= (expectedSteps, expectedRes)
+  let (actualSteps, actualWorld, actualRes) = envPropFold (EnvProp mempty prop) worlds
+  if actualSteps == 0
+    then actualWorld @?= Nothing
+    else actualWorld @?= Just (worlds !! (actualSteps - 1))
+  (actualSteps, actualRes) @?= (expectedSteps, expectedRes)
 
 defaultErr :: EqErr
 defaultErr = EqErr "You are doomed!"
@@ -128,6 +135,10 @@ eqCases =
   , EqCase "1 world; or1 #t" [emptyWorld] (PropOr PropTrue PropFalse) 1 (Right (EnvPropGoodBool True))
   , EqCase "1 world; or2 #f" [emptyWorld] (PropOr PropFalse PropFalse) 1 (Right (EnvPropGoodBool False))
   , EqCase "1 world; next1 #t" [emptyWorld] (PropNext PropTrue) 1 (Right (EnvPropGoodNext (EnvPropStepSingle (EnvProp mempty PropTrue))))
+  , EqCase "2 world; not (next false) #t" [emptyWorld, emptyWorld] (PropNot (PropNext PropFalse)) 2 (Right (EnvPropGoodBool True))
+  , EqCase "2 world; next (not false) #t" [emptyWorld, emptyWorld] (PropNext (PropNot PropFalse)) 2 (Right (EnvPropGoodBool True))
+  , EqCase "2 world; not (and (next true) (next false))) #t" [emptyWorld, emptyWorld] (PropNot (PropAnd (PropNext PropTrue) (PropNext PropFalse))) 2 (Right (EnvPropGoodBool True))
+  , EqCase "2 world; not (or (next false) (next false))) #t" [emptyWorld, emptyWorld] (PropNot (PropOr (PropNext PropFalse) (PropNext PropFalse))) 2 (Right (EnvPropGoodBool True))
   , EqCase "3 world; next2 #t" [emptyWorld, emptyWorld, emptyWorld] (PropNext PropTrue) 2 (Right (EnvPropGoodBool True))
   , EqCase "3 world; next3 #?" [emptyWorld, emptyWorld, emptyWorld] (PropNext (PropNext PropTrue)) 3 (Right (EnvPropGoodBool True))
   , EqCase "1 world; vacuous forall #t" [emptyWorld] (PropForAll (Binder "a" "Value") (PropAtom (Atom "IsEq" ["b", "b"]))) 1 (Right (EnvPropGoodBool True))
@@ -153,46 +164,88 @@ eqCases =
 testEqCases :: TestTree
 testEqCases = testGroup "Eq cases" (fmap testEqCase eqCases)
 
-data DriverTestError e = DriverTestError !(DriverError e) ![LogEntry] deriving stock (Eq, Show)
+newtype LogM a = LogM { unLogM :: Logger -> IO [LogEntry] -> IO a }
+  deriving stock (Functor)
 
-runDriverTest :: (Bridge e v w, Show e) => Theory -> [w] -> IO (Maybe (DriverTestError e))
-runDriverTest theory trace = do
+instance Applicative LogM where
+  pure a = LogM (\_ _ -> pure a)
+  (<*>) = ap
+
+instance Monad LogM where
+  return = pure
+  LogM f >>= g = LogM $ \logger getLogEntries -> do
+    a <- f logger getLogEntries
+    let LogM h = g a
+    h logger getLogEntries
+
+instance MonadIO LogM where
+  liftIO x = LogM (\_ _ -> x)
+
+instance MonadFail LogM where
+  fail = liftIO . fail
+
+flushLogM :: LogM [LogEntry]
+flushLogM = LogM (\_ getLogEntries -> getLogEntries)
+
+loggerLogM :: LogM Logger
+loggerLogM = LogM (\logger _ -> pure logger)
+
+runLogM :: LogM a -> IO a
+runLogM (LogM f) = do
+  -- Use the following two lines intead of those after to log to the console:
+  -- logger <- consoleLogger
+  -- f logger (pure [])
   logVar <- newLogVar
-  let logger = varLogger logVar
-  res <- driveVerificationIO logger theory trace
+  f (varLogger logVar) (flushLogVar logVar)
+
+runDriverTest :: (TruncBridge e v w, Show e, Show v) => Theory -> [w] -> LogM (Either (DriverError e) ())
+runDriverTest theory worlds = do
+  logger <- loggerLogM
+  liftIO (driveVerificationIO logger theory worlds)
+
+assertDriverTestOk :: (TruncBridge e v w, Show e, Show v) => Theory -> [w] -> LogM ()
+assertDriverTestOk theory worlds = do
+  res <- runDriverTest theory worlds
   case res of
     Left err -> do
-      logEntries <- flushLogVar logVar
-      pure (Just (DriverTestError err logEntries))
-    _ -> pure Nothing
-
-assertDriverTestOk :: (Bridge e v w, Show e) => Theory -> [w] -> IO ()
-assertDriverTestOk theory trace = do
-  res <- runDriverTest theory trace
-  case res of
-    Just (DriverTestError err logEntries) -> fail ("Failed to verify: " <> show err <> " | " <> show logEntries)
+      logEntries <- flushLogM
+      fail ("Failed to verify: " <> show err <> " | " <> show logEntries)
     _ -> pure ()
 
-runActorTest :: ApplyAction (AnnoMessage a) s => ActorCase a -> s -> IO ([SAS s (AnnoMessage a)], [LogEntry])
+runActorTest :: ApplyAction (AnnoMessage a) s => ActorCase a -> s -> LogM [SAS s (AnnoMessage a)]
 runActorTest kase initState = do
-  logVar <- newLogVar
-  let logger = varLogger logVar
-  actions <- runActorCaseSimple logger kase
-  let worlds = initScanSAS applyAction initState actions
-  logEntries <- flushLogVar logVar
-  pure (worlds, logEntries)
+  logger <- loggerLogM
+  actions <- liftIO (runActorCaseSimple logger kase)
+  pure (initScanSAS applyAction initState actions)
 
-testPingSimple :: TestTree
-testPingSimple = testCase "Ping simple" (assertDriverTestOk pingTheory pingWorldOk)
+testPingTraceOk :: TestTree
+testPingTraceOk = testCase "Ping trace ok" (runLogM (assertDriverTestOk pingTheory pingWorldsOk))
+
+testPingTraceNotOk :: TestTree
+testPingTraceNotOk = testCase "Ping trace not ok" $ runLogM $ do
+  res <- runDriverTest pingTheory pingWorldsNotOk
+  case res of
+    Left err ->
+      case err of
+        DriverErrorStepFalse _ -> pure ()
+        _ -> do
+          logEntries <- flushLogM
+          fail ("Unexpected error: " <> show err <> " | " <> show logEntries)
+    Right val -> fail ("Unexpected success: " <> show val)
 
 testPingActors :: TestTree
-testPingActors = testCase "Ping actors" $ do
+testPingActors = testCase "Ping actors" $ runLogM $ do
   let limit = 5
-  (xs, _) <- runActorTest (pingCase limit shortTickInterval) emptyPingState
+  xs <- runActorTest (pingCase limit shortTickInterval) emptyPingState
   assertDriverTestOk pingTheory (fmap PingWorld xs)
 
 testPing :: TestTree
-testPing = testGroup "Ping" [testPingSimple, testPingActors]
+testPing = testGroup "Ping"
+  [ testPingTraceOk
+  -- TODO fix this test!
+  -- , testPingTraceNotOk
+  , testPingActors
+  ]
 
 main :: IO ()
 main = do

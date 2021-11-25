@@ -14,10 +14,11 @@ import Ltlspec.TriBool (TriBool (..), triBoolAnd, triBoolAndAll, triBoolNot, tri
                         triBoolUntil)
 import Ltlspec.Types (Atom (..), AtomVar, Binder (..), Bridge (..), Env, EnvProp (..), EnvPropBad (..),
                       EnvPropGood (..), EnvPropRes, EnvPropStep (..), Prop (..), PropF (..), PropName, Quantifier (..),
-                      TyName, VarName)
+                      TruncBridge (..), TyName, VarName)
 
 -- | Put the prop in negation normal form, which basically involves
--- pushing negations to the bottom.
+-- pushing negations to the bottom. Note that this does not negate the prop;
+-- it only traverses the whole prop to lower negations.
 --
 -- >>> propNegationNormalForm (PropAtom (Atom "a" []))
 -- PropAtom (Atom "a" [])
@@ -36,6 +37,31 @@ propNegationNormalForm = pos where
     PropTrue -> PropFalse
     PropFalse -> PropTrue
     PropNot r -> pos r
+    PropAnd r1 r2 -> PropOr (neg r1) (neg r2)
+    PropOr r1 r2 -> PropAnd (neg r1) (neg r2)
+    PropNext r -> PropNext (neg r)
+    PropUntil r1 r2 -> PropRelease (neg r1) (neg r2)
+    PropRelease r1 r2 -> PropUntil (neg r1) (neg r2)
+    PropForAll b r -> PropExists b (neg r)
+    PropExists b r -> PropForAll b (neg r)
+
+-- | Negate the prop. You could add a PropNot on the outside
+-- but this pushes the negation as far in as possible to keep
+-- terms in negation normal form.
+--
+-- >>> propNegate (PropAtom (Atom "a" []))
+-- PropNot (PropAtom (Atom "a" []))
+-- >>> propNegate (PropNot (PropAtom (Atom "a" [])))
+-- PropAtom (Atom "a" [])
+-- >>> propNegate (PropNot (PropAnd (PropNot (PropAtom (Atom "a" []))) (PropAtom (Atom "b" []))))
+-- PropAnd (PropNot (PropAtom (Atom "a" []))) (PropAtom (Atom "b" []))
+propNegate :: Prop -> Prop
+propNegate = neg where
+  neg = \case
+    PropAtom a -> PropNot (PropAtom a)
+    PropTrue -> PropFalse
+    PropFalse -> PropTrue
+    PropNot r -> r
     PropAnd r1 r2 -> PropOr (neg r1) (neg r2)
     PropOr r1 r2 -> PropAnd (neg r1) (neg r2)
     PropNext r -> PropNext (neg r)
@@ -73,7 +99,7 @@ propEventually = PropUntil PropTrue
 
 -- | Propositional implication: r1 -> r2
 propIf :: Prop -> Prop -> Prop
-propIf = PropOr . PropNot
+propIf = PropOr . propNegate
 
 -- | Simple constructor for nested ifs
 propIfNested :: [Prop] -> Prop -> Prop
@@ -144,34 +170,25 @@ insertEnv env name val = M.insertWithKey (\k _ -> error ("Data variable " ++ k +
 lookupEnvAtom :: Env v -> AtomVar -> Either VarName (Atom v)
 lookupEnvAtom env = traverse (\n -> maybe (Left n) Right (lookupEnvName env n))
 
--- | Combines "forall" branch results
-sequenceForAllRes :: [EnvPropRes e v] -> EnvPropRes e v
-sequenceForAllRes rs = sequenceA rs >>= go Empty where
+sequenceQuantRes :: Bool -> Quantifier -> [EnvPropRes e v] -> EnvPropRes e v
+sequenceQuantRes zero quant rs = sequenceA rs >>= go Empty where
   go !acc = \case
     [] -> case acc of
-      -- Acc will be empty when all prop eval results are True
-      -- Thus the ForAll prop is True
-      -- This case also stands for vacuous truth
-      Empty -> Right (EnvPropGoodBool True)
-      _ -> Right (EnvPropGoodNext (EnvPropStepParallel QuantifierForAll acc))
+      Empty -> Right (EnvPropGoodBool zero)
+      Empty :|> ep -> Right (EnvPropGoodNext ep)
+      _ -> Right (EnvPropGoodNext (mergeAllEnvPropSteps quant acc))
     p:ps ->
       case p of
-        EnvPropGoodBool b -> if b then go acc ps else Right p
+        EnvPropGoodBool b -> if b == zero then go acc ps else Right p
         EnvPropGoodNext x -> go (acc :|> x) ps
+
+-- | Combines "forall" branch results
+sequenceForAllRes :: [EnvPropRes e v] -> EnvPropRes e v
+sequenceForAllRes = sequenceQuantRes True QuantifierForAll
 
 -- | Combines "exists" branch results
 sequenceExistsRes :: [EnvPropRes e v] -> EnvPropRes e v
-sequenceExistsRes rs = sequenceA rs >>= go Empty where
-  go !acc = \case
-    [] -> case acc of
-      -- Similarly, acc will be empty when all prop eval results are False
-      -- Thus the Exists prop is False
-      Empty -> Right (EnvPropGoodBool False)
-      _ -> Right (EnvPropGoodNext (EnvPropStepParallel QuantifierExists acc))
-    p:ps ->
-      case p of
-        EnvPropGoodBool b -> if b then Right p else go acc ps
-        EnvPropGoodNext x -> go (acc :|> x) ps
+sequenceExistsRes = sequenceQuantRes False QuantifierExists
 
 -- typing less is a blessing
 pattern GoodB :: Bool -> Either a (EnvPropGood v)
@@ -180,23 +197,28 @@ pattern GoodB b = Right (EnvPropGoodBool b)
 pattern GoodN :: EnvPropStep v -> Either a (EnvPropGood v)
 pattern GoodN ep = Right (EnvPropGoodNext ep)
 
-data PropCombinator = PcAnd | PcOr
+mergeAllEnvPropSteps :: Quantifier -> Seq (EnvPropStep v) -> EnvPropStep v
+mergeAllEnvPropSteps q0 = EnvPropStepParallel q0 . foldr flatMid Empty where
+  flatMid x m =
+    case x of
+      EnvPropStepParallel q1 ys | q0 == q1 -> ys <> m
+      _ -> x :<| m
 
 -- | Anytime we have And/Or/Forall/Exists, we need to check multiple propostions concurrently
 -- This merge function will merge single step propositions into a sequence.
 -- The elements in the sequence are *conceptually* running in parallel.
-mergeEnvPropSteps :: PropCombinator -> EnvPropStep v -> EnvPropStep v -> EnvPropStep v
-mergeEnvPropSteps pc s1 s2 =
-  case pc of
-    PcAnd -> EnvPropStepParallel QuantifierForAll (fromList [s1, s2])
-    PcOr -> EnvPropStepParallel QuantifierExists (fromList [s1, s2])
+mergeEnvPropSteps :: Quantifier -> EnvPropStep v -> EnvPropStep v -> EnvPropStep v
+mergeEnvPropSteps q0 s1 s2 = mergeAllEnvPropSteps q0 (fromList [s1, s2])
+
+negateQuantifier :: Quantifier -> Quantifier
+negateQuantifier = \case
+  QuantifierForAll -> QuantifierExists
+  QuantifierExists -> QuantifierForAll
 
 negateEnvPropStep :: EnvPropStep v -> EnvPropStep v
 negateEnvPropStep = \case
-  EnvPropStepSingle (EnvProp e p) -> EnvPropStepSingle (EnvProp e (PropNot p))
-  EnvPropStepParallel qt eps ->
-    let eps' = fmap negateEnvPropStep eps
-    in EnvPropStepParallel qt eps'
+  EnvPropStepSingle (EnvProp e p) -> EnvPropStepSingle (EnvProp e (propNegate p))
+  EnvPropStepParallel qt eps -> EnvPropStepParallel (negateQuantifier qt) (fmap negateEnvPropStep eps)
 
 -- TODO(yanze) implement this and resurrect unit tests!
 envPropEval :: Bridge e v w => EnvProp v -> w -> EnvPropRes e v
@@ -234,7 +256,7 @@ envPropEval ep0@(EnvProp env0 prop0) world = go env0 prop0 where
           false@(Right (EnvPropGoodBool False)) -> false
           -- both p1 and p2 needs further evaluation in the next world,
           -- merge them based on the current proposition (PropAnd)
-          Right (EnvPropGoodNext next2) -> GoodN $ mergeEnvPropSteps PcAnd next1 next2
+          Right (EnvPropGoodNext next2) -> GoodN $ mergeEnvPropSteps QuantifierForAll next1 next2
       PropOr p1 p2 -> case go env p1 of
         bad@(Left _) -> bad
         Right (EnvPropGoodBool False) -> go env p2
@@ -243,7 +265,7 @@ envPropEval ep0@(EnvProp env0 prop0) world = go env0 prop0 where
           bad@(Left _) -> bad
           Right (EnvPropGoodBool False) -> GoodN next1
           true@(Right (EnvPropGoodBool True)) -> true
-          Right (EnvPropGoodNext next2) -> GoodN $ mergeEnvPropSteps PcOr next1 next2
+          Right (EnvPropGoodNext next2) -> GoodN $ mergeEnvPropSteps QuantifierExists next1 next2
       PropNext p -> GoodN $ EnvPropStepSingle (EnvProp env p)
       PropUntil p1 p2 -> case go env p2 of
         bad@(Left _) -> bad
@@ -261,12 +283,12 @@ envPropEval ep0@(EnvProp env0 prop0) world = go env0 prop0 where
           -- Therefore we use PropAnd to connect the residual and the original prop.
           -- the residual will be evaluate first, and if it's true, the proposition is proven;
           -- otherwise, we need to evaluate the same prop in the next world (next time tick)
-          Right (EnvPropGoodNext next) -> GoodN $ mergeEnvPropSteps PcAnd next (EnvPropStepSingle ep0)
+          Right (EnvPropGoodNext next) -> GoodN $ mergeEnvPropSteps QuantifierForAll next (EnvPropStepSingle ep0)
         -- p2 has some residual for next world
         -- If p2 is evaluate to be true in the next world,
         -- the whole prop is true in the *current* world.
         -- Therefore, we use PropOr to connect.
-        Right (EnvPropGoodNext next) -> GoodN $ mergeEnvPropSteps PcOr next (EnvPropStepSingle ep0)
+        Right (EnvPropGoodNext next) -> GoodN $ mergeEnvPropSteps QuantifierExists next (EnvPropStepSingle ep0)
       PropRelease p1 p2 -> case go env p2 of
         bad@(Left _) -> bad
         -- p2 is false, the prop is false!
@@ -283,9 +305,9 @@ envPropEval ep0@(EnvProp env0 prop0) world = go env0 prop0 where
           -- If the residual is true, the prop is proven,
           -- otherwise we need to keep evaluating the prop in next world
           -- Therefore we use PropOr to connect the residual and the original prop.
-          Right (EnvPropGoodNext next) -> GoodN $ mergeEnvPropSteps PcOr next (EnvPropStepSingle ep0)
+          Right (EnvPropGoodNext next) -> GoodN $ mergeEnvPropSteps QuantifierExists next (EnvPropStepSingle ep0)
         -- Similarly, here we use PropAnd to connect
-        Right (EnvPropGoodNext next) -> GoodN $ mergeEnvPropSteps PcAnd next (EnvPropStepSingle ep0)
+        Right (EnvPropGoodNext next) -> GoodN $ mergeEnvPropSteps QuantifierForAll next (EnvPropStepSingle ep0)
       PropForAll (Binder varName tyName) bodyProp ->
         case bridgeQuantify world tyName of
           Left err -> Left (EnvPropBadErr err)
@@ -313,38 +335,50 @@ evalEnvPropGood res world = case res of
     in result
 
 -- | Evaluate the prop at every timestep until true/false or there are no more inputs.
--- Also returns the number of timesteps evaluated.
+-- Also returns the number of timesteps evaluated and the last world considered.
+-- For 0 timesteps evaluted, the last world will be 'Nothing'. In all other cases it will be 'Just'.
 -- NOTE: Worlds start from the leftmost one in the list
-envPropFold :: Bridge e v w => EnvProp v -> [w] -> (Int, EnvPropRes e v)
-envPropFold p = go 0 (Right (EnvPropGoodNext (EnvPropStepSingle p))) where
-  go i r [] = (i, r)
-  go i r (w:ws) =
-    case r of
-      Left _ -> (i, r)
-      Right (EnvPropGoodBool _) -> (i, r)
-      Right good -> go (i+1) (evalEnvPropGood good w) ws
+envPropFold :: Bridge e v w => EnvProp v -> [w] -> (Int, Maybe w, EnvPropRes e v)
+envPropFold p = go 0 Nothing (Right (EnvPropGoodNext (EnvPropStepSingle p))) where
+  go !i !mw !r = \case
+    [] -> (i, mw, r)
+    w:ws ->
+      case r of
+        Left _ -> (i, mw, r)
+        Right (EnvPropGoodBool _) -> (i, mw, r)
+        Right good -> go (i+1) (Just w) (evalEnvPropGood good w) ws
 
 -- | Given a set of types that we assert will never be inhabited
 -- in any future world, evaluate the (3-valued) truth of the proposition.
 -- 'Left' indicates an unbound var, 'Right' indicates a valid result.
-truncateEnvPropStep :: Set TyName -> (Atom v -> TriBool) -> EnvPropStep v -> Either VarName TriBool
-truncateEnvPropStep emptyTys oracle = goStep where
+truncEnvPropStepExplicit :: Set TyName -> (Atom v -> Either e TriBool) -> EnvPropStep v -> Either (EnvPropBad e) TriBool
+truncEnvPropStepExplicit emptyTys oracle = goStep where
   goStep = \case
-    EnvPropStepSingle (EnvProp e p) -> goProp e p
+    EnvPropStepSingle (EnvProp n p) -> goProp n p
     EnvPropStepParallel quant steps -> fmap (goQuant quant) (traverse goStep steps)
   goQuant quant res =
     case quant of
       QuantifierForAll -> triBoolAndAll res
       QuantifierExists -> triBoolOrAll res
-  goProp e = \case
-    PropAtom av -> fmap oracle (lookupEnvAtom e av)
+  goProp n = \case
+    PropAtom atomVar ->
+      case lookupEnvAtom n atomVar of
+        Left varName -> Left (EnvPropBadMissing varName)
+        Right atomVal ->
+          case oracle atomVal of
+            Left err -> Left (EnvPropBadErr err)
+            Right b -> Right b
     PropTrue -> Right TriBoolTrue
     PropFalse -> Right TriBoolFalse
-    PropNot p -> fmap triBoolNot (goProp e p)
-    PropAnd p1 p2 -> triBoolAnd <$> goProp e p1 <*> goProp e p2
-    PropOr p1 p2 -> triBoolOr <$> goProp e p1 <*> goProp e p2
-    PropNext p -> goProp e p
-    PropUntil p1 p2 -> triBoolUntil <$> goProp e p1 <*> goProp e p2
-    PropRelease p1 p2 -> triBoolRelease <$> goProp e p1 <*> goProp e p2
+    PropNot p -> fmap triBoolNot (goProp n p)
+    PropAnd p1 p2 -> triBoolAnd <$> goProp n p1 <*> goProp n p2
+    PropOr p1 p2 -> triBoolOr <$> goProp n p1 <*> goProp n p2
+    PropNext p -> goProp n p
+    PropUntil p1 p2 -> triBoolUntil <$> goProp n p1 <*> goProp n p2
+    PropRelease p1 p2 -> triBoolRelease <$> goProp n p1 <*> goProp n p2
     PropForAll (Binder _ ty) _ -> Right (if Set.member ty emptyTys then TriBoolTrue else TriBoolUnknown)
     PropExists (Binder _ ty) _ -> Right (if Set.member ty emptyTys then TriBoolFalse else TriBoolUnknown)
+
+-- | Truncates the proposition given a base world - see 'truncEnvPropStepExplicit'.
+truncEnvPropStep :: TruncBridge e v w => w -> EnvPropStep v -> Either (EnvPropBad e) TriBool
+truncEnvPropStep w = truncEnvPropStepExplicit (truncBridgeEmpty w) (truncBridgeOracle w)

@@ -4,6 +4,7 @@ module Ltlspec.System.Logging
   , strToLogLevel
   , Logger (..)
   , runLogger
+  , logDebug
   , disabledLogger
   , filterLogger
   , consoleLogger
@@ -51,6 +52,10 @@ newtype Logger = Logger { runLoggerIO :: LogLevel -> String -> IO () }
 -- | Because wrapping in liftIO is a pain!
 runLogger :: MonadIO m => Logger -> LogLevel -> String -> m ()
 runLogger logger ll s = liftIO (runLoggerIO logger ll s)
+
+-- | Because it's so common
+logDebug :: MonadIO m => Logger -> String -> m ()
+logDebug logger = liftIO . runLogger logger LogLevelDebug
 
 -- | A logger that does nothing.
 disabledLogger :: Logger
