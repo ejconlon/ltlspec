@@ -14,7 +14,9 @@ import Data.Hashable (Hashable)
 import Data.List (scanl')
 import Data.Map.Strict (Map)
 import Data.Sequence (Seq)
+import Data.Set (Set)
 import GHC.Generics (Generic)
+import Ltlspec.TriBool (TriBool)
 
 type Error = String
 
@@ -173,3 +175,10 @@ class Eq v => Bridge e v w | w -> e v where
   bridgeEvalProp :: w -> Atom v -> Either e Prop
   -- | Quantify over all values of the given type or fail.
   bridgeQuantify :: w -> TyName -> Either e [v]
+
+-- | A 'Bridge' that supports proposition truncation.
+class Bridge e v w => TruncBridge e v w where
+  -- | Returns set of types with empty quantification in *all reachable worlds*
+  truncBridgeEmpty :: w -> Set TyName
+  -- | An oracle for atomic propositions in *all reachable worlds*
+  truncBridgeOracle :: w -> Atom v -> Either e TriBool

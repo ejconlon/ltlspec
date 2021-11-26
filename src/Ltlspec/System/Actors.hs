@@ -47,7 +47,7 @@ import Data.Set (Set)
 import qualified Data.Set as Set
 import Data.Traversable (for)
 import GHC.Generics (Generic)
-import Ltlspec.System.Logging (LogLevel (..), Logger (..))
+import Ltlspec.System.Logging (Logger (..), logDebug)
 import Ltlspec.System.TBarrier (TBarrier, newTBarrierIO, signalTBarrier, waitingTBarrier)
 import Ltlspec.System.TEvent (TEvent, isSetTEvent, newTEventDelay, newTEventIO, setTEvent)
 import Ltlspec.System.Time (TimeDelta, threadDelayDelta)
@@ -210,27 +210,27 @@ filterLogEvents = \case
 -- On termination flushes the log.
 mkNetworkBody :: Logger -> TEvent -> TQueue (NetMessage msg) -> TQueue (LogEvent msg) -> Map ActorId (TQueue (NetMessage msg)) -> IO ()
 mkNetworkBody logger doneEvent globalQueue logQueue actorQueues = do
-  runLoggerIO logger LogLevelDebug "network started"
+  logDebug logger "network started"
   processUntilDone doneEvent globalQueue $ \netMsg@(NetMessage mid (AppMessage recvAid _)) -> do
     case Map.lookup recvAid actorQueues of
       Nothing -> writeTQueue logQueue (LogEventUndeliverable recvAid mid)
       Just actorQueue -> do
         writeTQueue logQueue (LogEventDelivered recvAid mid)
         writeTQueue actorQueue netMsg
-  runLoggerIO logger LogLevelDebug "network done processing"
-  runLoggerIO logger LogLevelDebug "network stopped"
+  logDebug logger "network done processing"
+  logDebug logger "network stopped"
 
 -- | The body of the monitor thread. On quiescence sets the done event to stop all threads.
 mkMonitorBody :: Logger -> TEvent -> TQueue (NetMessage msg) -> Map ActorId (TQueue (NetMessage msg)) -> TBarrier ->  TQueue (LogEvent msg) -> MVar [LogEvent msg] -> IO ()
 mkMonitorBody logger doneEvent globalQueue actorQueues timerBarrier logQueue outVar = go where
   go = do
-    runLoggerIO logger LogLevelDebug "monitor started"
+    logDebug logger "monitor started"
     atomically monitor
-    runLoggerIO logger LogLevelDebug "monitor flushing logs"
+    logDebug logger "monitor flushing logs"
     logEvents <- atomically (flushTQueue logQueue)
-    runLoggerIO logger LogLevelDebug "monitor writing logs"
+    logDebug logger "monitor writing logs"
     putMVar outVar logEvents
-    runLoggerIO logger LogLevelDebug "monitor stopped"
+    logDebug logger "monitor stopped"
   monitor = do
     isDone <- isSetTEvent doneEvent
     if isDone
@@ -253,20 +253,20 @@ mkTimerBody :: Logger -> TimerId -> ActorId -> TimerConfig msg -> TEvent -> TBar
 mkTimerBody logger timerId sendAid (TimerConfig mayDelay mayPeriod recvAids pay) doneEvent timerBarrier netHandler = go where
   tstr = "timer " ++ show (unTimerId timerId) ++ " (actor " ++ show (unActorId sendAid) ++ ")"
   go = do
-    runLoggerIO logger LogLevelDebug $ tstr ++ " started"
+    logDebug logger $ tstr ++ " started"
     -- Delay initially if configured to do so
     case mayDelay of
       Nothing -> pure ()
       Just delay -> do
-        runLoggerIO logger LogLevelDebug $ tstr ++ " initial delay"
+        logDebug logger $ tstr ++ " initial delay"
         threadDelayDelta delay
     -- Enter the timer loop
     recur 0
-    runLoggerIO logger LogLevelDebug $ tstr ++ " signaling"
+    logDebug logger $ tstr ++ " signaling"
     atomically (signalTBarrier timerBarrier)
-    runLoggerIO logger LogLevelDebug $ tstr ++ " stopped"
+    logDebug logger $ tstr ++ " stopped"
   recur !count = do
-    runLoggerIO logger LogLevelDebug $ tstr ++ " invoking"
+    logDebug logger $ tstr ++ " invoking"
     -- Loop until done - first check done event and send
     eventDone <- atomically $ do
       isDone <- isSetTEvent doneEvent
@@ -288,7 +288,7 @@ mkTimerBody logger timerId sendAid (TimerConfig mayDelay mayPeriod recvAids pay)
               case mayLim of
                 Just lim | lim <= count -> pure True
                 _ -> do
-                  runLoggerIO logger LogLevelDebug $ tstr ++ " periodic delay"
+                  logDebug logger $ tstr ++ " periodic delay"
                   threadDelayDelta interval $> False
         if periodDone
           then pure ()
@@ -305,15 +305,16 @@ mkNetworkHandler sendAid snVar globalQueue logQueue appMsg = do
 mkActorBody :: Logger -> ActorId -> TEvent -> TQueue (NetMessage msg) -> TQueue (LogEvent msg) -> Handler msg -> IO ()
 mkActorBody logger aid doneEvent actorQueue logQueue handler = do
   let astr = "actor " ++ show (unActorId aid)
-  runLoggerIO logger LogLevelDebug $ astr ++ " started"
-  processUntilDone doneEvent actorQueue $ \nm@(NetMessage mid appMsg@(AppMessage recvAid _)) -> do
+  logDebug logger $ astr ++ " started"
+  processUntilDone doneEvent actorQueue $ \nm@(NetMessage mid@(MessageId sendAid _) (AppMessage recvAid pay)) -> do
     if aid == recvAid
       then do
         writeTQueue logQueue (LogEventReceived nm)
-        handler appMsg
+        let flipAppMsg = AppMessage sendAid pay
+        handler flipAppMsg
         writeTQueue logQueue (LogEventProcessed aid mid)
       else writeTQueue logQueue (LogEventMisdelivered aid mid recvAid)
-  runLoggerIO logger LogLevelDebug $ astr ++ " stopped"
+  logDebug logger $ astr ++ " stopped"
 
 -- | Run the actor system
 runActorSystem :: Logger -> Maybe TimeDelta -> ActorConstructor r msg -> [r] -> IO (TEvent, [ThreadId], MVar [LogEvent msg])
