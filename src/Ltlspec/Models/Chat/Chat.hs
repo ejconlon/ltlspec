@@ -1,6 +1,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
 {-# OPTIONS_GHC -Wno-name-shadowing #-}
+{-# OPTIONS_GHC -Wno-missing-methods #-}
 
 module Ltlspec.Models.Chat.Chat where
 
@@ -10,8 +11,9 @@ import qualified Data.List as List
 import qualified Data.Map as Map
 import qualified Data.Set as Set
 import Ltlspec (propAlways, propAndAll, propEventually, propExistsNested, propForAllNested, propIf)
-import Ltlspec.Types (Atom (..), Bridge (..), Error, Prop (..), SAS (..), Theory (..), initScanSAS)
+import Ltlspec.Types (Atom (..), Bridge (..), Error, Prop (..), SAS (..), Theory (..), initScanSAS, TruncBridge, truncBridgeOracle, truncBridgeEmpty)
 import System.Random (StdGen, mkStdGen, randomR)
+import Ltlspec.TriBool
 
 chatTheory :: Theory
 chatTheory = Theory
@@ -248,16 +250,17 @@ bufferToList buf = fst (randomEventPick buf randomGen)
 generateSequenceOfMessages :: Integer -> Integer -> [SystemEvent]
 generateSequenceOfMessages a b = (bufferToList . fst3 . fst)  (simulation a b) where fst3 (b,_,_) = b
 
-trace :: [ChatWorld]
-trace = initScanSAS processEvent (initialChatState 3) (generateSequenceOfMessages 20 3)
+shortTrace :: [ChatWorld]
+shortTrace = initScanSAS processEvent (initialChatState 3) (generateSequenceOfMessages 20 3)
+
+longTrace :: [ChatWorld]
+longTrace = initScanSAS processEvent (initialChatState 4) (generateSequenceOfMessages 100 4)
 
 generateTraceGivenMessages :: [SystemEvent] -> [ChatWorld]
 generateTraceGivenMessages = initScanSAS processEvent (initialChatState 3)
 
--- TODO(tarcisio) Implement unit tests
-
-instance Bridge Error ChatVal ChatWorld where
-    bridgeEvalProp (SAS _ e s2) (Atom propName vals) =
+evalChatProp :: ChatWorld -> Atom ChatVal -> Either Error Prop
+evalChatProp (SAS _ e s2) (Atom propName vals) =
         case (propName, vals) of
             ("IsMember", [ChatValClient cid, ChatValChannel chid]) -> if chid `elem` Map.findWithDefault [] cid (fst s2) then Right PropTrue else Right PropFalse
             ("IsSameClient", [ChatValClient cid1, ChatValClient cid2]) -> if cid1 == cid2 then Right PropTrue else Right PropFalse
@@ -275,9 +278,20 @@ instance Bridge Error ChatVal ChatWorld where
             ("ChannelListNote", [ChatValAction aid, ChatValClient cid, ChatValChannel chid]) -> if e == Right (ChannelList aid cid chid) then Right PropTrue else Right PropFalse
             _ -> Left ("Could not eval " <> propName <> " on " <> show vals)
 
+instance Bridge Error ChatVal ChatWorld where
+    bridgeEvalProp = evalChatProp
+
     bridgeQuantify (SAS _ _ s2) tyname =
         case tyname of
             "ClientID" -> Right (map ChatValClient (Map.keys (fst s2)))
             "ChannelID" -> Right (map ChatValChannel (Set.toList (Set.fromList (concat (Map.elems (fst s2))))))
             "ActionID" -> Right (map  ChatValAction [0..(snd s2)] )
             _ -> Left ("Could not quantify over " <> tyname)
+
+instance TruncBridge Error ChatVal ChatWorld where
+    truncBridgeEmpty _ = Set.fromList ["ClientID", "ChannelID", "ActionID"] 
+    truncBridgeOracle w p = let prop = evalChatProp w p in 
+        case prop of 
+            Right PropFalse -> Right TriBoolFalse
+            Right PropTrue -> Right TriBoolTrue
+            Left e -> Left e

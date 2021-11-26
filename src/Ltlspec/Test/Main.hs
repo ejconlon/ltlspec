@@ -19,6 +19,7 @@ import System.Environment (lookupEnv, setEnv)
 import System.IO (BufferMode (NoBuffering), hSetBuffering, stderr, stdout)
 import Test.Tasty (TestTree, defaultMain, testGroup)
 import Test.Tasty.HUnit (testCase, (@?=))
+import Ltlspec.Models.Chat.Chat (chatTheory, longTrace, shortTrace)
 
 -- | A tick interval for actor tests
 shortTickInterval :: TimeDelta
@@ -246,6 +247,18 @@ testPing = testGroup "Ping"
   , testPingActors
   ]
 
+testChatLongTraceOk :: TestTree 
+testChatLongTraceOk = testCase "Chat long trace ok" (runLogM (assertDriverTestOk chatTheory longTrace))
+
+testChatShortTraceOk :: TestTree 
+testChatShortTraceOk = testCase "Chat short trace ok" (runLogM (assertDriverTestOk chatTheory shortTrace))
+
+testChat :: TestTree 
+testChat = testGroup "Chat"
+  [ testChatShortTraceOk
+  , testChatLongTraceOk
+  ]
+
 main :: IO ()
 main = do
   mayDebugStr <- lookupEnv "DEBUG"
@@ -257,4 +270,5 @@ main = do
   defaultMain $ testGroup "Ltlspec"
     [ testEqCases
     , testPing
+    , testChat
     ]
