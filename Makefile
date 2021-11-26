@@ -19,3 +19,7 @@ docker-test:
 .PHONY: debug-test
 debug-test:
 	DEBUG=1 $(MAKE) test
+
+.PHONY: preso
+preso:
+	./script/mkpreso.sh && open ./output/ltlspec-presentation.pdf
