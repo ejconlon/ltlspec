@@ -60,7 +60,7 @@ module Ltlspec.Models.Chat.Actors where
 --               Leave n i j -> undefined
 --               Send n i s j -> undefined
 --               _ -> error (show cm ++ "is not a valid server message")
-              
+
 -- chatCtor :: Int -> TimeDelta -> IO (ActorConstructor ChatConfig (TickMessage ChatMessage))
 -- chatCtor limit interval = do
---   channels 
+--   channels

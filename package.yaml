@@ -15,7 +15,6 @@ description: Please see the README on GitHub at <https://github.com/ejconlon/ltl
 
 dependencies:
 - base >= 4.12 && < 5
-- aeson
 - containers
 - deepseq
 - hashable

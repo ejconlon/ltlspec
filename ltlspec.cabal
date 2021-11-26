@@ -75,8 +75,7 @@ library
       TypeFamilies
   ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wincomplete-uni-patterns -Wpartial-fields -Wredundant-constraints -fno-warn-unused-top-binds -fwrite-ide-info -hiedir=.hie
   build-depends:
-      aeson
-    , base >=4.12 && <5
+      base >=4.12 && <5
     , containers
     , deepseq
     , hashable
@@ -125,8 +124,7 @@ executable ltlspec-exe
       TypeFamilies
   ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wincomplete-uni-patterns -Wpartial-fields -Wredundant-constraints -fno-warn-unused-top-binds -fwrite-ide-info -hiedir=.hie -threaded -rtsopts -with-rtsopts=-N
   build-depends:
-      aeson
-    , base >=4.12 && <5
+      base >=4.12 && <5
     , containers
     , deepseq
     , hashable
@@ -177,8 +175,7 @@ test-suite ltlspec-doctest
       TypeFamilies
   ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wincomplete-uni-patterns -Wpartial-fields -Wredundant-constraints -fno-warn-unused-top-binds -fwrite-ide-info -hiedir=.hie -threaded -rtsopts -with-rtsopts=-N
   build-depends:
-      aeson
-    , base >=4.12 && <5
+      base >=4.12 && <5
     , containers
     , deepseq
     , doctest
@@ -230,8 +227,7 @@ test-suite ltlspec-test
       TypeFamilies
   ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wincomplete-uni-patterns -Wpartial-fields -Wredundant-constraints -fno-warn-unused-top-binds -fwrite-ide-info -hiedir=.hie -threaded -rtsopts -with-rtsopts=-N
   build-depends:
-      aeson
-    , base >=4.12 && <5
+      base >=4.12 && <5
     , containers
     , deepseq
     , hashable

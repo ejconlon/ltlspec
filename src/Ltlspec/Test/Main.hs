@@ -3,14 +3,14 @@ module Ltlspec.Test.Main (main) where
 import Control.Monad (ap, when)
 import Control.Monad.IO.Class (MonadIO (..))
 import qualified Data.Map.Strict as Map
-import Data.Maybe (isJust)
 import Ltlspec (envPropFold, propAlways, propEventually, propForAllNested, propIf, propIfNested)
 import Ltlspec.Driver (DriverError (..), driveVerificationIO)
+import Ltlspec.Models.Chat.Chat (chatTheory, longTrace, shortTrace)
 import Ltlspec.Models.Ping.Actors (pingCase)
 import Ltlspec.Models.Ping.Verification (PingWorld (PingWorld), emptyPingState, pingTheory, pingWorldsNotOk,
                                          pingWorldsOk)
 import Ltlspec.System.Actors (ActorCase, AnnoMessage, runActorCaseSimple)
-import Ltlspec.System.Logging (LogEntry, Logger, consoleLogger, flushLogVar, newLogVar, varLogger)
+import Ltlspec.System.Logging (LogEntry, Logger, flushLogVar, newLogVar, varLogger)
 import Ltlspec.System.Time (TimeDelta, timeDeltaFromFracSecs)
 import Ltlspec.Types (ApplyAction (..), Atom (..), Binder (..), Bridge (..), EnvProp (..), EnvPropBad (..),
                       EnvPropGood (..), EnvPropRes, EnvPropStep (..), Prop (..), SAS, Theory (..), TruncBridge, VarName,
@@ -19,7 +19,6 @@ import System.Environment (lookupEnv, setEnv)
 import System.IO (BufferMode (NoBuffering), hSetBuffering, stderr, stdout)
 import Test.Tasty (TestTree, defaultMain, testGroup)
 import Test.Tasty.HUnit (testCase, (@?=))
-import Ltlspec.Models.Chat.Chat (chatTheory, longTrace, shortTrace)
 
 -- | A tick interval for actor tests
 shortTickInterval :: TimeDelta
@@ -199,12 +198,12 @@ runLogM (LogM f) = do
   logVar <- newLogVar
   f (varLogger logVar) (flushLogVar logVar)
 
-runDriverTest :: (TruncBridge e v w, Show e, Show v) => Theory -> [w] -> LogM (Either (DriverError e) ())
+runDriverTest :: (TruncBridge e v w, Show e) => Theory -> [w] -> LogM (Either (DriverError e) ())
 runDriverTest theory worlds = do
   logger <- loggerLogM
   liftIO (driveVerificationIO logger theory worlds)
 
-assertDriverTestOk :: (TruncBridge e v w, Show e, Show v) => Theory -> [w] -> LogM ()
+assertDriverTestOk :: (TruncBridge e v w, Show e) => Theory -> [w] -> LogM ()
 assertDriverTestOk theory worlds = do
   res <- runDriverTest theory worlds
   case res of
@@ -247,13 +246,13 @@ testPing = testGroup "Ping"
   , testPingActors
   ]
 
-testChatLongTraceOk :: TestTree 
+testChatLongTraceOk :: TestTree
 testChatLongTraceOk = testCase "Chat long trace ok" (runLogM (assertDriverTestOk chatTheory longTrace))
 
-testChatShortTraceOk :: TestTree 
+testChatShortTraceOk :: TestTree
 testChatShortTraceOk = testCase "Chat short trace ok" (runLogM (assertDriverTestOk chatTheory shortTrace))
 
-testChat :: TestTree 
+testChat :: TestTree
 testChat = testGroup "Chat"
   [ testChatShortTraceOk
   , testChatLongTraceOk

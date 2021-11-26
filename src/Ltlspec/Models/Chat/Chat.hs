@@ -5,15 +5,15 @@
 
 module Ltlspec.Models.Chat.Chat where
 
-import Data.Aeson (ToJSON (..), object, (.=))
 import qualified Data.Bifunctor
 import qualified Data.List as List
 import qualified Data.Map as Map
 import qualified Data.Set as Set
 import Ltlspec (propAlways, propAndAll, propEventually, propExistsNested, propForAllNested, propIf)
-import Ltlspec.Types (Atom (..), Bridge (..), Error, Prop (..), SAS (..), Theory (..), initScanSAS, TruncBridge, truncBridgeOracle, truncBridgeEmpty)
+import Ltlspec.TriBool (TriBool (..))
+import Ltlspec.Types (Atom (..), Bridge (..), Error, Prop (..), SAS (..), Theory (..), TruncBridge, initScanSAS,
+                      truncBridgeEmpty, truncBridgeOracle)
 import System.Random (StdGen, mkStdGen, randomR)
-import Ltlspec.TriBool
 
 chatTheory :: Theory
 chatTheory = Theory
@@ -90,14 +90,6 @@ data ActionRep =
   | ActionSend
   deriving stock (Eq, Show)
 
-instance ToJSON ClientAction where
-  toJSON = \case
-    List aid cid -> object ["type" .= ("list" :: String), "action" .= aid, "client" .= cid]
-    Join aid cid cn -> object ["type" .= ("join" :: String), "action" .= aid, "client" .= cid, "channel" .= cn]
-    Leave aid cid cn -> object ["type" .= ("leave" :: String), "action" .= aid, "client" .= cid, "channel" .= cn]
-    Send aid cid msg cn -> object ["type" .= ("send" :: String), "action" .= aid, "client" .= cid, "message" .= msg, "channel" .= cn]
-    NoOp -> object ["type" .= ("noop" :: String)]
-
 data ServerResponse =
     Share ActionID ClientID MessageContent ClientID
   | NewJoin ActionID ClientID ChannelID ClientID
@@ -105,14 +97,6 @@ data ServerResponse =
   | ChannelList ActionID ClientID ChannelID
   | StartService
   deriving stock (Eq, Show, Ord)
-
-instance ToJSON ServerResponse where
-  toJSON = \case
-    ChannelList aid cid cn -> object ["type" .= ("channel-list" :: String), "correspondent-action" .= aid, "client" .= cid, "channel" .= cn]
-    NewJoin aid sid cn rid -> object ["type" .= ("new-join" :: String), "correspondent-action" .= aid, "sender" .= sid, "channel" .= cn, "receiver" .= rid]
-    NewLeave aid sid cn rid -> object ["type" .= ("new-leave" :: String), "correspondent-action" .= aid, "sender" .= sid, "channel" .= cn, "receiver" .= rid]
-    Share aid sid msg rid -> object ["type" .= ("share" :: String), "correspondent-action" .= aid, "sender" .= sid, "message" .= msg, "receiver" .= rid]
-    StartService -> object ["type" .= ("start-service"::String) ]
 
 type SystemEvent = Either ClientAction ServerResponse
 
@@ -128,9 +112,10 @@ type ChatWorld = SAS ChatState SystemEvent
 
 data ChatVal =
     ChatValClient ClientID
-    | ChatValChannel ChannelID
-    | ChatValAction ActionID
-    deriving stock (Eq, Show)
+  | ChatValChannel ChannelID
+  | ChatValAction ActionID
+  deriving stock (Eq, Show)
+
 send :: SystemState -> ClientID -> MessageContent -> ChannelID -> SystemState
 send (buffer, cState, seed) client message channel = (updateBuffer, cState , seed+1)
     where {
@@ -289,9 +274,13 @@ instance Bridge Error ChatVal ChatWorld where
             _ -> Left ("Could not quantify over " <> tyname)
 
 instance TruncBridge Error ChatVal ChatWorld where
-    truncBridgeEmpty _ = Set.fromList ["ClientID", "ChannelID", "ActionID"] 
-    truncBridgeOracle w p = let prop = evalChatProp w p in 
-        case prop of 
-            Right PropFalse -> Right TriBoolFalse
-            Right PropTrue -> Right TriBoolTrue
-            Left e -> Left e
+    truncBridgeEmpty _ = Set.fromList ["ClientID", "ChannelID", "ActionID"]
+    truncBridgeOracle w p =
+      let prop = evalChatProp w p in
+      case prop of
+          Left e -> Left e
+          Right p ->
+            case p of
+              PropTrue -> Right TriBoolTrue
+              PropFalse -> Right TriBoolFalse
+              _ -> Right TriBoolUnknown

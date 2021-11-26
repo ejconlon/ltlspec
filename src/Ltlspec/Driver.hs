@@ -10,7 +10,6 @@ import Ltlspec (envPropFold, truncEnvPropStep)
 import Ltlspec.System.Logging (Logger, logDebug)
 import Ltlspec.TriBool (TriBool (..))
 import Ltlspec.Types (EnvProp (..), EnvPropBad, EnvPropGood (..), Theory (..), TruncBridge)
--- import Text.Pretty.Simple (pPrint)
 
 data DriverError e =
     DriverErrorBad !Int !(EnvPropBad e)
@@ -29,7 +28,7 @@ newtype DriverM e a = DriverM { unDriverM :: ExceptT (DriverError e) IO a }
 runDriverM :: DriverM e a -> IO (Either (DriverError e) a)
 runDriverM = runExceptT . unDriverM
 
-driveVerification :: (TruncBridge e v w, Show e, Show v) => Logger -> Theory -> [w] -> DriverM e ()
+driveVerification :: (TruncBridge e v w, Show e) => Logger -> Theory -> [w] -> DriverM e ()
 driveVerification logger theory trace = do
   for_ (Map.toList (theoryAxioms theory)) $ \(axName, axProp) -> do
     logDebug logger ("Verifying " <> axName)
@@ -48,8 +47,6 @@ driveVerification logger theory trace = do
               throwError (DriverErrorFalse i)
         EnvPropGoodNext step -> do
           logDebug logger ("Truncating after world " <> show i)
-          -- Uncomment to see an infinite loop...
-          -- liftIO (pPrint step)
           case mw of
             Nothing -> do
               logDebug logger "No world to evaluate truncation"
@@ -69,5 +66,5 @@ driveVerification logger theory trace = do
                     logDebug logger "Truncation inconclusive"
                     throwError (DriverErrorStepUnknown i)
 
-driveVerificationIO :: (TruncBridge e v w, Show e, Show v) => Logger -> Theory -> [w] -> IO (Either (DriverError e) ())
+driveVerificationIO :: (TruncBridge e v w, Show e) => Logger -> Theory -> [w] -> IO (Either (DriverError e) ())
 driveVerificationIO logger theory trace = runDriverM (driveVerification logger theory trace)
