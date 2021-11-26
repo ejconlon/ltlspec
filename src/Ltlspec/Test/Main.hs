@@ -2,6 +2,7 @@ module Ltlspec.Test.Main (main) where
 
 import Control.Monad (ap, when)
 import Control.Monad.IO.Class (MonadIO (..))
+import Data.Functor (($>))
 import qualified Data.Map.Strict as Map
 import Ltlspec (envPropFold, propAlways, propEventually, propForAllNested, propIf, propIfNested)
 import Ltlspec.Driver (DriverError (..), driveVerificationIO)
@@ -18,8 +19,7 @@ import Ltlspec.Types (ApplyAction (..), Atom (..), Binder (..), Bridge (..), Env
 import System.Environment (lookupEnv, setEnv)
 import System.IO (BufferMode (NoBuffering), hSetBuffering, stderr, stdout)
 import Test.Tasty (TestTree, defaultMain, testGroup)
-import Test.Tasty.HUnit (testCase, (@?=), testCaseInfo)
-import Data.Functor (($>))
+import Test.Tasty.HUnit (testCase, testCaseInfo, (@?=))
 
 testCaseSkip :: Bool -> String -> IO () -> TestTree
 testCaseSkip ci name body = testCaseInfo name (if ci then pure "SKIPPED" else body $> "")

@@ -15,19 +15,19 @@ import Ltlspec.Types (ApplyAction (..), Atom (..), Bridge (..), Error, Prop (..)
 
 -- | A proposition encoding responsiveness for ping messages.
 -- Textually, this is equivalent to:
--- Always (Forall (m1: SentPing). Eventually (Exists (m2: RecvPong). PingPong m1 m2))
+-- Always (Forall (m1: SentPing). Eventually (Exists (m2: RecvPong). IsPingPong m1 m2))
 pingResponsiveProp :: Prop
 pingResponsiveProp =
   let prop = propAlways (propForAllNested [("m1", "SentPing")] eventuallyPong)
       eventuallyPong = propEventually (propExistsNested [("m2", "RecvPong")] pong)
-      pong = PropAtom (Atom "PingPong" ["m1", "m2"])
+      pong = PropAtom (Atom "IsPingPong" ["m1", "m2"])
   in prop
 
 pingTheory :: Theory
 pingTheory = Theory
   { theoryTypes = ["SentPing", "RecvPong"]
   , theoryProps = Map.fromList
-      [ ("PingPong", ["SentPing", "RecvPong"])
+      [ ("IsPingPong", ["SentPing", "RecvPong"])
       ]
   , theoryAxioms = Map.fromList
       [ ("isResponsive", pingResponsiveProp)
@@ -96,8 +96,8 @@ pingWorldsOk = mkPingWorlds pingMessagesOk
 pingWorldsNotOk :: [PingWorld]
 pingWorldsNotOk = mkPingWorlds pingMessagesNotOk
 
-evalPingPong :: PingAction -> PingAction -> Bool
-evalPingPong am1 am2 =
+evalIsPingPong :: PingAction -> PingAction -> Bool
+evalIsPingPong am1 am2 =
   let AnnoMessage view1 (NetMessage (MessageId sendAid1 _) (AppMessage recvAid1 msg1)) = am1
       AnnoMessage view2 (NetMessage (MessageId sendAid2 _) (AppMessage recvAid2 msg2)) = am2
   in case (view1, msg1, view2, msg2) of
@@ -107,7 +107,7 @@ evalPingPong am1 am2 =
 evalPingProp :: Atom PingAction -> Either Error Bool
 evalPingProp (Atom propName vals) =
   case (propName, vals) of
-    ("PingPong", [m1, m2]) -> Right (evalPingPong m1 m2)
+    ("IsPingPong", [m1, m2]) -> Right (evalIsPingPong m1 m2)
     _ -> Left ("Could not eval " <> propName <> " on " <> show vals)
 
 instance Bridge Error PingAction PingWorld where

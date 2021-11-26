@@ -14,7 +14,8 @@ SOURCE_FORMAT="markdown_strict\
 +all_symbols_escapable\
 +link_attributes\
 +smart\
-+fenced_divs"
++fenced_divs\
++tex_math_dollars"
 
 mkdir -p output
 

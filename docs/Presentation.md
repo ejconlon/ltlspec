@@ -31,8 +31,10 @@ linkstyle: "bold"
 
 - World-relevant propositional logic
 - Atomic propositions (`P`, `Q`)
-- Standard connectives (`/\`, `\/`, `~`, `->`)
-- Modal connectives (`Always` (`Box`), `Eventually` (`Diamond`))
+- Standard connectives
+  - $\land$, $\lor$, $\neg$, $\implies$
+- Modal connectives
+  - $\Box$ (Always), $\diamond$ (Eventually)
 
 # LTL Theories
 
@@ -41,6 +43,8 @@ linkstyle: "bold"
 # Making LTL useful
 
 - Add data variable quantification (`LTL-FO+`)
+  - $\forall$, $\exists$
+  - First order - no quantifying over propositions
 - Add user-defined atomic props and quantification
 - For each domain require user-defined "bridge"
 
@@ -106,7 +110,7 @@ linkstyle: "bold"
 - Primary concern: Correctness
   - Collected traces and verified axioms of each theory
   - The tests pass... And we never write bugs!
-- Secondary concertn: Performance
+- Secondary concern: Performance
   - Fine even with naive implementation - not stress-tested
   - Want safe-for-space machine
   - Want term graph deduplication
