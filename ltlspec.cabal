@@ -26,7 +26,9 @@ library
   exposed-modules:
       Ltlspec
       Ltlspec.Driver
-      Ltlspec.Models.Chat
+      Ltlspec.Models.Chat.Actors
+      Ltlspec.Models.Chat.Chat
+      Ltlspec.Models.Chat.Verification
       Ltlspec.Models.DinningHakker
       Ltlspec.Models.Ping.Actors
       Ltlspec.Models.Ping.Common

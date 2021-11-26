@@ -1,0 +1,111 @@
+
+module Ltlspec.Models.Chat.Verification where
+
+-- import qualified Data.Map as Map
+-- import qualified Data.Set as Set
+-- import Ltlspec
+--   ( propAlways,
+--     propAndAll,
+--     propEventually,
+--     propExistsNested,
+--     propForAllNested,
+--     propIf,
+--   )
+-- import Ltlspec.Models.Chat.Chat
+--   ( ChatVal (..),
+--     ChatWorld,
+--     ClientAction (Join, Leave, List, Send),
+--     ServerResponse (ChannelList, NewJoin, NewLeave, Share),
+--   )
+-- import Ltlspec.Types (Atom (..), Bridge (..), Error, Prop (..), SAS (..), Theory (..))
+
+-- chatTheory :: Theory
+-- chatTheory =
+--   Theory
+--     { theoryTypes = ["ClientID", "ChannelID", "ActionID"],
+--       theoryProps =
+--         Map.fromList
+--           [ ("IsMember", ["ClientID", "ChannelID"]),
+--             ("IsSameClient", ["ClientID", "ClientID"]),
+--             ("Left", ["ActionID", "ClientID", "ChannelID"]),
+--             ("Joined", ["ActionID", "ClientID", "ChannelID"]),
+--             ("ListRequested", ["ActionID", "ClientID"]),
+--             ("Sent", ["ActionID", "ClientID", "ChannelID"]),
+--             ("Shared", ["ActionID", "ClientID", "ClientID"]),
+--             ("NewJoinNote", ["ActionID", "ClientID", "ChannelID", "ClientID"]),
+--             ("NewLeaveNote", ["ActionID", "ClientID", "ChannelID", "ClientID"]),
+--             ("ChannelListNote", ["ActionID", "ClientID", "ChannelID"])
+--           ],
+--       theoryAxioms =
+--         Map.fromList
+--           [ ( "IsMemberBetweenJoinAndLeave",
+--               propAlways
+--                 ( propForAllNested
+--                     [("c", "ClientID"), ("ch", "ChannelID")]
+--                     ( propExistsNested
+--                         [("i", "ActionID"), ("j", "ActionID")]
+--                         ( propIf
+--                             (PropAtom (Atom "Joined" ["i", "c", "ch"]))
+--                             ( PropUntil
+--                                 (PropAtom (Atom "IsMember" ["c", "ch"]))
+--                                 (PropAtom (Atom "Left" ["j", "c", "ch"]))
+--                             )
+--                         )
+--                     )
+--                 )
+--             ),
+--             ( "IfInChannelReceiveMessage",
+--               propAlways
+--                 ( propForAllNested
+--                     [("c1", "ClientID"), ("ch", "ChannelID"), ("c2", "ClientID"), ("m", "ActionID")]
+--                     ( propIf
+--                         ( propAndAll
+--                             [ PropNot (PropAtom (Atom "IsSameClient" ["c1", "c2"])),
+--                               PropAtom (Atom "IsMember" ["c1", "ch"]),
+--                               PropAtom (Atom "IsMember" ["c2", "ch"]),
+--                               PropAtom (Atom "Sent" ["m", "c1", "ch"])
+--                             ]
+--                         )
+--                         ( PropAnd
+--                             (PropNot (PropAtom (Atom "Shared" ["m", "c1", "c1"])))
+--                             (propEventually (PropAtom (Atom "Shared" ["m", "c1", "c2"])))
+--                         )
+--                     )
+--                 )
+--             ),
+--             ( "NeverSendMessageToMyself",
+--               propAlways
+--                 ( propForAllNested
+--                     [("c", "ClientID"), ("m", "ActionID")]
+--                     ( PropNot (PropAtom (Atom "Shared" ["m", "c", "c"]))
+--                     )
+--                 )
+--             )
+--           ]
+--     }
+
+-- instance Bridge Error ChatVal ChatWorld where
+--   bridgeEvalProp (SAS _ e s2) (Atom propName vals) =
+--     case (propName, vals) of
+--       ("IsMember", [ChatValClient cid, ChatValChannel chid]) -> if chid `elem` Map.findWithDefault [] cid (fst s2) then Right PropTrue else Right PropFalse
+--       ("IsSameClient", [ChatValClient cid1, ChatValClient cid2]) -> if cid1 == cid2 then Right PropTrue else Right PropFalse
+--       ("Left", [ChatValAction aid, ChatValClient cid, ChatValChannel chid]) -> if e == Left (Leave aid cid chid) then Right PropTrue else Right PropFalse
+--       ("Joined", [ChatValAction aid, ChatValClient cid, ChatValChannel chid]) -> if e == Left (Join aid cid chid) then Right PropTrue else Right PropFalse
+--       ("Sent", [ChatValAction aid, ChatValClient cid, ChatValChannel chid]) -> case e of
+--         Left (Send a c _ ch) -> if a == aid && c == cid && ch == chid then Right PropTrue else Right PropFalse
+--         _ -> Right PropFalse
+--       ("ListRequested", [ChatValAction aid, ChatValClient cid]) -> if e == Left (List aid cid) then Right PropTrue else Right PropFalse
+--       ("Shared", [ChatValAction aid, ChatValClient sid, ChatValClient rid]) -> case e of
+--         Right (Share a s _ r) -> if a == aid && s == sid && r == rid then Right PropTrue else Right PropFalse
+--         _ -> Right PropFalse
+--       ("NewJoinNote", [ChatValAction aid, ChatValClient cid1, ChatValChannel chid, ChatValClient cid2]) -> if e == Right (NewJoin aid cid1 chid cid2) then Right PropTrue else Right PropFalse
+--       ("NewLeaveNote", [ChatValAction aid, ChatValClient cid1, ChatValChannel chid, ChatValClient cid2]) -> if e == Right (NewLeave aid cid1 chid cid2) then Right PropTrue else Right PropFalse
+--       ("ChannelListNote", [ChatValAction aid, ChatValClient cid, ChatValChannel chid]) -> if e == Right (ChannelList aid cid chid) then Right PropTrue else Right PropFalse
+--       _ -> Left ("Could not eval " <> propName <> " on " <> show vals)
+
+--   bridgeQuantify (SAS _ _ s2) tyname =
+--     case tyname of
+--       "ClientID" -> Right (map ChatValClient (Map.keys (fst s2)))
+--       "ChannelID" -> Right (map ChatValChannel (Set.toList (Set.fromList (concat (Map.elems (fst s2))))))
+--       "ActionID" -> Right (map ChatValAction [0 .. (snd s2)])
+--       _ -> Left ("Could not quantify over " <> tyname)

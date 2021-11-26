@@ -1,6 +1,8 @@
 {-# LANGUAGE OverloadedStrings #-}
+{-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
+{-# OPTIONS_GHC -Wno-name-shadowing #-}
 
-module Ltlspec.Models.Chat where
+module Ltlspec.Models.Chat.Chat where
 
 import Data.Aeson (ToJSON (..), object, (.=))
 import qualified Data.Bifunctor
