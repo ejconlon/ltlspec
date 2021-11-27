@@ -11,7 +11,7 @@ import qualified Data.Text as T
 import Ltlspec.Recursion (foldUpM)
 import Ltlspec.Types (Atom (..), AxiomDef, AxiomName, Binder (..), Commented (..), PropDef, PropName, SProp,
                       SPropF (..), Theory (..), TyDef, TyName)
-import Prettyprinter (Doc, annotate, hcat, hsep, pretty, vsep)
+import Prettyprinter (Doc, annotate, hcat, hsep, pretty, vsep, line)
 
 data Element =
     ElementComment !Text
@@ -298,7 +298,7 @@ renderGroup :: Group -> RenderM [Doc Role]
 renderGroup = traverse renderElement
 
 renderGroups :: [Group] -> RenderM (Doc Role)
-renderGroups = fmap vsep . traverse (fmap vsep . renderGroup)
+renderGroups = fmap (vsep . intersperse line) . traverse (fmap vsep . renderGroup)
 
 prettyTheory :: Theory -> RenderM (Doc Role)
 prettyTheory = renderGroups . theoryGroups
