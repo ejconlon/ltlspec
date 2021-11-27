@@ -3,14 +3,16 @@
 module Ltlspec.Printer where
 
 import Control.Monad (join)
+import Control.Monad.Reader (Reader, asks, runReader)
 import qualified Data.Map.Strict as Map
 import Data.Text (Text)
 import qualified Data.Text as T
 import Ltlspec.Models.Ping.Verification (pingTheory)
-import Ltlspec.Types (AxiomDef, AxiomName, Commented (..), PropDef, PropName, SProp, Theory (..), TyDef, TyName, SPropF (..), Atom (..))
-import Prettyprinter (Doc, annotate, hsep, pretty, vsep, punctuate, hcat)
+import Ltlspec.Recursion (foldUpM)
+import Ltlspec.Types (Atom (..), AxiomDef, AxiomName, Commented (..), PropDef, PropName, SProp, SPropF (..),
+                      Theory (..), TyDef, TyName)
+import Prettyprinter (Doc, annotate, hcat, hsep, pretty, punctuate, vsep)
 import Prettyprinter.Render.Terminal (AnsiStyle, Color (..), color, putDoc)
-import Data.Functor.Foldable (fold)
 
 data Element =
     ElementComment !Text
@@ -42,76 +44,167 @@ theoryGroups (Theory tds pds ads) = filter (not . null)
   , Map.toList ads >>= axiomDefElements
   ]
 
-comColor, tyColor, synColor, propColor, bindColor, valColor, axColor, sortColor, logColor  :: Color
-comColor = Green
-tyColor = Blue
-synColor = White
-propColor = Cyan
-bindColor = Red
-valColor = Magenta
-axColor = valColor
-sortColor = Yellow
-logColor = propColor
+data Role =
+    RoleComment
+  | RoleType
+  | RoleSyntax
+  | RoleProp
+  | RoleBinder
+  | RoleValue
+  | RoleSort
+  deriving stock (Eq, Show)
+
+roleColor :: Role -> Color
+roleColor = \case
+  RoleComment -> Green
+  RoleType -> Blue
+  RoleSyntax -> White
+  RoleProp -> Cyan
+  RoleBinder -> Red
+  RoleValue -> Magenta
+  RoleSort -> Yellow
+
+data Symbol =
+    SymTrue
+  | SymFalse
+  | SymNot
+  | SymAnd
+  | SymOr
+  | SymAlways
+  | SymEventually
+  | SymArrow
+  | SymForAll
+  | SymExists
+  | SymNext
+  | SymUntil
+  | SymRelease
+  | SymSet
+  | SymProp
+  | SymColon
+  | SymComment
+  deriving stock (Eq, Show)
+
+asciiRep :: Symbol -> Text
+asciiRep = \case
+  SymTrue -> "True"
+  SymFalse -> "False"
+  SymNot -> "Not"
+  SymAnd -> "And"
+  SymOr -> "Or"
+  SymAlways -> "Always"
+  SymEventually -> "Eventually"
+  SymArrow -> "->"
+  SymForAll -> "ForAll"
+  SymExists -> "Exists"
+  SymNext -> "Next"
+  SymUntil -> "Until"
+  SymRelease -> "Release"
+  SymSet -> "Set"
+  SymProp -> "Prop"
+  SymColon -> ":"
+  SymComment -> "#"
+
+symRole :: Symbol -> Role
+symRole = \case
+  SymTrue -> RoleProp
+  SymFalse -> RoleProp
+  SymNot -> RoleProp
+  SymAnd -> RoleProp
+  SymOr -> RoleProp
+  SymAlways -> RoleProp
+  SymEventually -> RoleProp
+  SymArrow -> RoleSyntax
+  SymForAll -> RoleProp
+  SymExists -> RoleProp
+  SymNext -> RoleProp
+  SymUntil -> RoleProp
+  SymRelease -> RoleProp
+  SymSet -> RoleSort
+  SymProp -> RoleSort
+  SymColon -> RoleSyntax
+  SymComment -> RoleComment
+
+newtype RenderM a = RenderM { unRenderM :: Reader (Symbol -> Text) a }
+  deriving newtype (Functor, Applicative, Monad)
+
+runRenderM :: RenderM a -> (Symbol -> Text) -> a
+runRenderM = runReader . unRenderM
+
+askSym :: Symbol -> RenderM (Doc Role)
+askSym sym = RenderM (asks (\rep -> annotate (symRole sym) (pretty (rep sym))))
 
 type Prec = Int
 
-paren :: (Bool, Doc Color) -> Doc Color
+paren :: (Bool, Doc ann) -> Doc ann
 paren (many, doc) = if many then hcat ["(", doc, ")"] else doc
 
-renderSProp :: SProp -> (Bool, Doc Color)
-renderSProp = fold go where
+renderSPropRec :: SProp -> RenderM (Bool, Doc Role)
+renderSPropRec = foldUpM go where
   go = \case
-    SPropAtomF (Atom name vals) -> (not (null vals), hsep (annotate propColor (pretty name) : fmap (annotate valColor . pretty) vals))
-    SPropTrueF -> (False, annotate logColor "True")
-    SPropFalseF -> (False, annotate logColor "False")
-    SPropNotF x -> (True, hsep [annotate logColor "Not", paren x])
-    SPropAndF xs -> (True, hsep (punctuate "/\\" (fmap paren xs)))
-    SPropOrF xs -> (True, hsep (punctuate "\\/" (fmap paren xs)))
-    SPropIfF xs y -> (True, "TODO")
-    SPropIffF x y -> (False, "TODO")
-    SPropNextF x-> (False, "TODO")
-    SPropAlwaysF x -> (True, hsep [annotate logColor "Always", paren x])
-    SPropEventuallyF x -> (True, hsep [annotate logColor "Eventually", paren x])
-    SPropUntilF x y -> (False, "TODO")
-    SPropReleaseF x y -> (False, "TODO")
-    SPropForAllF bs x ->
-      let foo = 1
-      in (True, "TODO")
-    SPropExistsF bs x -> (False, "TODO")
+    SPropAtomF (Atom name vals) -> pure (not (null vals), hsep (annotate RoleProp (pretty name) : fmap (annotate RoleValue . pretty) vals))
+    SPropTrueF -> pure (False, annotate RoleProp "True")
+    SPropFalseF -> pure (False, annotate RoleProp "False")
+    SPropNotF x -> pure (True, hsep [annotate RoleProp "Not", paren x])
+    SPropAndF xs -> pure (True, hsep (punctuate (annotate RoleProp "/\\") (fmap paren xs)))
+    SPropOrF xs -> pure (True, hsep (punctuate (annotate RoleProp "\\/") (fmap paren xs)))
+    SPropIfF xs y -> pure (True, "TODO")
+    SPropIffF x y -> pure (False, "TODO")
+    SPropNextF x -> pure (False, "TODO")
+    SPropAlwaysF x -> pure (True, hsep [annotate RoleProp "Always", paren x])
+    SPropEventuallyF x -> pure (True, hsep [annotate RoleProp "Eventually", paren x])
+    SPropUntilF x y -> pure (False, "TODO")
+    SPropReleaseF x y -> pure (False, "TODO")
+    SPropForAllF bs x -> pure (True, "TODO")
+    SPropExistsF bs x -> pure (False, "TODO")
 
+renderSProp :: SProp -> RenderM (Doc Role)
+renderSProp = fmap snd . renderSPropRec
 
-renderElement :: Element -> Doc Color
+renderElement :: Element -> RenderM (Doc Role)
 renderElement = \case
-  ElementComment txt -> annotate comColor (hsep ["#", pretty txt])
-  ElementType tn tns ->
-    let start = [annotate tyColor (pretty tn), annotate synColor ":"]
-        mid = join [[annotate tyColor (pretty an), annotate synColor "->"] | an <- tns]
-        end = [annotate sortColor "Set"]
+  ElementComment txt -> do
+    com <- askSym SymComment
+    pure (hsep [com, annotate RoleComment (pretty txt)])
+  ElementType tn tns -> do
+    col <- askSym SymColon
+    arr <- askSym SymArrow
+    set <- askSym SymSet
+    let start = [annotate RoleType (pretty tn), col]
+        mid = join [[annotate RoleType (pretty an), arr] | an <- tns]
+        end = [set]
         complete = start ++ mid ++ end
-    in hsep complete
-  ElementProp pn tns ->
-    let start = [annotate propColor (pretty pn), annotate synColor ":"]
-        mid = join [[annotate tyColor (pretty an), annotate synColor "->"] | an <- tns]
-        end = [annotate sortColor "Prop"]
+    pure (hsep complete)
+  ElementProp pn tns -> do
+    col <- askSym SymColon
+    arr <- askSym SymArrow
+    prop <- askSym SymProp
+    let start = [annotate RoleProp (pretty pn), col]
+        mid = join [[annotate RoleType (pretty an), arr] | an <- tns]
+        end = [prop]
         complete = start ++ mid ++ end
-    in hsep complete
-  ElementAxiom an sprop ->
-    let start = [annotate axColor (pretty an), annotate synColor ":"]
-        end = [snd (renderSProp sprop)]
+    pure (hsep complete)
+  ElementAxiom an sprop -> do
+    col <- askSym SymColon
+    rest <- renderSProp sprop
+    let start = [annotate RoleValue (pretty an), col]
+        end = [rest]
         complete = start ++ end
-    in hsep complete
+    pure (hsep complete)
 
-renderGroups :: [Group] -> Doc Color
-renderGroups = vsep . fmap (vsep . fmap renderElement)
+renderGroup :: Group -> RenderM [Doc Role]
+renderGroup = traverse renderElement
 
-prettyTheory :: Theory -> Doc Color
+renderGroups :: [Group] -> RenderM (Doc Role)
+renderGroups = fmap vsep . traverse (fmap vsep . renderGroup)
+
+prettyTheory :: Theory -> RenderM (Doc Role)
 prettyTheory = renderGroups . theoryGroups
 
-ansiDoc :: Doc Color -> Doc AnsiStyle
-ansiDoc = fmap color
+ansiDoc :: Doc Role -> Doc AnsiStyle
+ansiDoc = fmap (color . roleColor)
 
-putAnsiDoc :: Doc Color -> IO ()
+putAnsiDoc :: Doc Role -> IO ()
 putAnsiDoc = putDoc . ansiDoc
 
 main :: IO ()
-main = putAnsiDoc (prettyTheory pingTheory)
+main = putAnsiDoc (runRenderM (prettyTheory pingTheory) asciiRep) *> putChar '\n'
