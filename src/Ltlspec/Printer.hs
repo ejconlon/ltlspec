@@ -9,9 +9,9 @@ import qualified Data.Map.Strict as Map
 import Data.Text (Text)
 import qualified Data.Text as T
 import Ltlspec.Recursion (foldUpM)
-import Ltlspec.Types (Atom (..), AxiomDef, AxiomName, Binder (..), Commented (..), PropDef, PropName, SProp,
+import Ltlspec.Types (Atom (..), AxiomDef, AxiomName, BinderGroup (..), Commented (..), PropDef, PropName, SProp,
                       SPropF (..), Theory (..), TyDef, TyName)
-import Prettyprinter (Doc, annotate, hcat, hsep, pretty, vsep, line)
+import Prettyprinter (Doc, annotate, hcat, hsep, line, pretty, vsep)
 
 data Element =
     ElementComment !Text
@@ -177,21 +177,21 @@ paren (many, doc) =
       pure (hcat [openDoc, doc, closeDoc])
     else pure doc
 
-renderBinder :: Binder -> RenderM (Doc Role)
-renderBinder (Binder v t) = do
-    openDoc <- askSym SymOpenParen
-    closeDoc <- askSym SymCloseParen
-    colonDoc <- askSym SymColon
-    let vDoc = annotate RoleBinder (pretty v)
-        tDoc = annotate RoleType (pretty t)
-    pure (hcat [openDoc, hsep [vDoc, colonDoc, tDoc], closeDoc])
+renderBinderGroup :: BinderGroup -> RenderM (Doc Role)
+renderBinderGroup (BinderGroup vs t) = do
+  openDoc <- askSym SymOpenParen
+  closeDoc <- askSym SymCloseParen
+  colonDoc <- askSym SymColon
+  let vsDoc = hsep (fmap (annotate RoleBinder . pretty) vs)
+      tDoc = annotate RoleType (pretty t)
+  pure (hcat [openDoc, hsep [vsDoc, colonDoc, tDoc], closeDoc])
 
 -- TODO coalesce binders of same type
-renderBinders :: [Binder] -> RenderM (Doc Role)
-renderBinders bs = do
+renderBinderGroups :: [BinderGroup] -> RenderM (Doc Role)
+renderBinderGroups bgs = do
   commaDoc <- askSym SymComma
-  bsDocs <- traverse renderBinder bs
-  pure (hcat [hsep bsDocs, commaDoc])
+  bgsDocs <- traverse renderBinderGroup bgs
+  pure (hcat [hsep bgsDocs, commaDoc])
 
 -- TODO render infix until/release?
 renderSPropRec :: SProp -> RenderM (Bool, Doc Role)
@@ -248,16 +248,16 @@ renderSPropRec = foldUpM go where
       xDoc <- paren x
       yDoc <- paren y
       pure (True, hsep [releaseDoc, xDoc, yDoc])
-    SPropForAllF bs x -> do
+    SPropForAllF bgs x -> do
       forDoc <- askSym SymForAll
-      bsDoc <- renderBinders bs
+      bgsDoc <- renderBinderGroups bgs
       let xDoc = snd x
-      pure (True, hsep [forDoc, bsDoc, xDoc])
-    SPropExistsF bs x -> do
+      pure (True, hsep [forDoc, bgsDoc, xDoc])
+    SPropExistsF bgs x -> do
       exDoc <- askSym SymExists
-      bsDoc <- renderBinders bs
+      bgsDoc <- renderBinderGroups bgs
       let xDoc = snd x
-      pure (True, hsep [exDoc, bsDoc, xDoc])
+      pure (True, hsep [exDoc, bgsDoc, xDoc])
 
 renderSProp :: SProp -> RenderM (Doc Role)
 renderSProp = fmap snd . renderSPropRec

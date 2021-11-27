@@ -2,7 +2,7 @@ module Ltlspec.Models.DinningHakker where
 
 import qualified Data.Map.Strict as M
 import Data.Sequence as S (Seq (..), empty)
-import Ltlspec.Types (Atom (..), Binder (..), Commented (..), SAS (..), SProp (..), Theory (..))
+import Ltlspec.Types (Atom (..), BinderGroup (..), Commented (..), SAS (..), SProp (..), Theory (..))
 
 type TimeStamp = Int
 
@@ -265,7 +265,7 @@ dinningHakkerTheory = Theory
         -- forall h: Hakker. isThinking(h) -> F[isEating(h)]
         SPropAlways
           (SPropForAll
-            [Binder "h" "Hakker"]
+            [BinderGroup ["h"] "Hakker"]
             (SPropIf
               [SPropAtom (Atom "IsThinking" ["h"])]
               (SPropEventually
@@ -275,7 +275,7 @@ dinningHakkerTheory = Theory
       )
     , ("receiveFromAdjacentHakkers",
         SPropAlways
-          (SPropForAll [Binder "c" "Chopstick", Binder "hm" "HakkerMsg"]
+          (SPropForAll [BinderGroup ["c"] "Chopstick", BinderGroup ["hm"] "HakkerMsg"]
             (SPropIf
               [SPropAtom (Atom "ReceivedNotDelivered" ["c", "hm"])]
               (SPropAtom (Atom "FromAdjacent" ["c", "hm"]))

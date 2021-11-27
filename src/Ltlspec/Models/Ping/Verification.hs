@@ -9,16 +9,16 @@ import Ltlspec.Models.Ping.Common (PingAction, PingMessage (..))
 import Ltlspec.System.Actors (ActorId, AnnoMessage (..), AppMessage (..), MessageId (..), MessageView (..),
                               NetMessage (..))
 import Ltlspec.TriBool (TriBool (..))
-import Ltlspec.Types (ApplyAction (..), Atom (..), Binder (..), Bridge (..), Commented (..), Error, Prop (..), SAS (..),
-                      SProp (..), Theory (..), TruncBridge (..), initScanSAS)
+import Ltlspec.Types (ApplyAction (..), Atom (..), BinderGroup (..), Bridge (..), Commented (..), Error, Prop (..),
+                      SAS (..), SProp (..), Theory (..), TruncBridge (..), initScanSAS)
 
 -- | A proposition encoding responsiveness for ping messages.
 -- Textually, this is equivalent to:
 -- Always (Forall (m1: SentPing). Eventually (Exists (m2: RecvPong). IsPingPong m1 m2))
 pingResponsiveProp :: SProp
 pingResponsiveProp =
-  let prop = SPropAlways (SPropForAll [Binder "m1" "SentPing"] eventuallyPong)
-      eventuallyPong = SPropEventually (SPropExists [Binder "m2" "RecvPong"] pong)
+  let prop = SPropAlways (SPropForAll [BinderGroup ["m1"] "SentPing"] eventuallyPong)
+      eventuallyPong = SPropEventually (SPropExists [BinderGroup ["m2"] "RecvPong"] pong)
       pong = SPropAtom (Atom "IsPingPong" ["m1", "m2"])
   in prop
 

@@ -11,8 +11,8 @@ import Ltlspec.Models.Ping.Verification (pingTheory)
 import Ltlspec.Printer (Role (..), prettyTheory, runRenderM, unicodeRep)
 import Ltlspec.Types (Theory)
 import Prettyprinter (Doc, annotate, hsep, indent, pretty)
-import Prettyprinter.Render.Text (hPutDoc)
 import Prettyprinter.Render.Terminal (AnsiStyle, Color (..), color, putDoc)
+import Prettyprinter.Render.Text (hPutDoc)
 import System.IO (IOMode (..), hPutStr, withFile)
 
 roleColor :: Role -> Color

@@ -13,9 +13,9 @@ import Ltlspec.Models.Ping.Verification (PingWorld (PingWorld), emptyPingState, 
 import Ltlspec.System.Actors (ActorCase, AnnoMessage, runActorCaseSimple)
 import Ltlspec.System.Logging (LogEntry, Logger, flushLogVar, newLogVar, varLogger)
 import Ltlspec.System.Time (TimeDelta, timeDeltaFromFracSecs)
-import Ltlspec.Types (ApplyAction (..), Atom (..), Binder (..), Bridge (..), Commented (..), EnvProp (..),
-                      EnvPropBad (..), EnvPropGood (..), EnvPropRes, EnvPropStep (..), Prop (..), SAS, SProp (..),
-                      Theory (..), TruncBridge, VarName, initScanSAS)
+import Ltlspec.Types (ApplyAction (..), Atom (..), Binder (..), BinderGroup (..), Bridge (..), Commented (..),
+                      EnvProp (..), EnvPropBad (..), EnvPropGood (..), EnvPropRes, EnvPropStep (..), Prop (..), SAS,
+                      SProp (..), Theory (..), TruncBridge, VarName, initScanSAS)
 import System.Environment (lookupEnv, setEnv)
 import System.IO (BufferMode (NoBuffering), hSetBuffering, stderr, stdout)
 import Test.Tasty (TestTree, defaultMain, testGroup)
@@ -29,7 +29,7 @@ shortTickInterval :: TimeDelta
 shortTickInterval = timeDeltaFromFracSecs (0.01 :: Double)
 
 eqForAll :: [VarName] -> SProp -> SProp
-eqForAll = SPropForAll . fmap (`Binder` "Value")
+eqForAll = SPropForAll . pure . (`BinderGroup` "Value")
 
 eqProp :: VarName -> VarName -> SProp
 eqProp x y = SPropAtom (Atom "IsEq" [x, y])

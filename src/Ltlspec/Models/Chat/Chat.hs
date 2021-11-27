@@ -7,7 +7,7 @@ import qualified Data.List as List
 import qualified Data.Map as Map
 import qualified Data.Set as Set
 import Ltlspec.TriBool (TriBool (..))
-import Ltlspec.Types (Atom (..), Binder (..), Bridge (..), Commented (..), Error, Prop (..), SAS (..), SProp (..),
+import Ltlspec.Types (Atom (..), BinderGroup (..), Bridge (..), Commented (..), Error, Prop (..), SAS (..), SProp (..),
                       Theory (..), TruncBridge, initScanSAS, truncBridgeEmpty, truncBridgeOracle)
 import System.Random (StdGen, mkStdGen, randomR)
 
@@ -29,8 +29,8 @@ chatTheory = Theory
   , theoryAxioms = NoComment <$> Map.fromList
       [ ("isMemberBetweenJoinAndLeave",
           SPropAlways (
-            SPropForAll [Binder "c" "Client", Binder "ch" "Channel"] (
-              SPropExists [Binder "i" "Action", Binder "j" "Action"] (
+            SPropForAll [BinderGroup ["c"] "Client", BinderGroup ["ch"] "Channel"] (
+              SPropExists [BinderGroup ["i", "j"] "Action"] (
                 SPropIf
                   [SPropAtom (Atom "Joined" ["i", "c", "ch"])]
                   (SPropUntil
@@ -43,7 +43,7 @@ chatTheory = Theory
         )
       , ("ifInChannelReceiveMessage",
           SPropAlways (
-            SPropForAll [Binder "c1" "Client", Binder "ch" "Channel", Binder "c2" "Client", Binder "m" "Action"] (
+            SPropForAll [BinderGroup ["c1", "c2"] "Client", BinderGroup ["ch"] "Channel", BinderGroup ["m"] "Action"] (
               SPropIf
                 [ SPropAnd
                   [ SPropNot (SPropAtom (Atom "IsSameClient" ["c1", "c2"]))
@@ -58,7 +58,7 @@ chatTheory = Theory
         )
       , ("neverSendMessageToMyself",
           SPropAlways (
-            SPropForAll [Binder "c" "Client", Binder "m" "Action"] (
+            SPropForAll [BinderGroup ["c"] "Client", BinderGroup ["m"] "Action"] (
               SPropNot (SPropAtom (Atom "Shared" ["m", "c", "c"]))
             )
           )

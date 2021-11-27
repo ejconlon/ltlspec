@@ -30,8 +30,8 @@
     Shared : Action → Client → Client → Prop
 
 
-    ifInChannelReceiveMessage : □ (∀ (c1 : Client) (ch : Channel) (c2 : Client) (m : Action), ((¬ (IsSameClient c1 c2)) ∧ (IsMember c1 ch) ∧ (IsMember c2 ch) ∧ (Sent m c1 ch)) ⇒ (◇ (Shared m c1 c2)))
-    isMemberBetweenJoinAndLeave : □ (∀ (c : Client) (ch : Channel), ∃ (i : Action) (j : Action), (Joined i c ch) ⇒ (U (IsMember c ch) (Left j c ch)))
+    ifInChannelReceiveMessage : □ (∀ (c1 c2 : Client) (ch : Channel) (m : Action), ((¬ (IsSameClient c1 c2)) ∧ (IsMember c1 ch) ∧ (IsMember c2 ch) ∧ (Sent m c1 ch)) ⇒ (◇ (Shared m c1 c2)))
+    isMemberBetweenJoinAndLeave : □ (∀ (c : Client) (ch : Channel), ∃ (i j : Action), (Joined i c ch) ⇒ (U (IsMember c ch) (Left j c ch)))
     neverSendMessageToMyself : □ (∀ (c : Client) (m : Action), ¬ (Shared m c c))
 
 # Dining Philosophers Theory

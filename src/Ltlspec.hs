@@ -12,9 +12,9 @@ import qualified Data.Set as Set
 import Ltlspec.Recursion (foldUpM)
 import Ltlspec.TriBool (TriBool (..), triBoolAnd, triBoolAndAll, triBoolNot, triBoolOr, triBoolOrAll, triBoolRelease,
                         triBoolUntil)
-import Ltlspec.Types (Atom (..), AtomVar, Binder (..), Bridge (..), Env, EnvProp (..), EnvPropBad (..),
-                      EnvPropGood (..), EnvPropRes, EnvPropStep (..), Prop (..), PropF (..), PropName, Quantifier (..),
-                      SProp, SPropF (..), TruncBridge (..), TyName, VarName)
+import Ltlspec.Types (Atom (..), AtomVar, Binder (..), BinderGroup (BinderGroup), Bridge (..), Env, EnvProp (..),
+                      EnvPropBad (..), EnvPropGood (..), EnvPropRes, EnvPropStep (..), Prop (..), PropF (..), PropName,
+                      Quantifier (..), SProp, SPropF (..), TruncBridge (..), TyName, VarName)
 
 -- | Put the prop in negation normal form, which basically involves
 -- pushing negations to the bottom. Note that this does not negate the prop;
@@ -113,18 +113,24 @@ propIff :: Prop -> Prop -> Prop
 propIff r1 r2 = PropAnd (propIf r1 r2) (propIf r2 r1)
 
 -- | Simple constructor for nested foralls.
-propForAllNested :: [Binder] -> Prop -> Prop
-propForAllNested pairs body = go pairs where
-  go = \case
+propForAllNested :: [BinderGroup] -> Prop -> Prop
+propForAllNested pairs body = go1 pairs where
+  go1 = \case
     [] -> body
-    b:bs-> PropForAll b (go bs)
+    (BinderGroup vs t):bgs-> go2 bgs t vs
+  go2 bgs t = \case
+    [] -> go1 bgs
+    v:vs -> PropForAll (Binder v t) (go2 bgs t vs)
 
 -- | Simple constructor for nested exists.
-propExistsNested :: [Binder] -> Prop -> Prop
-propExistsNested pairs body = go pairs where
-  go = \case
+propExistsNested :: [BinderGroup] -> Prop -> Prop
+propExistsNested pairs body = go1 pairs where
+  go1 = \case
     [] -> body
-    b:bs -> PropExists b (go bs)
+    (BinderGroup vs t):bgs-> go2 bgs t vs
+  go2 bgs t = \case
+    [] -> go1 bgs
+    v:vs -> PropExists (Binder v t) (go2 bgs t vs)
 
 propDesugar :: SProp -> Prop
 propDesugar = fold go where
@@ -143,8 +149,8 @@ propDesugar = fold go where
     SPropEventuallyF p -> propEventually p
     SPropUntilF p1 p2 -> PropUntil p1 p2
     SPropReleaseF p1 p2 -> PropRelease p1 p2
-    SPropForAllF bs p -> propForAllNested bs p
-    SPropExistsF bs p -> propExistsNested bs p
+    SPropForAllF bgs p -> propForAllNested bgs p
+    SPropExistsF bgs p -> propExistsNested bgs p
 
 -- | The size of the 'Prop' (number of constructors)
 --

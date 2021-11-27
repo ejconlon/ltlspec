@@ -47,6 +47,10 @@ data Binder = Binder !VarName !TyName
   deriving stock (Eq, Show, Generic)
   deriving anyclass (Hashable, NFData)
 
+data BinderGroup = BinderGroup ![VarName] !TyName
+  deriving stock (Eq, Show, Generic)
+  deriving anyclass (Hashable, NFData)
+
 -- | "Sugared" proposition.
 -- Allows for pretty printing of the proposition but
 -- is quickly desugared to 'Prop'.
@@ -64,8 +68,8 @@ data SProp =
   | SPropEventually !SProp
   | SPropUntil !SProp !SProp
   | SPropRelease !SProp !SProp
-  | SPropForAll ![Binder] !SProp
-  | SPropExists ![Binder] !SProp
+  | SPropForAll ![BinderGroup] !SProp
+  | SPropExists ![BinderGroup] !SProp
   deriving stock (Eq, Show, Generic)
   deriving anyclass (Hashable, NFData)
 
