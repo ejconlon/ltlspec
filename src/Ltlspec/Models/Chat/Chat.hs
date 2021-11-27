@@ -9,10 +9,9 @@ import qualified Data.Bifunctor
 import qualified Data.List as List
 import qualified Data.Map as Map
 import qualified Data.Set as Set
-import Ltlspec (propAlways, propAndAll, propEventually, propExistsNested, propForAllNested, propIf)
 import Ltlspec.TriBool (TriBool (..))
-import Ltlspec.Types (Atom (..), Binder (..), Bridge (..), Commented (..), Error, Prop (..), SAS (..), Theory (..),
-                      TruncBridge, initScanSAS, truncBridgeEmpty, truncBridgeOracle)
+import Ltlspec.Types (Atom (..), Binder (..), Bridge (..), Commented (..), Error, Prop (..), SAS (..), SProp (..),
+                      Theory (..), TruncBridge, initScanSAS, truncBridgeEmpty, truncBridgeOracle)
 import System.Random (StdGen, mkStdGen, randomR)
 
 chatTheory :: Theory
@@ -32,40 +31,42 @@ chatTheory = Theory
       ]
   , theoryAxioms = NoComment <$> Map.fromList
       [ ("IsMemberBetweenJoinAndLeave",
-          propAlways (
-            propForAllNested [Binder "c" "ClientID", Binder "ch" "ChannelID"] (
-              propExistsNested [Binder "i" "ActionID", Binder "j" "ActionID"] (
-                propIf
-                  (PropAtom (Atom "Joined" ["i","c","ch"]))
-                  (PropUntil
-                    (PropAtom (Atom "IsMember" ["c","ch"]))
-                    (PropAtom (Atom "Left" ["j","c","ch"]))
+          SPropAlways (
+            SPropForAll [Binder "c" "ClientID", Binder "ch" "ChannelID"] (
+              SPropExists [Binder "i" "ActionID", Binder "j" "ActionID"] (
+                SPropIf
+                  [SPropAtom (Atom "Joined" ["i", "c", "ch"])]
+                  (SPropUntil
+                    (SPropAtom (Atom "IsMember" ["c","ch"]))
+                    (SPropAtom (Atom "Left" ["j","c","ch"]))
                   )
               )
             )
           )
         )
       , ("IfInChannelReceiveMessage",
-          propAlways (
-            propForAllNested [Binder "c1" "ClientID", Binder "ch" "ChannelID", Binder "c2" "ClientID", Binder "m" "ActionID"] (
-              propIf
-                (propAndAll [
-                  PropNot (PropAtom (Atom "IsSameClient" ["c1","c2"])),
-                  PropAtom (Atom "IsMember" ["c1","ch"]),
-                  PropAtom (Atom "IsMember" ["c2","ch"]),
-                  PropAtom (Atom "Sent" ["m","c1","ch"])
-                ])
-                (PropAnd
-                  (PropNot (PropAtom (Atom "Shared" ["m","c1","c1"])))
-                  (propEventually (PropAtom (Atom "Shared" ["m", "c1", "c2"])))
+          SPropAlways (
+            SPropForAll [Binder "c1" "ClientID", Binder "ch" "ChannelID", Binder "c2" "ClientID", Binder "m" "ActionID"] (
+              SPropIf
+                [ SPropAnd
+                  [ SPropNot (SPropAtom (Atom "IsSameClient" ["c1", "c2"]))
+                  , SPropAtom (Atom "IsMember" ["c1", "ch"])
+                  , SPropAtom (Atom "IsMember" ["c2", "ch"])
+                  , SPropAtom (Atom "Sent" ["m", "c1", "ch"])
+                  ]
+                ]
+                (SPropAnd
+                  [ SPropNot (SPropAtom (Atom "Shared" ["m", "c1", "c1"]))
+                  , SPropEventually (SPropAtom (Atom "Shared" ["m", "c1", "c2"]))
+                  ]
                 )
             )
           )
         )
       , ("NeverSendMessageToMyself",
-          propAlways (
-            propForAllNested [Binder "c" "ClientID", Binder "m" "ActionID"] (
-              PropNot (PropAtom (Atom "Shared" ["m", "c", "c"]))
+          SPropAlways (
+            SPropForAll [Binder "c" "ClientID", Binder "m" "ActionID"] (
+              SPropNot (SPropAtom (Atom "Shared" ["m", "c", "c"]))
             )
           )
         )

@@ -5,22 +5,21 @@ import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as Map
 import Data.Set (Set)
 import qualified Data.Set as Set
-import Ltlspec (propAlways, propEventually, propExistsNested, propForAllNested)
 import Ltlspec.Models.Ping.Common (PingAction, PingMessage (..))
 import Ltlspec.System.Actors (ActorId, AnnoMessage (..), AppMessage (..), MessageId (..), MessageView (..),
                               NetMessage (..))
 import Ltlspec.TriBool (TriBool (..))
 import Ltlspec.Types (ApplyAction (..), Atom (..), Binder (..), Bridge (..), Commented (..), Error, Prop (..), SAS (..),
-                      Theory (..), TruncBridge (..), initScanSAS)
+                      SProp (..), Theory (..), TruncBridge (..), initScanSAS)
 
 -- | A proposition encoding responsiveness for ping messages.
 -- Textually, this is equivalent to:
 -- Always (Forall (m1: SentPing). Eventually (Exists (m2: RecvPong). IsPingPong m1 m2))
-pingResponsiveProp :: Prop
+pingResponsiveProp :: SProp
 pingResponsiveProp =
-  let prop = propAlways (propForAllNested [Binder "m1" "SentPing"] eventuallyPong)
-      eventuallyPong = propEventually (propExistsNested [Binder "m2" "RecvPong"] pong)
-      pong = PropAtom (Atom "IsPingPong" ["m1", "m2"])
+  let prop = SPropAlways (SPropForAll [Binder "m1" "SentPing"] eventuallyPong)
+      eventuallyPong = SPropEventually (SPropExists [Binder "m2" "RecvPong"] pong)
+      pong = SPropAtom (Atom "IsPingPong" ["m1", "m2"])
   in prop
 
 pingTheory :: Theory

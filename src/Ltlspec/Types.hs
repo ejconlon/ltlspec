@@ -117,8 +117,8 @@ type TyDef = Commented TyName
 type TyDefs = [TyDef]
 type PropDef = (PropName, Commented [TyName])
 type PropDefs = Map PropName (Commented [TyName])
-type AxiomDef = (AxiomName, Commented Prop)
-type AxiomDefs = Map AxiomName (Commented Prop)
+type AxiomDef = (AxiomName, Commented SProp)
+type AxiomDefs = Map AxiomName (Commented SProp)
 
 data Theory = Theory
   { theoryTypes :: !TyDefs

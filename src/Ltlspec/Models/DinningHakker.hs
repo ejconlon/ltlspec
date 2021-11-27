@@ -2,8 +2,7 @@ module Ltlspec.Models.DinningHakker where
 
 import qualified Data.Map.Strict as M
 import Data.Sequence as S (Seq (..), empty)
-import Ltlspec (propAlways, propAtom, propEventually, propForAllNested, propIf)
-import Ltlspec.Types (Binder (..), Commented (..), Prop (..), SAS (..), Theory (..))
+import Ltlspec.Types (Atom (..), Binder (..), Commented (..), SAS (..), SProp (..), Theory (..))
 
 type TimeStamp = Int
 
@@ -258,30 +257,30 @@ dinningHakkerTheory = Theory
     , ("receivedNotDelivered", ["ChopstickId, HakkerMsg"])
     , ("fromAdjacent", ["ChopstickId, HakkerMsg"])
   ]
-  , theoryAxioms = NoComment <$> M.fromList [
-    -- checking liveness properties for all hakkers
-    -- All hakkers will start from thinking, and should eventually start eating
-    -- Because the Eating state is mutually exclusive for adjacent Hakkers
-    -- forall h: Hakker. isThinking(h) -> F[isEating(h)]
-    ("Liveness",
-      propAlways
-        (PropForAll
-          (Binder "h" "HakkerId")
-          (propIf
-            (propAtom "isThinking" ["h"])
-            (propEventually
-              (propAtom "isEating" ["h"]))
+  , theoryAxioms = NoComment <$> M.fromList
+    [ ("Liveness",
+        -- checking liveness properties for all hakkers
+        -- All hakkers will start from thinking, and should eventually start eating
+        -- Because the Eating state is mutually exclusive for adjacent Hakkers
+        -- forall h: Hakker. isThinking(h) -> F[isEating(h)]
+        SPropAlways
+          (SPropForAll
+            [Binder "h" "HakkerId"]
+            (SPropIf
+              [SPropAtom (Atom "isThinking" ["h"])]
+              (SPropEventually
+                (SPropAtom (Atom "isEating" ["h"])))
+            )
           )
-        )
-    ),
-    ("ReceiveFromAdjacentHakkers",
-      propAlways
-        (propForAllNested [Binder "c" "ChopstickId", Binder "hm" "HakkerMsg"]
-          (propIf
-            (propAtom "receivedNotDeliverd" ["c", "hm"])
-            (propAtom "fromAdjacent" ["c", "hm"])
+      )
+    , ("ReceiveFromAdjacentHakkers",
+        SPropAlways
+          (SPropForAll [Binder "c" "ChopstickId", Binder "hm" "HakkerMsg"]
+            (SPropIf
+              [SPropAtom (Atom "receivedNotDeliverd" ["c", "hm"])]
+              (SPropAtom (Atom "fromAdjacent" ["c", "hm"]))
+            )
           )
-        )
-    )
-  ]
+      )
+    ]
   }

@@ -7,15 +7,16 @@ import qualified Data.Map.Strict as Map
 import Data.Text (Text)
 import qualified Data.Text as T
 import Ltlspec.Models.Ping.Verification (pingTheory)
-import Ltlspec.Types (AxiomDef, AxiomName, Commented (..), Prop, PropDef, PropName, Theory (..), TyDef, TyName)
-import Prettyprinter (Doc, annotate, hsep, pretty, vsep)
+import Ltlspec.Types (AxiomDef, AxiomName, Commented (..), PropDef, PropName, SProp, Theory (..), TyDef, TyName, SPropF (..), Atom (..))
+import Prettyprinter (Doc, annotate, hsep, pretty, vsep, punctuate, hcat)
 import Prettyprinter.Render.Terminal (AnsiStyle, Color (..), color, putDoc)
+import Data.Functor.Foldable (fold)
 
 data Element =
     ElementComment !Text
   | ElementType !TyName ![TyName]
   | ElementProp !PropName ![TyName]
-  | ElementAxiom !AxiomName !Prop
+  | ElementAxiom !AxiomName !SProp
   deriving stock (Eq, Show)
 
 type Group = [Element]
@@ -35,23 +36,49 @@ axiomDefElements :: AxiomDef -> [Element]
 axiomDefElements (an, cprop) = flip commentedElements cprop $ \prop -> [ElementAxiom an prop]
 
 theoryGroups :: Theory -> [Group]
-theoryGroups (Theory tds pds ads) =
+theoryGroups (Theory tds pds ads) = filter (not . null)
   [ tds >>= tyDefElements
   , Map.toList pds >>= propDefElements
   , Map.toList ads >>= axiomDefElements
   ]
 
-comColor, tyColor, synColor, propColor, axColor, sortColor, logColor  :: Color
+comColor, tyColor, synColor, propColor, bindColor, valColor, axColor, sortColor, logColor  :: Color
 comColor = Green
 tyColor = Blue
 synColor = White
 propColor = Cyan
-axColor = Magenta
+bindColor = Red
+valColor = Magenta
+axColor = valColor
 sortColor = Yellow
-logColor = Red
+logColor = propColor
 
-renderProp :: Prop -> Doc Color
-renderProp _ = "TODO"
+type Prec = Int
+
+paren :: (Bool, Doc Color) -> Doc Color
+paren (many, doc) = if many then hcat ["(", doc, ")"] else doc
+
+renderSProp :: SProp -> (Bool, Doc Color)
+renderSProp = fold go where
+  go = \case
+    SPropAtomF (Atom name vals) -> (not (null vals), hsep (annotate propColor (pretty name) : fmap (annotate valColor . pretty) vals))
+    SPropTrueF -> (False, annotate logColor "True")
+    SPropFalseF -> (False, annotate logColor "False")
+    SPropNotF x -> (True, hsep [annotate logColor "Not", paren x])
+    SPropAndF xs -> (True, hsep (punctuate "/\\" (fmap paren xs)))
+    SPropOrF xs -> (True, hsep (punctuate "\\/" (fmap paren xs)))
+    SPropIfF xs y -> (True, "TODO")
+    SPropIffF x y -> (False, "TODO")
+    SPropNextF x-> (False, "TODO")
+    SPropAlwaysF x -> (True, hsep [annotate logColor "Always", paren x])
+    SPropEventuallyF x -> (True, hsep [annotate logColor "Eventually", paren x])
+    SPropUntilF x y -> (False, "TODO")
+    SPropReleaseF x y -> (False, "TODO")
+    SPropForAllF bs x ->
+      let foo = 1
+      in (True, "TODO")
+    SPropExistsF bs x -> (False, "TODO")
+
 
 renderElement :: Element -> Doc Color
 renderElement = \case
@@ -68,9 +95,9 @@ renderElement = \case
         end = [annotate sortColor "Prop"]
         complete = start ++ mid ++ end
     in hsep complete
-  ElementAxiom an prop ->
+  ElementAxiom an sprop ->
     let start = [annotate axColor (pretty an), annotate synColor ":"]
-        end = [renderProp prop]
+        end = [snd (renderSProp sprop)]
         complete = start ++ end
     in hsep complete
 

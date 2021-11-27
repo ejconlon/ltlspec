@@ -4,7 +4,7 @@ import Control.Monad (ap, when)
 import Control.Monad.IO.Class (MonadIO (..))
 import Data.Functor (($>))
 import qualified Data.Map.Strict as Map
-import Ltlspec (envPropFold, propAlways, propEventually, propForAllNested, propIf, propIfNested)
+import Ltlspec (envPropFold, propAlways, propEventually)
 import Ltlspec.Driver (DriverError (..), driveVerificationIO)
 import Ltlspec.Models.Chat.Chat (chatTheory, longTrace, shortTrace)
 import Ltlspec.Models.Ping.Actors (pingCase)
@@ -14,8 +14,8 @@ import Ltlspec.System.Actors (ActorCase, AnnoMessage, runActorCaseSimple)
 import Ltlspec.System.Logging (LogEntry, Logger, flushLogVar, newLogVar, varLogger)
 import Ltlspec.System.Time (TimeDelta, timeDeltaFromFracSecs)
 import Ltlspec.Types (ApplyAction (..), Atom (..), Binder (..), Bridge (..), Commented (..), EnvProp (..),
-                      EnvPropBad (..), EnvPropGood (..), EnvPropRes, EnvPropStep (..), Prop (..), SAS, Theory (..),
-                      TruncBridge, VarName, initScanSAS)
+                      EnvPropBad (..), EnvPropGood (..), EnvPropRes, EnvPropStep (..), Prop (..), SAS, SProp (..),
+                      Theory (..), TruncBridge, VarName, initScanSAS)
 import System.Environment (lookupEnv, setEnv)
 import System.IO (BufferMode (NoBuffering), hSetBuffering, stderr, stdout)
 import Test.Tasty (TestTree, defaultMain, testGroup)
@@ -28,16 +28,16 @@ testCaseSkip ci name body = testCaseInfo name (if ci then pure "SKIPPED" else bo
 shortTickInterval :: TimeDelta
 shortTickInterval = timeDeltaFromFracSecs (0.01 :: Double)
 
-eqForAll :: [VarName] -> Prop -> Prop
-eqForAll = propForAllNested . fmap (`Binder` "Value")
+eqForAll :: [VarName] -> SProp -> SProp
+eqForAll = SPropForAll . fmap (`Binder` "Value")
 
-eqProp :: VarName -> VarName -> Prop
-eqProp x y = PropAtom (Atom "IsEq" [x, y])
+eqProp :: VarName -> VarName -> SProp
+eqProp x y = SPropAtom (Atom "IsEq" [x, y])
 
-eqAxReflexive, eqAxTransitive, eqAxSymmetric :: Prop
+eqAxReflexive, eqAxTransitive, eqAxSymmetric :: SProp
 eqAxReflexive = eqForAll ["x"] (eqProp "x" "x")
-eqAxTransitive = eqForAll ["x", "y", "z"] (propIfNested [eqProp "x" "y", eqProp "y" "z"] (eqProp "x" "z"))
-eqAxSymmetric = eqForAll ["x", "y"] (propIf (eqProp "x" "y") (eqProp "y" "x"))
+eqAxTransitive = eqForAll ["x", "y", "z"] (SPropIf [eqProp "x" "y", eqProp "y" "z"] (eqProp "x" "z"))
+eqAxSymmetric = eqForAll ["x", "y"] (SPropIf [eqProp "x" "y"] (eqProp "y" "x"))
 
 -- A theory of total order over some type
 orderTheory :: Theory
