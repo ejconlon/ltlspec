@@ -4,15 +4,14 @@ module Ltlspec.Printer where
 
 import Control.Monad (join)
 import Control.Monad.Reader (Reader, asks, runReader)
+import Data.List (intersperse)
 import qualified Data.Map.Strict as Map
 import Data.Text (Text)
 import qualified Data.Text as T
-import Ltlspec.Models.Ping.Verification (pingTheory)
 import Ltlspec.Recursion (foldUpM)
 import Ltlspec.Types (Atom (..), AxiomDef, AxiomName, Binder (..), Commented (..), PropDef, PropName, SProp,
                       SPropF (..), Theory (..), TyDef, TyName)
-import Prettyprinter (Doc, annotate, hcat, hsep, pretty, punctuate, vsep)
-import Prettyprinter.Render.Terminal (AnsiStyle, Color (..), color, putDoc)
+import Prettyprinter (Doc, annotate, hcat, hsep, pretty, vsep)
 
 data Element =
     ElementComment !Text
@@ -54,16 +53,6 @@ data Role =
   | RoleSort
   deriving stock (Eq, Show)
 
-roleColor :: Role -> Color
-roleColor = \case
-  RoleComment -> Green
-  RoleType -> Blue
-  RoleSyntax -> White
-  RoleProp -> Cyan
-  RoleBinder -> Red
-  RoleValue -> Magenta
-  RoleSort -> Yellow
-
 data Symbol =
     SymTrue
   | SymFalse
@@ -86,14 +75,15 @@ data Symbol =
   | SymComma
   | SymOpenParen
   | SymCloseParen
-  | SymComment
+  | SymOpenComment
+  | SymCloseComment
   deriving stock (Eq, Show)
 
 asciiRep :: Symbol -> Text
 asciiRep = \case
   SymTrue -> "True"
   SymFalse -> "False"
-  SymNot -> "Not"
+  SymNot -> "not"
   SymAnd -> "And"
   SymOr -> "Or"
   SymAlways -> "Always"
@@ -101,8 +91,8 @@ asciiRep = \case
   SymArrow -> "->"
   SymIf -> "=>"
   SymIff -> "<=>"
-  SymForAll -> "ForAll"
-  SymExists -> "Exists"
+  SymForAll -> "forall"
+  SymExists -> "exists"
   SymNext -> "Next"
   SymUntil -> "Until"
   SymRelease -> "Release"
@@ -112,7 +102,34 @@ asciiRep = \case
   SymComma -> ","
   SymOpenParen -> "("
   SymCloseParen -> ")"
-  SymComment -> "#"
+  SymOpenComment -> "(*"
+  SymCloseComment -> "*)"
+
+unicodeRep :: Symbol -> Text
+unicodeRep = \case
+  SymTrue -> "⊤"
+  SymFalse -> "⊥"
+  SymNot -> "¬"
+  SymAnd -> "∧"
+  SymOr -> "∨"
+  SymAlways -> "□"
+  SymEventually -> "◇"
+  SymArrow -> "→"
+  SymIf -> "⇒"
+  SymIff -> "⇔"
+  SymForAll -> "∀"
+  SymExists -> "∃"
+  SymNext -> "X"
+  SymUntil -> "U"
+  SymRelease -> "R"
+  SymSet -> "Set"
+  SymProp -> "Prop"
+  SymColon -> ":"
+  SymComma -> ","
+  SymOpenParen -> "("
+  SymCloseParen -> ")"
+  SymOpenComment -> "(*"
+  SymCloseComment -> "*)"
 
 symRole :: Symbol -> Role
 symRole = \case
@@ -137,7 +154,8 @@ symRole = \case
   SymComma -> RoleSyntax
   SymOpenParen -> RoleSyntax
   SymCloseParen -> RoleSyntax
-  SymComment -> RoleComment
+  SymOpenComment -> RoleComment
+  SymCloseComment -> RoleComment
 
 newtype RenderM a = RenderM { unRenderM :: Reader (Symbol -> Text) a }
   deriving newtype (Functor, Applicative, Monad)
@@ -193,16 +211,16 @@ renderSPropRec = foldUpM go where
     SPropAndF xs -> do
       andDoc <- askSym SymAnd
       xsDocs <- traverse paren xs
-      pure (True, hsep (punctuate andDoc xsDocs))
+      pure (True, hsep (intersperse andDoc xsDocs))
     SPropOrF xs -> do
       orDoc <- askSym SymOr
       xsDocs <- traverse paren xs
-      pure (True, hsep (punctuate orDoc xsDocs))
+      pure (True, hsep (intersperse orDoc xsDocs))
     SPropIfF xs y -> do
       ifDoc <- askSym SymIf
       xsDocs <- traverse paren xs
       yDoc <- paren y
-      pure (True, hsep (punctuate ifDoc xsDocs ++ [ifDoc, yDoc]))
+      pure (True, hsep (intersperse ifDoc xsDocs ++ [ifDoc, yDoc]))
     SPropIffF x y -> do
       iffDoc <- askSym SymIff
       xDoc <- paren x
@@ -233,12 +251,12 @@ renderSPropRec = foldUpM go where
     SPropForAllF bs x -> do
       forDoc <- askSym SymForAll
       bsDoc <- renderBinders bs
-      xDoc <- paren x
+      let xDoc = snd x
       pure (True, hsep [forDoc, bsDoc, xDoc])
     SPropExistsF bs x -> do
       exDoc <- askSym SymExists
       bsDoc <- renderBinders bs
-      xDoc <- paren x
+      let xDoc = snd x
       pure (True, hsep [exDoc, bsDoc, xDoc])
 
 renderSProp :: SProp -> RenderM (Doc Role)
@@ -247,8 +265,9 @@ renderSProp = fmap snd . renderSPropRec
 renderElement :: Element -> RenderM (Doc Role)
 renderElement = \case
   ElementComment txt -> do
-    comDoc <- askSym SymComment
-    pure (hsep [comDoc, annotate RoleComment (pretty txt)])
+    openComDoc <- askSym SymOpenComment
+    closeComDoc <- askSym SymCloseComment
+    pure (hsep [openComDoc, annotate RoleComment (pretty txt), closeComDoc])
   ElementType tn tns -> do
     colDoc <- askSym SymColon
     arrDoc <- askSym SymArrow
@@ -283,12 +302,3 @@ renderGroups = fmap vsep . traverse (fmap vsep . renderGroup)
 
 prettyTheory :: Theory -> RenderM (Doc Role)
 prettyTheory = renderGroups . theoryGroups
-
-ansiDoc :: Doc Role -> Doc AnsiStyle
-ansiDoc = fmap (color . roleColor)
-
-putAnsiDoc :: Doc Role -> IO ()
-putAnsiDoc = putDoc . ansiDoc
-
-main :: IO ()
-main = putAnsiDoc (runRenderM (prettyTheory pingTheory) asciiRep) *> putChar '\n'

@@ -9,6 +9,12 @@ cradle:
     - path: "./exe/Paths_ltlspec.hs"
       component: "ltlspec:exe:ltlspec-exe"
 
+    - path: "./gen/Main.hs"
+      component: "ltlspec:exe:ltlspec-gen"
+
+    - path: "./gen/Paths_ltlspec.hs"
+      component: "ltlspec:exe:ltlspec-gen"
+
     - path: "./doctest"
       component: "ltlspec:test:ltlspec-doctest"
 

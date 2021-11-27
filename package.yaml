@@ -20,7 +20,6 @@ dependencies:
 - hashable
 - mtl
 - prettyprinter
-- prettyprinter-ansi-terminal
 - pretty-simple
 - random
 - recursion-schemes
@@ -90,6 +89,17 @@ executables:
     - -with-rtsopts=-N
     dependencies:
     - ltlspec
+
+  ltlspec-gen:
+    main:                Main.hs
+    source-dirs:         gen
+    ghc-options:
+    - -threaded
+    - -rtsopts
+    - -with-rtsopts=-N
+    dependencies:
+    - ltlspec
+    - prettyprinter-ansi-terminal
 
 tests:
   ltlspec-doctest:
