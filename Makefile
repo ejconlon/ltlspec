@@ -12,13 +12,17 @@ cleandocs:
 exec: build
 	stack exec ltlspec-exe
 
-.PHONY: docker-test
-docker-test:
-	docker run -i -v ${PWD}:/project -w /project -t haskell:8.10.7 /bin/bash -c 'make test'
-
 .PHONY: debug-test
 debug-test:
 	DEBUG=1 $(MAKE) test
+
+.PHONY: ci-test
+ci-test:
+	CI=1 $(MAKE) test
+
+.PHONY: docker-test
+docker-test:
+	docker run -i -v ${PWD}:/project -w /project -t haskell:8.10.7 /bin/bash -c 'make ci-test'
 
 .PHONY: preso
 preso:

@@ -13,9 +13,9 @@ import Ltlspec.Models.Ping.Verification (PingWorld (PingWorld), emptyPingState, 
 import Ltlspec.System.Actors (ActorCase, AnnoMessage, runActorCaseSimple)
 import Ltlspec.System.Logging (LogEntry, Logger, flushLogVar, newLogVar, varLogger)
 import Ltlspec.System.Time (TimeDelta, timeDeltaFromFracSecs)
-import Ltlspec.Types (ApplyAction (..), Atom (..), Binder (..), Bridge (..), EnvProp (..), EnvPropBad (..),
-                      EnvPropGood (..), EnvPropRes, EnvPropStep (..), Prop (..), SAS, Theory (..), TruncBridge, VarName,
-                      initScanSAS)
+import Ltlspec.Types (ApplyAction (..), Atom (..), Binder (..), Bridge (..), Commented (..), EnvProp (..),
+                      EnvPropBad (..), EnvPropGood (..), EnvPropRes, EnvPropStep (..), Prop (..), SAS, Theory (..),
+                      TruncBridge, VarName, initScanSAS)
 import System.Environment (lookupEnv, setEnv)
 import System.IO (BufferMode (NoBuffering), hSetBuffering, stderr, stdout)
 import Test.Tasty (TestTree, defaultMain, testGroup)
@@ -42,11 +42,11 @@ eqAxSymmetric = eqForAll ["x", "y"] (propIf (eqProp "x" "y") (eqProp "y" "x"))
 -- A theory of total order over some type
 orderTheory :: Theory
 orderTheory = Theory
-  { theoryTypes = ["Value"]
-  , theoryProps = Map.fromList
+  { theoryTypes = NoComment <$> ["Value"]
+  , theoryProps = NoComment <$> Map.fromList
       [ ("IsEq", ["Value", "Value"])
       ]
-  , theoryAxioms = Map.fromList
+  , theoryAxioms = NoComment <$> Map.fromList
       [ ("Reflexive", eqAxReflexive)
       , ("Transitive", eqAxTransitive)
       , ("Symmetric", eqAxSymmetric)
@@ -263,12 +263,16 @@ testChat ci = testGroup "Chat"
   , testChatLongTraceOk ci
   ]
 
+isTrueEnvValue :: Maybe String -> Bool
+isTrueEnvValue = \case
+  Just "1" -> True
+  Just "true" -> True
+  _ -> False
+
 main :: IO ()
 main = do
-  mayDebugStr <- lookupEnv "DEBUG"
-  mayCiStr <- lookupEnv "CI"
-  let debug = Just "1" == mayDebugStr
-      ci = Just "true" == mayCiStr
+  debug <- fmap isTrueEnvValue (lookupEnv "DEBUG")
+  ci <- fmap isTrueEnvValue (lookupEnv "CI")
   when debug $ do
     setEnv "TASTY_NUM_THREADS" "1"
     hSetBuffering stdout NoBuffering

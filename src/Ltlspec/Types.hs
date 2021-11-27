@@ -20,13 +20,27 @@ import Ltlspec.TriBool (TriBool)
 
 type Error = String
 
+data Commented a =
+    NoComment !a
+  | YesComment !a !String
+  deriving stock (Eq, Show, Generic, Functor, Foldable, Traversable)
+  deriving anyclass (NFData)
+
+withoutComment :: Commented a -> a
+withoutComment = \case
+  NoComment a -> a
+  YesComment a _ -> a
+
 type PropName = String
 type TyName = String
 type AxiomName = String
 
-type TyDefs = [TyName]
-type PropDefs = Map PropName [TyName]
-type AxiomDefs = Map AxiomName Prop
+type TyDef = Commented TyName
+type TyDefs = [TyDef]
+type PropDef = (PropName, Commented [TyName])
+type PropDefs = Map PropName (Commented [TyName])
+type AxiomDef = (AxiomName, Commented Prop)
+type AxiomDefs = Map AxiomName (Commented Prop)
 
 data Theory = Theory
   { theoryTypes :: !TyDefs

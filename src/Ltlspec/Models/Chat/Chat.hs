@@ -11,63 +11,65 @@ import qualified Data.Map as Map
 import qualified Data.Set as Set
 import Ltlspec (propAlways, propAndAll, propEventually, propExistsNested, propForAllNested, propIf)
 import Ltlspec.TriBool (TriBool (..))
-import Ltlspec.Types (Atom (..), Bridge (..), Error, Prop (..), SAS (..), Theory (..), TruncBridge, initScanSAS,
-                      truncBridgeEmpty, truncBridgeOracle)
+import Ltlspec.Types (Atom (..), Bridge (..), Commented (..), Error, Prop (..), SAS (..), Theory (..), TruncBridge,
+                      initScanSAS, truncBridgeEmpty, truncBridgeOracle)
 import System.Random (StdGen, mkStdGen, randomR)
 
 chatTheory :: Theory
 chatTheory = Theory
-  { theoryTypes = ["ClientID", "ChannelID", "ActionID"]
-  , theoryProps = Map.fromList [("IsMember", ["ClientID", "ChannelID"]),
-                                ("IsSameClient", ["ClientID", "ClientID"]),
-                                ("Left", ["ActionID", "ClientID", "ChannelID"]),
-                                ("Joined", ["ActionID", "ClientID", "ChannelID"]),
-                                ("ListRequested",["ActionID", "ClientID"]),
-                                ("Sent", ["ActionID", "ClientID", "ChannelID"]),
-                                ("Shared", ["ActionID", "ClientID", "ClientID"]),
-                                ("NewJoinNote", ["ActionID", "ClientID", "ChannelID", "ClientID"]),
-                                ("NewLeaveNote", ["ActionID", "ClientID", "ChannelID", "ClientID"]),
-                                ("ChannelListNote", ["ActionID", "ClientID", "ChannelID"])]
-  , theoryAxioms = Map.fromList [
-        ("IsMemberBetweenJoinAndLeave",
-            propAlways (
-                propForAllNested [("c","ClientID"), ("ch", "ChannelID")] (
-                    propExistsNested [("i","ActionID"), ("j","ActionID")] (
-                        propIf
-                            (PropAtom (Atom "Joined" ["i","c","ch"]))
-                            (PropUntil
-                                (PropAtom (Atom "IsMember" ["c","ch"]))
-                                (PropAtom (Atom "Left" ["j","c","ch"]))
-                            )
-                    )
-                )
+  { theoryTypes = NoComment <$> ["ClientID", "ChannelID", "ActionID"]
+  , theoryProps = NoComment <$> Map.fromList
+      [ ("IsMember", ["ClientID", "ChannelID"])
+      , ("IsSameClient", ["ClientID", "ClientID"])
+      , ("Left", ["ActionID", "ClientID", "ChannelID"])
+      , ("Joined", ["ActionID", "ClientID", "ChannelID"])
+      , ("ListRequested",["ActionID", "ClientID"])
+      , ("Sent", ["ActionID", "ClientID", "ChannelID"])
+      , ("Shared", ["ActionID", "ClientID", "ClientID"])
+      , ("NewJoinNote", ["ActionID", "ClientID", "ChannelID", "ClientID"])
+      , ("NewLeaveNote", ["ActionID", "ClientID", "ChannelID", "ClientID"])
+      , ("ChannelListNote", ["ActionID", "ClientID", "ChannelID"])
+      ]
+  , theoryAxioms = NoComment <$> Map.fromList
+      [ ("IsMemberBetweenJoinAndLeave",
+          propAlways (
+            propForAllNested [("c","ClientID"), ("ch", "ChannelID")] (
+              propExistsNested [("i","ActionID"), ("j","ActionID")] (
+                propIf
+                  (PropAtom (Atom "Joined" ["i","c","ch"]))
+                  (PropUntil
+                    (PropAtom (Atom "IsMember" ["c","ch"]))
+                    (PropAtom (Atom "Left" ["j","c","ch"]))
+                  )
+              )
             )
-        ),
-        ("IfInChannelReceiveMessage",
-            propAlways (
-                propForAllNested [("c1","ClientID"),("ch","ChannelID"),("c2","ClientID"),("m","ActionID")] (
-                    propIf
-                        (propAndAll [
-                            PropNot (PropAtom (Atom "IsSameClient" ["c1","c2"])),
-                            PropAtom (Atom "IsMember" ["c1","ch"]),
-                            PropAtom (Atom "IsMember" ["c2","ch"]),
-                            PropAtom (Atom "Sent" ["m","c1","ch"])
-                        ])
-                        (PropAnd
-                            (PropNot (PropAtom (Atom "Shared" ["m","c1","c1"])))
-                            (propEventually (PropAtom (Atom "Shared" ["m", "c1", "c2"])))
-                        )
-                )
-            )
-        ),
-        ("NeverSendMessageToMyself",
-            propAlways (
-                propForAllNested [("c","ClientID"), ("m", "ActionID")] (
-                    PropNot (PropAtom (Atom "Shared" ["m", "c", "c"]))
-                )
-            )
+          )
         )
-    ]
+      , ("IfInChannelReceiveMessage",
+          propAlways (
+            propForAllNested [("c1","ClientID"),("ch","ChannelID"),("c2","ClientID"),("m","ActionID")] (
+              propIf
+                (propAndAll [
+                  PropNot (PropAtom (Atom "IsSameClient" ["c1","c2"])),
+                  PropAtom (Atom "IsMember" ["c1","ch"]),
+                  PropAtom (Atom "IsMember" ["c2","ch"]),
+                  PropAtom (Atom "Sent" ["m","c1","ch"])
+                ])
+                (PropAnd
+                  (PropNot (PropAtom (Atom "Shared" ["m","c1","c1"])))
+                  (propEventually (PropAtom (Atom "Shared" ["m", "c1", "c2"])))
+                )
+            )
+          )
+        )
+      , ("NeverSendMessageToMyself",
+          propAlways (
+            propForAllNested [("c","ClientID"), ("m", "ActionID")] (
+              PropNot (PropAtom (Atom "Shared" ["m", "c", "c"]))
+            )
+          )
+        )
+      ]
   }
 
 type ActionID = Integer

@@ -3,7 +3,7 @@ module Ltlspec.Models.DinningHakker where
 import qualified Data.Map.Strict as M
 import Data.Sequence as S (Seq (..), empty)
 import Ltlspec (propAlways, propAtom, propEventually, propForAllNested, propIf)
-import Ltlspec.Types (Binder (..), Prop (..), SAS (..), Theory (..))
+import Ltlspec.Types (Binder (..), Commented (..), Prop (..), SAS (..), Theory (..))
 
 type TimeStamp = Int
 
@@ -248,8 +248,8 @@ dhtrace3 = genTrace dhaction3 dhinitState3
 -- Domain Theory
 dinningHakkerTheory :: Theory
 dinningHakkerTheory = Theory
-  { theoryTypes = ["HakkerId", "ChopstickId", "TimeStamp", "HakkerMsg", "ChopstickMsg"]
-  , theoryProps = M.fromList [
+  { theoryTypes = NoComment <$> ["HakkerId", "ChopstickId", "TimeStamp", "HakkerMsg", "ChopstickMsg"]
+  , theoryProps = NoComment <$> M.fromList [
       ("isThinking",["HakkerId"])
     , ("isHungry",["HakkerId"])
     , ("isEating",["HakkerId"])
@@ -258,7 +258,7 @@ dinningHakkerTheory = Theory
     , ("receivedNotDelivered", ["ChopstickId, HakkerMsg"])
     , ("fromAdjacent", ["ChopstickId, HakkerMsg"])
   ]
-  , theoryAxioms = M.fromList [
+  , theoryAxioms = NoComment <$> M.fromList [
     -- checking liveness properties for all hakkers
     -- All hakkers will start from thinking, and should eventually start eating
     -- Because the Eating state is mutually exclusive for adjacent Hakkers

@@ -19,10 +19,13 @@ dependencies:
 - deepseq
 - hashable
 - mtl
+- prettyprinter
+- prettyprinter-ansi-terminal
 - pretty-simple
 - random
 - recursion-schemes
 - stm
+- text
 - unordered-containers
 # test deps - these are here to make HLS work better
 # TODO move back out to test package
@@ -60,6 +63,7 @@ default-extensions:
 - TypeApplications
 - TypeOperators
 - TypeFamilies
+- ViewPatterns
 
 ghc-options:
 - -Wall

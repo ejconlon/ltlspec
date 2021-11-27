@@ -9,7 +9,7 @@ import Data.Typeable (Typeable)
 import Ltlspec (envPropFold, truncEnvPropStep)
 import Ltlspec.System.Logging (Logger, logDebug)
 import Ltlspec.TriBool (TriBool (..))
-import Ltlspec.Types (EnvProp (..), EnvPropBad, EnvPropGood (..), Theory (..), TruncBridge)
+import Ltlspec.Types (EnvProp (..), EnvPropBad, EnvPropGood (..), Theory (..), TruncBridge, withoutComment)
 
 data DriverError e =
     DriverErrorBad !Int !(EnvPropBad e)
@@ -30,7 +30,7 @@ runDriverM = runExceptT . unDriverM
 
 driveVerification :: (TruncBridge e v w, Show e) => Logger -> Theory -> [w] -> DriverM e ()
 driveVerification logger theory trace = do
-  for_ (Map.toList (theoryAxioms theory)) $ \(axName, axProp) -> do
+  for_ (Map.toList (theoryAxioms theory)) $ \(axName, withoutComment -> axProp) -> do
     logDebug logger ("Verifying " <> axName)
     let initEnvProp = EnvProp mempty axProp
     let (i, mw, res) = envPropFold initEnvProp trace

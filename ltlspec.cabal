@@ -33,6 +33,7 @@ library
       Ltlspec.Models.Ping.Actors
       Ltlspec.Models.Ping.Common
       Ltlspec.Models.Ping.Verification
+      Ltlspec.Printer
       Ltlspec.Recursion
       Ltlspec.System.Actors
       Ltlspec.System.Logging
@@ -73,6 +74,7 @@ library
       TypeApplications
       TypeOperators
       TypeFamilies
+      ViewPatterns
   ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wincomplete-uni-patterns -Wpartial-fields -Wredundant-constraints -fno-warn-unused-top-binds -fwrite-ide-info -hiedir=.hie
   build-depends:
       base >=4.12 && <5
@@ -81,11 +83,14 @@ library
     , hashable
     , mtl
     , pretty-simple
+    , prettyprinter
+    , prettyprinter-ansi-terminal
     , random
     , recursion-schemes
     , stm
     , tasty
     , tasty-hunit
+    , text
     , unordered-containers
   default-language: Haskell2010
 
@@ -122,6 +127,7 @@ executable ltlspec-exe
       TypeApplications
       TypeOperators
       TypeFamilies
+      ViewPatterns
   ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wincomplete-uni-patterns -Wpartial-fields -Wredundant-constraints -fno-warn-unused-top-binds -fwrite-ide-info -hiedir=.hie -threaded -rtsopts -with-rtsopts=-N
   build-depends:
       base >=4.12 && <5
@@ -131,11 +137,14 @@ executable ltlspec-exe
     , ltlspec
     , mtl
     , pretty-simple
+    , prettyprinter
+    , prettyprinter-ansi-terminal
     , random
     , recursion-schemes
     , stm
     , tasty
     , tasty-hunit
+    , text
     , unordered-containers
   default-language: Haskell2010
 
@@ -173,6 +182,7 @@ test-suite ltlspec-doctest
       TypeApplications
       TypeOperators
       TypeFamilies
+      ViewPatterns
   ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wincomplete-uni-patterns -Wpartial-fields -Wredundant-constraints -fno-warn-unused-top-binds -fwrite-ide-info -hiedir=.hie -threaded -rtsopts -with-rtsopts=-N
   build-depends:
       base >=4.12 && <5
@@ -183,11 +193,14 @@ test-suite ltlspec-doctest
     , ltlspec
     , mtl
     , pretty-simple
+    , prettyprinter
+    , prettyprinter-ansi-terminal
     , random
     , recursion-schemes
     , stm
     , tasty
     , tasty-hunit
+    , text
     , unordered-containers
   default-language: Haskell2010
 
@@ -225,6 +238,7 @@ test-suite ltlspec-test
       TypeApplications
       TypeOperators
       TypeFamilies
+      ViewPatterns
   ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wincomplete-uni-patterns -Wpartial-fields -Wredundant-constraints -fno-warn-unused-top-binds -fwrite-ide-info -hiedir=.hie -threaded -rtsopts -with-rtsopts=-N
   build-depends:
       base >=4.12 && <5
@@ -234,10 +248,13 @@ test-suite ltlspec-test
     , ltlspec
     , mtl
     , pretty-simple
+    , prettyprinter
+    , prettyprinter-ansi-terminal
     , random
     , recursion-schemes
     , stm
     , tasty
     , tasty-hunit
+    , text
     , unordered-containers
   default-language: Haskell2010

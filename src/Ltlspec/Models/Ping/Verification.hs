@@ -10,7 +10,7 @@ import Ltlspec.Models.Ping.Common (PingAction, PingMessage (..))
 import Ltlspec.System.Actors (ActorId, AnnoMessage (..), AppMessage (..), MessageId (..), MessageView (..),
                               NetMessage (..))
 import Ltlspec.TriBool (TriBool (..))
-import Ltlspec.Types (ApplyAction (..), Atom (..), Bridge (..), Error, Prop (..), SAS (..), Theory (..),
+import Ltlspec.Types (ApplyAction (..), Atom (..), Bridge (..), Commented (..), Error, Prop (..), SAS (..), Theory (..),
                       TruncBridge (..), initScanSAS)
 
 -- | A proposition encoding responsiveness for ping messages.
@@ -25,12 +25,15 @@ pingResponsiveProp =
 
 pingTheory :: Theory
 pingTheory = Theory
-  { theoryTypes = ["SentPing", "RecvPong"]
+  { theoryTypes =
+      [ YesComment "SentPing" "A pong message sent by an actor"
+      , YesComment "RecvPong" "A pong message received by an actor"
+      ]
   , theoryProps = Map.fromList
-      [ ("IsPingPong", ["SentPing", "RecvPong"])
+      [ ("IsPingPong", NoComment ["SentPing", "RecvPong"])
       ]
   , theoryAxioms = Map.fromList
-      [ ("isResponsive", pingResponsiveProp)
+      [ ("isResponsive", NoComment pingResponsiveProp)
       ]
   }
 
