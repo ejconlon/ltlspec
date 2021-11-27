@@ -29,7 +29,7 @@ shortTickInterval :: TimeDelta
 shortTickInterval = timeDeltaFromFracSecs (0.01 :: Double)
 
 eqForAll :: [VarName] -> Prop -> Prop
-eqForAll = propForAllNested . fmap (, "Value")
+eqForAll = propForAllNested . fmap (`Binder` "Value")
 
 eqProp :: VarName -> VarName -> Prop
 eqProp x y = PropAtom (Atom "IsEq" [x, y])

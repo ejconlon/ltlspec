@@ -10,16 +10,16 @@ import Ltlspec.Models.Ping.Common (PingAction, PingMessage (..))
 import Ltlspec.System.Actors (ActorId, AnnoMessage (..), AppMessage (..), MessageId (..), MessageView (..),
                               NetMessage (..))
 import Ltlspec.TriBool (TriBool (..))
-import Ltlspec.Types (ApplyAction (..), Atom (..), Bridge (..), Commented (..), Error, Prop (..), SAS (..), Theory (..),
-                      TruncBridge (..), initScanSAS)
+import Ltlspec.Types (ApplyAction (..), Atom (..), Binder (..), Bridge (..), Commented (..), Error, Prop (..), SAS (..),
+                      Theory (..), TruncBridge (..), initScanSAS)
 
 -- | A proposition encoding responsiveness for ping messages.
 -- Textually, this is equivalent to:
 -- Always (Forall (m1: SentPing). Eventually (Exists (m2: RecvPong). IsPingPong m1 m2))
 pingResponsiveProp :: Prop
 pingResponsiveProp =
-  let prop = propAlways (propForAllNested [("m1", "SentPing")] eventuallyPong)
-      eventuallyPong = propEventually (propExistsNested [("m2", "RecvPong")] pong)
+  let prop = propAlways (propForAllNested [Binder "m1" "SentPing"] eventuallyPong)
+      eventuallyPong = propEventually (propExistsNested [Binder "m2" "RecvPong"] pong)
       pong = PropAtom (Atom "IsPingPong" ["m1", "m2"])
   in prop
 

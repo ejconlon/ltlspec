@@ -276,7 +276,7 @@ dinningHakkerTheory = Theory
     ),
     ("ReceiveFromAdjacentHakkers",
       propAlways
-        (propForAllNested [("c", "ChopstickId"), ("hm", "HakkerMsg")]
+        (propForAllNested [Binder "c" "ChopstickId", Binder "hm" "HakkerMsg"]
           (propIf
             (propAtom "receivedNotDeliverd" ["c", "hm"])
             (propAtom "fromAdjacent" ["c", "hm"])

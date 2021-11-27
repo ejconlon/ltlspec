@@ -11,8 +11,8 @@ import qualified Data.Map as Map
 import qualified Data.Set as Set
 import Ltlspec (propAlways, propAndAll, propEventually, propExistsNested, propForAllNested, propIf)
 import Ltlspec.TriBool (TriBool (..))
-import Ltlspec.Types (Atom (..), Bridge (..), Commented (..), Error, Prop (..), SAS (..), Theory (..), TruncBridge,
-                      initScanSAS, truncBridgeEmpty, truncBridgeOracle)
+import Ltlspec.Types (Atom (..), Binder (..), Bridge (..), Commented (..), Error, Prop (..), SAS (..), Theory (..),
+                      TruncBridge, initScanSAS, truncBridgeEmpty, truncBridgeOracle)
 import System.Random (StdGen, mkStdGen, randomR)
 
 chatTheory :: Theory
@@ -33,8 +33,8 @@ chatTheory = Theory
   , theoryAxioms = NoComment <$> Map.fromList
       [ ("IsMemberBetweenJoinAndLeave",
           propAlways (
-            propForAllNested [("c","ClientID"), ("ch", "ChannelID")] (
-              propExistsNested [("i","ActionID"), ("j","ActionID")] (
+            propForAllNested [Binder "c" "ClientID", Binder "ch" "ChannelID"] (
+              propExistsNested [Binder "i" "ActionID", Binder "j" "ActionID"] (
                 propIf
                   (PropAtom (Atom "Joined" ["i","c","ch"]))
                   (PropUntil
@@ -47,7 +47,7 @@ chatTheory = Theory
         )
       , ("IfInChannelReceiveMessage",
           propAlways (
-            propForAllNested [("c1","ClientID"),("ch","ChannelID"),("c2","ClientID"),("m","ActionID")] (
+            propForAllNested [Binder "c1" "ClientID", Binder "ch" "ChannelID", Binder "c2" "ClientID", Binder "m" "ActionID"] (
               propIf
                 (propAndAll [
                   PropNot (PropAtom (Atom "IsSameClient" ["c1","c2"])),
@@ -64,7 +64,7 @@ chatTheory = Theory
         )
       , ("NeverSendMessageToMyself",
           propAlways (
-            propForAllNested [("c","ClientID"), ("m", "ActionID")] (
+            propForAllNested [Binder "c" "ClientID", Binder "m" "ActionID"] (
               PropNot (PropAtom (Atom "Shared" ["m", "c", "c"]))
             )
           )

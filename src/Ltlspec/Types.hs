@@ -35,20 +35,6 @@ type PropName = String
 type TyName = String
 type AxiomName = String
 
-type TyDef = Commented TyName
-type TyDefs = [TyDef]
-type PropDef = (PropName, Commented [TyName])
-type PropDefs = Map PropName (Commented [TyName])
-type AxiomDef = (AxiomName, Commented Prop)
-type AxiomDefs = Map AxiomName (Commented Prop)
-
-data Theory = Theory
-  { theoryTypes :: !TyDefs
-  , theoryProps :: !PropDefs
-  , theoryAxioms :: !AxiomDefs
-  } deriving stock (Eq, Show, Generic)
-    deriving anyclass (NFData)
-
 type VarName = String
 
 data Atom v = Atom !PropName ![v]
@@ -60,6 +46,35 @@ type AtomVar = Atom VarName
 data Binder = Binder !VarName !TyName
   deriving stock (Eq, Show, Generic)
   deriving anyclass (Hashable, NFData)
+
+-- | "Sugared" proposition.
+-- Allows for pretty printing of the proposition but
+-- is quickly desugared to 'Prop'.
+data SProp =
+    SPropAtom !AtomVar
+  | SPropTrue
+  | SPropFalse
+  | SPropNot !SProp
+  | SPropAnd ![SProp]
+  | SPropOr ![SProp]
+  | SPropIf ![SProp] !SProp
+  | SPropIff !SProp !SProp
+  | SPropNext SProp
+  | SPropAlways !SProp
+  | SPropEventually !SProp
+  | SPropUntil !SProp !SProp
+  | SPropRelease !SProp !SProp
+  | SPropForAll ![Binder] !SProp
+  | SPropExists ![Binder] !SProp
+  deriving stock (Eq, Show, Generic)
+  deriving anyclass (Hashable, NFData)
+
+-- Makes SPropF and instances for Recursive and Corecursive from Data.Functor.Foldable
+makeBaseFunctor ''SProp
+
+deriving stock instance Generic (SPropF a)
+deriving anyclass instance Hashable a => (Hashable (SPropF a))
+deriving anyclass instance NFData a => (NFData (SPropF a))
 
 -- | An LTL proposition with first-order data quantification.
 -- This selection of operators corresponds to "Release Positive Normal Form"
@@ -97,6 +112,20 @@ makeBaseFunctor ''Prop
 deriving stock instance Generic (PropF a)
 deriving anyclass instance Hashable a => (Hashable (PropF a))
 deriving anyclass instance NFData a => (NFData (PropF a))
+
+type TyDef = Commented TyName
+type TyDefs = [TyDef]
+type PropDef = (PropName, Commented [TyName])
+type PropDefs = Map PropName (Commented [TyName])
+type AxiomDef = (AxiomName, Commented Prop)
+type AxiomDefs = Map AxiomName (Commented Prop)
+
+data Theory = Theory
+  { theoryTypes :: !TyDefs
+  , theoryProps :: !PropDefs
+  , theoryAxioms :: !AxiomDefs
+  } deriving stock (Eq, Show, Generic)
+    deriving anyclass (NFData)
 
 -- | Variables bound during prop eval
 type Env v = Map VarName v

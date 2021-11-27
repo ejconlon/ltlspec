@@ -14,7 +14,7 @@ import Ltlspec.TriBool (TriBool (..), triBoolAnd, triBoolAndAll, triBoolNot, tri
                         triBoolUntil)
 import Ltlspec.Types (Atom (..), AtomVar, Binder (..), Bridge (..), Env, EnvProp (..), EnvPropBad (..),
                       EnvPropGood (..), EnvPropRes, EnvPropStep (..), Prop (..), PropF (..), PropName, Quantifier (..),
-                      TruncBridge (..), TyName, VarName)
+                      SProp, SPropF (..), TruncBridge (..), TyName, VarName)
 
 -- | Put the prop in negation normal form, which basically involves
 -- pushing negations to the bottom. Note that this does not negate the prop;
@@ -113,18 +113,38 @@ propIff :: Prop -> Prop -> Prop
 propIff r1 r2 = PropAnd (propIf r1 r2) (propIf r2 r1)
 
 -- | Simple constructor for nested foralls.
-propForAllNested :: [(VarName, TyName)] -> Prop -> Prop
+propForAllNested :: [Binder] -> Prop -> Prop
 propForAllNested pairs body = go pairs where
   go = \case
     [] -> body
-    (v, t):rest -> PropForAll (Binder v t) (go rest)
+    b:bs-> PropForAll b (go bs)
 
 -- | Simple constructor for nested exists.
-propExistsNested :: [(VarName, TyName)] -> Prop -> Prop
+propExistsNested :: [Binder] -> Prop -> Prop
 propExistsNested pairs body = go pairs where
   go = \case
     [] -> body
-    (v, t):rest -> PropExists (Binder v t) (go rest)
+    b:bs -> PropExists b (go bs)
+
+propDesugar :: SProp -> Prop
+propDesugar = fold go where
+  go :: SPropF Prop -> Prop
+  go = \case
+    SPropAtomF at -> PropAtom at
+    SPropTrueF -> PropTrue
+    SPropFalseF -> PropFalse
+    SPropNotF p -> PropNot p
+    SPropAndF ps -> propAndAll ps
+    SPropOrF ps -> propOrAll ps
+    SPropIfF ps q -> propIfNested ps q
+    SPropIffF p1 p2 -> propIff p1 p2
+    SPropNextF p -> PropNext p
+    SPropAlwaysF p -> propAlways p
+    SPropEventuallyF p -> propEventually p
+    SPropUntilF p1 p2 -> PropUntil p1 p2
+    SPropReleaseF p1 p2 -> PropRelease p1 p2
+    SPropForAllF bs p -> propForAllNested bs p
+    SPropExistsF bs p -> propExistsNested bs p
 
 -- | The size of the 'Prop' (number of constructors)
 --
