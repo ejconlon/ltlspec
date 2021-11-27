@@ -231,14 +231,14 @@ dhinitState3 :: GlobalState
 dhinitState3 = initState ["Ghosh", "Boner", "Klang"]
 
 dhaction3 :: [Action]
-dhaction3 = [
-  HakkerHungry "Ghosh",
-  HakkerHungry "Boner",
-  HakkerHungry "Klang",
-  ChopstickResp 0,
-  ChopstickResp 1,
-  ChopstickResp 2,
-  HakkerEat "Ghosh"
+dhaction3 =
+  [ HakkerHungry "Ghosh"
+  , HakkerHungry "Boner"
+  , HakkerHungry "Klang"
+  , ChopstickResp 0
+  , ChopstickResp 1
+  , ChopstickResp 2
+  , HakkerEat "Ghosh"
   ]
 
 dhtrace3 :: [World]
@@ -247,38 +247,38 @@ dhtrace3 = genTrace dhaction3 dhinitState3
 -- Domain Theory
 dinningHakkerTheory :: Theory
 dinningHakkerTheory = Theory
-  { theoryTypes = NoComment <$> ["HakkerId", "ChopstickId", "TimeStamp", "HakkerMsg", "ChopstickMsg"]
+  { theoryTypes = NoComment <$> ["Hakker", "Chopstick", "TimeStamp", "HakkerMsg", "ChopstickMsg"]
   , theoryProps = NoComment <$> M.fromList [
-      ("isThinking",["HakkerId"])
-    , ("isHungry",["HakkerId"])
-    , ("isEating",["HakkerId"])
+      ("IsThinking", ["Hakker"])
+    , ("IsHungry", ["Hakker"])
+    , ("IsEating", ["Hakker"])
     -- A message that has been received but not yet delivered by a chopstick
     -- i.e., the message is currently in the chopRecvs Seq
-    , ("receivedNotDelivered", ["ChopstickId, HakkerMsg"])
-    , ("fromAdjacent", ["ChopstickId, HakkerMsg"])
+    , ("ReceivedNotDelivered", ["Chopstick, HakkerMsg"])
+    , ("FromAdjacent", ["Chopstick, HakkerMsg"])
   ]
   , theoryAxioms = NoComment <$> M.fromList
-    [ ("Liveness",
+    [ ("liveness",
         -- checking liveness properties for all hakkers
         -- All hakkers will start from thinking, and should eventually start eating
         -- Because the Eating state is mutually exclusive for adjacent Hakkers
         -- forall h: Hakker. isThinking(h) -> F[isEating(h)]
         SPropAlways
           (SPropForAll
-            [Binder "h" "HakkerId"]
+            [Binder "h" "Hakker"]
             (SPropIf
-              [SPropAtom (Atom "isThinking" ["h"])]
+              [SPropAtom (Atom "IsThinking" ["h"])]
               (SPropEventually
-                (SPropAtom (Atom "isEating" ["h"])))
+                (SPropAtom (Atom "IsEating" ["h"])))
             )
           )
       )
-    , ("ReceiveFromAdjacentHakkers",
+    , ("receiveFromAdjacentHakkers",
         SPropAlways
-          (SPropForAll [Binder "c" "ChopstickId", Binder "hm" "HakkerMsg"]
+          (SPropForAll [Binder "c" "Chopstick", Binder "hm" "HakkerMsg"]
             (SPropIf
-              [SPropAtom (Atom "receivedNotDeliverd" ["c", "hm"])]
-              (SPropAtom (Atom "fromAdjacent" ["c", "hm"]))
+              [SPropAtom (Atom "ReceivedNotDelivered" ["c", "hm"])]
+              (SPropAtom (Atom "FromAdjacent" ["c", "hm"]))
             )
           )
       )

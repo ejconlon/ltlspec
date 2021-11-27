@@ -1,7 +1,4 @@
 {-# LANGUAGE OverloadedStrings #-}
-{-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
-{-# OPTIONS_GHC -Wno-name-shadowing #-}
-{-# OPTIONS_GHC -Wno-missing-methods #-}
 
 module Ltlspec.Models.Chat.Chat where
 
@@ -16,24 +13,24 @@ import System.Random (StdGen, mkStdGen, randomR)
 
 chatTheory :: Theory
 chatTheory = Theory
-  { theoryTypes = NoComment <$> ["ClientID", "ChannelID", "ActionID"]
+  { theoryTypes = NoComment <$> ["Client", "Channel", "Action"]
   , theoryProps = NoComment <$> Map.fromList
-      [ ("IsMember", ["ClientID", "ChannelID"])
-      , ("IsSameClient", ["ClientID", "ClientID"])
-      , ("Left", ["ActionID", "ClientID", "ChannelID"])
-      , ("Joined", ["ActionID", "ClientID", "ChannelID"])
-      , ("ListRequested",["ActionID", "ClientID"])
-      , ("Sent", ["ActionID", "ClientID", "ChannelID"])
-      , ("Shared", ["ActionID", "ClientID", "ClientID"])
-      , ("NewJoinNote", ["ActionID", "ClientID", "ChannelID", "ClientID"])
-      , ("NewLeaveNote", ["ActionID", "ClientID", "ChannelID", "ClientID"])
-      , ("ChannelListNote", ["ActionID", "ClientID", "ChannelID"])
+      [ ("IsMember", ["Client", "Channel"])
+      , ("IsSameClient", ["Client", "Client"])
+      , ("Left", ["Action", "Client", "Channel"])
+      , ("Joined", ["Action", "Client", "Channel"])
+      , ("ListRequested",["Action", "Client"])
+      , ("Sent", ["Action", "Client", "Channel"])
+      , ("Shared", ["Action", "Client", "Client"])
+      , ("NewJoinNote", ["Action", "Client", "Channel", "Client"])
+      , ("NewLeaveNote", ["Action", "Client", "Channel", "Client"])
+      , ("ChannelListNote", ["Action", "Client", "Channel"])
       ]
   , theoryAxioms = NoComment <$> Map.fromList
-      [ ("IsMemberBetweenJoinAndLeave",
+      [ ("isMemberBetweenJoinAndLeave",
           SPropAlways (
-            SPropForAll [Binder "c" "ClientID", Binder "ch" "ChannelID"] (
-              SPropExists [Binder "i" "ActionID", Binder "j" "ActionID"] (
+            SPropForAll [Binder "c" "Client", Binder "ch" "Channel"] (
+              SPropExists [Binder "i" "Action", Binder "j" "Action"] (
                 SPropIf
                   [SPropAtom (Atom "Joined" ["i", "c", "ch"])]
                   (SPropUntil
@@ -44,9 +41,9 @@ chatTheory = Theory
             )
           )
         )
-      , ("IfInChannelReceiveMessage",
+      , ("ifInChannelReceiveMessage",
           SPropAlways (
-            SPropForAll [Binder "c1" "ClientID", Binder "ch" "ChannelID", Binder "c2" "ClientID", Binder "m" "ActionID"] (
+            SPropForAll [Binder "c1" "Client", Binder "ch" "Channel", Binder "c2" "Client", Binder "m" "Action"] (
               SPropIf
                 [ SPropAnd
                   [ SPropNot (SPropAtom (Atom "IsSameClient" ["c1", "c2"]))
@@ -55,17 +52,13 @@ chatTheory = Theory
                   , SPropAtom (Atom "Sent" ["m", "c1", "ch"])
                   ]
                 ]
-                (SPropAnd
-                  [ SPropNot (SPropAtom (Atom "Shared" ["m", "c1", "c1"]))
-                  , SPropEventually (SPropAtom (Atom "Shared" ["m", "c1", "c2"]))
-                  ]
-                )
+                (SPropEventually (SPropAtom (Atom "Shared" ["m", "c1", "c2"])))
             )
           )
         )
-      , ("NeverSendMessageToMyself",
+      , ("neverSendMessageToMyself",
           SPropAlways (
-            SPropForAll [Binder "c" "ClientID", Binder "m" "ActionID"] (
+            SPropForAll [Binder "c" "Client", Binder "m" "Action"] (
               SPropNot (SPropAtom (Atom "Shared" ["m", "c", "c"]))
             )
           )
@@ -269,21 +262,22 @@ evalChatProp (SAS _ e s2) (Atom propName vals) =
 instance Bridge Error ChatVal ChatWorld where
     bridgeEvalProp = evalChatProp
 
+    -- TODO quantify actions with the action component of the SAS
     bridgeQuantify (SAS _ _ s2) tyname =
         case tyname of
-            "ClientID" -> Right (map ChatValClient (Map.keys (fst s2)))
-            "ChannelID" -> Right (map ChatValChannel (Set.toList (Set.fromList (concat (Map.elems (fst s2))))))
-            "ActionID" -> Right (map  ChatValAction [0..(snd s2)] )
+            "Client" -> Right (map ChatValClient (Map.keys (fst s2)))
+            "Channel" -> Right (map ChatValChannel (Set.toList (Set.fromList (concat (Map.elems (fst s2))))))
+            "Action" -> Right (map ChatValAction [0..(snd s2)] )
             _ -> Left ("Could not quantify over " <> tyname)
 
 instance TruncBridge Error ChatVal ChatWorld where
-    truncBridgeEmpty _ = Set.fromList ["ClientID", "ChannelID", "ActionID"]
+    truncBridgeEmpty _ = Set.fromList ["Client", "Channel", "Action"]
     truncBridgeOracle w p =
       let prop = evalChatProp w p in
       case prop of
           Left e -> Left e
-          Right p ->
-            case p of
+          Right q ->
+            case q of
               PropTrue -> Right TriBoolTrue
               PropFalse -> Right TriBoolFalse
               _ -> Right TriBoolUnknown

@@ -13,43 +13,43 @@
 
 # Chat Theory
 
-    ClientID : Set
-    ChannelID : Set
-    ActionID : Set
+    Client : Set
+    Channel : Set
+    Action : Set
 
 
-    ChannelListNote : ActionID → ClientID → ChannelID → Prop
-    IsMember : ClientID → ChannelID → Prop
-    IsSameClient : ClientID → ClientID → Prop
-    Joined : ActionID → ClientID → ChannelID → Prop
-    Left : ActionID → ClientID → ChannelID → Prop
-    ListRequested : ActionID → ClientID → Prop
-    NewJoinNote : ActionID → ClientID → ChannelID → ClientID → Prop
-    NewLeaveNote : ActionID → ClientID → ChannelID → ClientID → Prop
-    Sent : ActionID → ClientID → ChannelID → Prop
-    Shared : ActionID → ClientID → ClientID → Prop
+    ChannelListNote : Action → Client → Channel → Prop
+    IsMember : Client → Channel → Prop
+    IsSameClient : Client → Client → Prop
+    Joined : Action → Client → Channel → Prop
+    Left : Action → Client → Channel → Prop
+    ListRequested : Action → Client → Prop
+    NewJoinNote : Action → Client → Channel → Client → Prop
+    NewLeaveNote : Action → Client → Channel → Client → Prop
+    Sent : Action → Client → Channel → Prop
+    Shared : Action → Client → Client → Prop
 
 
-    IfInChannelReceiveMessage : □ (∀ (c1 : ClientID) (ch : ChannelID) (c2 : ClientID) (m : ActionID), ((¬ (IsSameClient c1 c2)) ∧ (IsMember c1 ch) ∧ (IsMember c2 ch) ∧ (Sent m c1 ch)) ⇒ ((¬ (Shared m c1 c1)) ∧ (◇ (Shared m c1 c2))))
-    IsMemberBetweenJoinAndLeave : □ (∀ (c : ClientID) (ch : ChannelID), ∃ (i : ActionID) (j : ActionID), (Joined i c ch) ⇒ (U (IsMember c ch) (Left j c ch)))
-    NeverSendMessageToMyself : □ (∀ (c : ClientID) (m : ActionID), ¬ (Shared m c c))
+    ifInChannelReceiveMessage : □ (∀ (c1 : Client) (ch : Channel) (c2 : Client) (m : Action), ((¬ (IsSameClient c1 c2)) ∧ (IsMember c1 ch) ∧ (IsMember c2 ch) ∧ (Sent m c1 ch)) ⇒ (◇ (Shared m c1 c2)))
+    isMemberBetweenJoinAndLeave : □ (∀ (c : Client) (ch : Channel), ∃ (i : Action) (j : Action), (Joined i c ch) ⇒ (U (IsMember c ch) (Left j c ch)))
+    neverSendMessageToMyself : □ (∀ (c : Client) (m : Action), ¬ (Shared m c c))
 
 # Dining Philosophers Theory
 
-    HakkerId : Set
-    ChopstickId : Set
+    Hakker : Set
+    Chopstick : Set
     TimeStamp : Set
     HakkerMsg : Set
     ChopstickMsg : Set
 
 
-    fromAdjacent : ChopstickId, HakkerMsg → Prop
-    isEating : HakkerId → Prop
-    isHungry : HakkerId → Prop
-    isThinking : HakkerId → Prop
-    receivedNotDelivered : ChopstickId, HakkerMsg → Prop
+    FromAdjacent : Chopstick, HakkerMsg → Prop
+    IsEating : Hakker → Prop
+    IsHungry : Hakker → Prop
+    IsThinking : Hakker → Prop
+    ReceivedNotDelivered : Chopstick, HakkerMsg → Prop
 
 
-    Liveness : □ (∀ (h : HakkerId), (isThinking h) ⇒ (◇ (isEating h)))
-    ReceiveFromAdjacentHakkers : □ (∀ (c : ChopstickId) (hm : HakkerMsg), (receivedNotDeliverd c hm) ⇒ (fromAdjacent c hm))
+    liveness : □ (∀ (h : Hakker), (IsThinking h) ⇒ (◇ (IsEating h)))
+    receiveFromAdjacentHakkers : □ (∀ (c : Chopstick) (hm : HakkerMsg), (ReceivedNotDelivered c hm) ⇒ (FromAdjacent c hm))
 
