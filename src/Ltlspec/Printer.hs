@@ -9,8 +9,8 @@ import Data.Text (Text)
 import qualified Data.Text as T
 import Ltlspec.Models.Ping.Verification (pingTheory)
 import Ltlspec.Recursion (foldUpM)
-import Ltlspec.Types (Atom (..), AxiomDef, AxiomName, Commented (..), PropDef, PropName, SProp, SPropF (..),
-                      Theory (..), TyDef, TyName)
+import Ltlspec.Types (Atom (..), AxiomDef, AxiomName, Binder (..), Commented (..), PropDef, PropName, SProp,
+                      SPropF (..), Theory (..), TyDef, TyName)
 import Prettyprinter (Doc, annotate, hcat, hsep, pretty, punctuate, vsep)
 import Prettyprinter.Render.Terminal (AnsiStyle, Color (..), color, putDoc)
 
@@ -73,6 +73,8 @@ data Symbol =
   | SymAlways
   | SymEventually
   | SymArrow
+  | SymIf
+  | SymIff
   | SymForAll
   | SymExists
   | SymNext
@@ -81,6 +83,9 @@ data Symbol =
   | SymSet
   | SymProp
   | SymColon
+  | SymComma
+  | SymOpenParen
+  | SymCloseParen
   | SymComment
   deriving stock (Eq, Show)
 
@@ -94,6 +99,8 @@ asciiRep = \case
   SymAlways -> "Always"
   SymEventually -> "Eventually"
   SymArrow -> "->"
+  SymIf -> "=>"
+  SymIff -> "<=>"
   SymForAll -> "ForAll"
   SymExists -> "Exists"
   SymNext -> "Next"
@@ -102,6 +109,9 @@ asciiRep = \case
   SymSet -> "Set"
   SymProp -> "Prop"
   SymColon -> ":"
+  SymComma -> ","
+  SymOpenParen -> "("
+  SymCloseParen -> ")"
   SymComment -> "#"
 
 symRole :: Symbol -> Role
@@ -114,6 +124,8 @@ symRole = \case
   SymAlways -> RoleProp
   SymEventually -> RoleProp
   SymArrow -> RoleSyntax
+  SymIf -> RoleProp
+  SymIff -> RoleProp
   SymForAll -> RoleProp
   SymExists -> RoleProp
   SymNext -> RoleProp
@@ -122,6 +134,9 @@ symRole = \case
   SymSet -> RoleSort
   SymProp -> RoleSort
   SymColon -> RoleSyntax
+  SymComma -> RoleSyntax
+  SymOpenParen -> RoleSyntax
+  SymCloseParen -> RoleSyntax
   SymComment -> RoleComment
 
 newtype RenderM a = RenderM { unRenderM :: Reader (Symbol -> Text) a }
@@ -135,27 +150,96 @@ askSym sym = RenderM (asks (\rep -> annotate (symRole sym) (pretty (rep sym))))
 
 type Prec = Int
 
-paren :: (Bool, Doc ann) -> Doc ann
-paren (many, doc) = if many then hcat ["(", doc, ")"] else doc
+paren :: (Bool, Doc Role) -> RenderM (Doc Role)
+paren (many, doc) =
+  if many
+    then do
+      openDoc <- askSym SymOpenParen
+      closeDoc <- askSym SymCloseParen
+      pure (hcat [openDoc, doc, closeDoc])
+    else pure doc
 
+renderBinder :: Binder -> RenderM (Doc Role)
+renderBinder (Binder v t) = do
+    openDoc <- askSym SymOpenParen
+    closeDoc <- askSym SymCloseParen
+    colonDoc <- askSym SymColon
+    let vDoc = annotate RoleBinder (pretty v)
+        tDoc = annotate RoleType (pretty t)
+    pure (hcat [openDoc, hsep [vDoc, colonDoc, tDoc], closeDoc])
+
+-- TODO coalesce binders of same type
+renderBinders :: [Binder] -> RenderM (Doc Role)
+renderBinders bs = do
+  commaDoc <- askSym SymComma
+  bsDocs <- traverse renderBinder bs
+  pure (hcat [hsep bsDocs, commaDoc])
+
+-- TODO render infix until/release?
 renderSPropRec :: SProp -> RenderM (Bool, Doc Role)
 renderSPropRec = foldUpM go where
   go = \case
     SPropAtomF (Atom name vals) -> pure (not (null vals), hsep (annotate RoleProp (pretty name) : fmap (annotate RoleValue . pretty) vals))
-    SPropTrueF -> pure (False, annotate RoleProp "True")
-    SPropFalseF -> pure (False, annotate RoleProp "False")
-    SPropNotF x -> pure (True, hsep [annotate RoleProp "Not", paren x])
-    SPropAndF xs -> pure (True, hsep (punctuate (annotate RoleProp "/\\") (fmap paren xs)))
-    SPropOrF xs -> pure (True, hsep (punctuate (annotate RoleProp "\\/") (fmap paren xs)))
-    SPropIfF xs y -> pure (True, "TODO")
-    SPropIffF x y -> pure (False, "TODO")
-    SPropNextF x -> pure (False, "TODO")
-    SPropAlwaysF x -> pure (True, hsep [annotate RoleProp "Always", paren x])
-    SPropEventuallyF x -> pure (True, hsep [annotate RoleProp "Eventually", paren x])
-    SPropUntilF x y -> pure (False, "TODO")
-    SPropReleaseF x y -> pure (False, "TODO")
-    SPropForAllF bs x -> pure (True, "TODO")
-    SPropExistsF bs x -> pure (False, "TODO")
+    SPropTrueF -> do
+      trueDoc <- askSym SymTrue
+      pure (False, trueDoc)
+    SPropFalseF -> do
+      falseDoc <- askSym SymFalse
+      pure (False, falseDoc)
+    SPropNotF x -> do
+      notDoc <- askSym SymNot
+      xDoc <- paren x
+      pure (True, hsep [notDoc, xDoc])
+    SPropAndF xs -> do
+      andDoc <- askSym SymAnd
+      xsDocs <- traverse paren xs
+      pure (True, hsep (punctuate andDoc xsDocs))
+    SPropOrF xs -> do
+      orDoc <- askSym SymOr
+      xsDocs <- traverse paren xs
+      pure (True, hsep (punctuate orDoc xsDocs))
+    SPropIfF xs y -> do
+      ifDoc <- askSym SymIf
+      xsDocs <- traverse paren xs
+      yDoc <- paren y
+      pure (True, hsep (punctuate ifDoc xsDocs ++ [ifDoc, yDoc]))
+    SPropIffF x y -> do
+      iffDoc <- askSym SymIff
+      xDoc <- paren x
+      yDoc <- paren y
+      pure (True, hsep [xDoc, iffDoc, yDoc])
+    SPropNextF x -> do
+      nextDoc <- askSym SymNext
+      xDoc <- paren x
+      pure (True, hsep [nextDoc, xDoc])
+    SPropAlwaysF x -> do
+      alwaysDoc <- askSym SymAlways
+      xDoc <- paren x
+      pure (True, hsep [alwaysDoc, xDoc])
+    SPropEventuallyF x -> do
+      evDoc <- askSym SymEventually
+      xDoc <- paren x
+      pure (True, hsep [evDoc, xDoc])
+    SPropUntilF x y -> do
+      untilDoc <- askSym SymUntil
+      xDoc <- paren x
+      yDoc <- paren y
+      pure (True, hsep [untilDoc, xDoc, yDoc])
+    SPropReleaseF x y -> do
+      releaseDoc <- askSym SymRelease
+      xDoc <- paren x
+      yDoc <- paren y
+      pure (True, hsep [releaseDoc, xDoc, yDoc])
+    SPropForAllF bs x -> do
+      forDoc <- askSym SymForAll
+      bsDoc <- renderBinders bs
+      xDoc <- paren x
+      pure (True, hsep [forDoc, bsDoc, xDoc])
+    SPropExistsF bs x -> do
+      exDoc <- askSym SymExists
+      bsDoc <- renderBinders bs
+      xDoc <- paren x
+      pure (True, hsep [exDoc, bsDoc, xDoc])
 
 renderSProp :: SProp -> RenderM (Doc Role)
 renderSProp = fmap snd . renderSPropRec
@@ -163,31 +247,31 @@ renderSProp = fmap snd . renderSPropRec
 renderElement :: Element -> RenderM (Doc Role)
 renderElement = \case
   ElementComment txt -> do
-    com <- askSym SymComment
-    pure (hsep [com, annotate RoleComment (pretty txt)])
+    comDoc <- askSym SymComment
+    pure (hsep [comDoc, annotate RoleComment (pretty txt)])
   ElementType tn tns -> do
-    col <- askSym SymColon
-    arr <- askSym SymArrow
-    set <- askSym SymSet
-    let start = [annotate RoleType (pretty tn), col]
-        mid = join [[annotate RoleType (pretty an), arr] | an <- tns]
-        end = [set]
+    colDoc <- askSym SymColon
+    arrDoc <- askSym SymArrow
+    setDoc <- askSym SymSet
+    let start = [annotate RoleType (pretty tn), colDoc]
+        mid = join [[annotate RoleType (pretty an), arrDoc] | an <- tns]
+        end = [setDoc]
         complete = start ++ mid ++ end
     pure (hsep complete)
   ElementProp pn tns -> do
-    col <- askSym SymColon
-    arr <- askSym SymArrow
-    prop <- askSym SymProp
-    let start = [annotate RoleProp (pretty pn), col]
-        mid = join [[annotate RoleType (pretty an), arr] | an <- tns]
-        end = [prop]
+    colDoc <- askSym SymColon
+    arrDoc <- askSym SymArrow
+    propDoc <- askSym SymProp
+    let start = [annotate RoleProp (pretty pn), colDoc]
+        mid = join [[annotate RoleType (pretty an), arrDoc] | an <- tns]
+        end = [propDoc]
         complete = start ++ mid ++ end
     pure (hsep complete)
   ElementAxiom an sprop -> do
-    col <- askSym SymColon
-    rest <- renderSProp sprop
-    let start = [annotate RoleValue (pretty an), col]
-        end = [rest]
+    colDoc <- askSym SymColon
+    spropDoc <- renderSProp sprop
+    let start = [annotate RoleValue (pretty an), colDoc]
+        end = [spropDoc]
         complete = start ++ end
     pure (hsep complete)
 
