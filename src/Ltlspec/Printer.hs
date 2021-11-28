@@ -8,10 +8,15 @@ import Data.List (intersperse)
 import qualified Data.Map.Strict as Map
 import Data.Text (Text)
 import qualified Data.Text as T
+-- import qualified Data.Text.Lazy as TL
+import qualified Data.Text.Lazy.Builder as TLB
+import qualified Data.Text.Lazy.IO as TLIO
 import Ltlspec.Recursion (foldUpM)
 import Ltlspec.Types (Atom (..), AxiomDef, AxiomName, BinderGroup (..), Commented (..), PropDef, PropName, SProp,
                       SPropF (..), Theory (..), TyDef, TyName)
-import Prettyprinter (Doc, annotate, hcat, hsep, line, pretty, vsep)
+import Prettyprinter (Doc, LayoutOptions (LayoutOptions), PageWidth (..), SimpleDocStream (..), annotate,
+                      defaultLayoutOptions, hcat, hsep, indent, layoutPretty, line, pretty, vsep)
+import System.IO (Handle)
 
 data Element =
     ElementComment !Text
@@ -168,6 +173,9 @@ askSym sym = RenderM (asks (\rep -> annotate (symRole sym) (pretty (rep sym))))
 
 type Prec = Int
 
+breakIndent :: Doc ann -> Doc ann
+breakIndent doc = line <> indent 2 doc
+
 paren :: (Bool, Doc Role) -> RenderM (Doc Role)
 paren (many, doc) =
   if many
@@ -252,12 +260,12 @@ renderSPropRec = foldUpM go where
       forDoc <- askSym SymForAll
       bgsDoc <- renderBinderGroups bgs
       let xDoc = snd x
-      pure (True, hsep [forDoc, bgsDoc, xDoc])
+      pure (True, hsep [forDoc, bgsDoc, breakIndent xDoc])
     SPropExistsF bgs x -> do
       exDoc <- askSym SymExists
       bgsDoc <- renderBinderGroups bgs
       let xDoc = snd x
-      pure (True, hsep [exDoc, bgsDoc, xDoc])
+      pure (True, hsep [exDoc, bgsDoc, breakIndent xDoc])
 
 renderSProp :: SProp -> RenderM (Doc Role)
 renderSProp = fmap snd . renderSPropRec
@@ -290,7 +298,7 @@ renderElement = \case
     colDoc <- askSym SymColon
     spropDoc <- renderSProp sprop
     let start = [annotate RoleValue (pretty an), colDoc]
-        end = [spropDoc]
+        end = [breakIndent spropDoc]
         complete = start ++ end
     pure (hsep complete)
 
@@ -302,3 +310,72 @@ renderGroups = fmap (vsep . intersperse line) . traverse (fmap vsep . renderGrou
 
 prettyTheory :: Theory -> RenderM (Doc Role)
 prettyTheory = renderGroups . theoryGroups
+
+texColor :: Role -> Text
+texColor = \case
+  RoleComment -> "black"
+  RoleType -> "blue"
+  RoleSyntax -> "darkgray"
+  RoleProp -> "teal"
+  RoleBinder -> "red"
+  RoleValue -> "purple"
+  RoleSort -> "cyan"
+
+texRep :: Symbol -> Text
+texRep = \case
+  SymTrue -> "$\\top$"
+  SymFalse -> "$\\bot$"
+  SymNot -> "$\\neg$"
+  SymAnd -> "$\\land$"
+  SymOr -> "$\\lor$"
+  SymAlways -> "$\\Box$"
+  SymEventually -> "$\\Diamond$"
+  SymArrow -> "$\\rightarrow$"
+  SymIf -> "$\\implies$"
+  SymIff -> "$\\iff$"
+  SymForAll -> "$\\forall$"
+  SymExists -> "$\\exists$"
+  SymNext -> "X"
+  SymUntil -> "U"
+  SymRelease -> "R"
+  SymSet -> "Set"
+  SymProp -> "Prop"
+  SymColon -> ":"
+  SymComma -> ","
+  SymOpenParen -> "("
+  SymCloseParen -> ")"
+  SymOpenComment -> "(*"
+  SymCloseComment -> "*)"
+
+data TexOptions = TexOptions
+  { texOptFontSize :: Maybe Text
+  , texOptWidth :: Maybe Int
+  } deriving stock (Eq, Show)
+
+texLayoutOptions :: TexOptions -> LayoutOptions
+texLayoutOptions = maybe defaultLayoutOptions (\w -> LayoutOptions (AvailablePerLine w 1.0)) . texOptWidth
+
+texVerbatimOptions :: TexOptions -> Text
+texVerbatimOptions (TexOptions mfs _) =
+  let base = "commandchars=\\\\\\{\\},codes={\\catcode`$=3}"
+  in maybe base (\fs -> base <> ",fontsize=\\" <> fs) mfs
+
+bRenderTex :: TexOptions -> Doc Role -> TLB.Builder
+bRenderTex texOpts doc = whole where
+  layoutOpts = texLayoutOptions texOpts
+  verbatimOpts = texVerbatimOptions texOpts
+  before = TLB.fromText "\\begin{Verbatim}[" <> TLB.fromText verbatimOpts <> TLB.fromText "]\n"
+  during = go (layoutPretty layoutOpts doc)
+  after = TLB.fromText "\n\\end{Verbatim}\n"
+  whole = before <> during <> after
+  go = \case
+    SFail -> error "fail"
+    SEmpty -> mempty
+    SChar c rest -> TLB.singleton c <> go rest
+    SText _ t rest -> TLB.fromText t <> go rest
+    SLine i rest -> TLB.fromText "\n" <> TLB.fromText (T.replicate i " ") <> go rest
+    SAnnPush ann rest -> TLB.fromText "\\textcolor{" <> TLB.fromText (texColor ann) <> TLB.fromText "}{" <> go rest
+    SAnnPop rest -> TLB.singleton '}' <> go rest
+
+hRenderTex :: TexOptions -> Handle -> Doc Role -> IO ()
+hRenderTex texOpts handle doc = TLIO.hPutStr handle (TLB.toLazyText (bRenderTex texOpts doc))

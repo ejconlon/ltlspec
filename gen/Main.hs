@@ -8,11 +8,12 @@ import qualified Data.Text as T
 import Ltlspec.Models.Chat.Chat (chatTheory)
 import Ltlspec.Models.DinningHakker (dinningHakkerTheory)
 import Ltlspec.Models.Ping.Verification (pingTheory)
-import Ltlspec.Printer (Role (..), prettyTheory, runRenderM, unicodeRep)
+import Ltlspec.Printer (Role (..), TexOptions (..), hRenderTex, prettyTheory, runRenderM, texRep, unicodeRep)
 import Ltlspec.Types (Theory)
 import Prettyprinter (Doc, annotate, hsep, indent, pretty)
 import Prettyprinter.Render.Terminal (AnsiStyle, Color (..), color, putDoc)
 import Prettyprinter.Render.Text (hPutDoc)
+import System.Directory (createDirectoryIfMissing)
 import System.IO (IOMode (..), hPutStr, withFile)
 
 roleColor :: Role -> Color
@@ -34,27 +35,41 @@ ansiDoc = fmap ansiAnn
 putAnsiDoc :: Doc Role -> IO ()
 putAnsiDoc = putDoc . ansiDoc
 
-theories :: [(Text, Theory)]
-theories = [("Ping", pingTheory), ("Chat", chatTheory), ("Dining Philosophers", dinningHakkerTheory)]
+theories :: [(Text, Text, Theory)]
+theories =
+  [ ("Ping", "ping", pingTheory)
+  , ("Chat", "chat", chatTheory)
+  , ("Dining Philosophers", "phil", dinningHakkerTheory)
+  ]
 
 printConsole :: IO ()
 printConsole = do
-  for_ theories $ \(name, theory) -> do
+  for_ theories $ \(name, _, theory) -> do
     putDoc (annotate (color Red) (hsep ["#", pretty name, "Theory"]))
     putStr "\n\n"
     putAnsiDoc (indent 4 (runRenderM (prettyTheory theory) unicodeRep))
     putStr "\n\n"
 
-printFile :: IO ()
-printFile = do
+printMarkdown :: IO ()
+printMarkdown = do
   let filename = "gendocs/Theories.md"
   withFile filename WriteMode $ \handle -> do
-    for_ theories $ \(name, theory) -> do
+    for_ theories $ \(name, _, theory) -> do
         hPutStr handle (T.unpack ("# " <> name <> " Theory\n\n"))
         hPutDoc handle (indent 4 (runRenderM (prettyTheory theory) unicodeRep))
         hPutStr handle "\n\n"
 
+printTex :: IO ()
+printTex = do
+  let texOpts = TexOptions (Just "small") Nothing
+  createDirectoryIfMissing False "gendocs/tex"
+  for_ theories $ \(_, slug, theory) -> do
+    let filename = "gendocs/tex/" <> T.unpack slug <> ".tex"
+    withFile filename WriteMode $ \handle ->
+      hRenderTex texOpts handle (runRenderM (prettyTheory theory) texRep)
+
 main :: IO ()
 main = do
   printConsole
-  printFile
+  printMarkdown
+  printTex

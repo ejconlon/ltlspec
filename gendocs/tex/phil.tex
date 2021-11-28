@@ -1,0 +1,22 @@
+\begin{Verbatim}[commandchars=\\\{\},codes={\catcode`$=3},fontsize=\small]
+\textcolor{blue}{Hakker} \textcolor{darkgray}{:} \textcolor{cyan}{Set}
+\textcolor{blue}{Chopstick} \textcolor{darkgray}{:} \textcolor{cyan}{Set}
+\textcolor{blue}{TimeStamp} \textcolor{darkgray}{:} \textcolor{cyan}{Set}
+\textcolor{blue}{HakkerMsg} \textcolor{darkgray}{:} \textcolor{cyan}{Set}
+\textcolor{blue}{ChopstickMsg} \textcolor{darkgray}{:} \textcolor{cyan}{Set}
+
+
+\textcolor{teal}{FromAdjacent} \textcolor{darkgray}{:} \textcolor{blue}{Chopstick, HakkerMsg} \textcolor{darkgray}{$\rightarrow$} \textcolor{cyan}{Prop}
+\textcolor{teal}{IsEating} \textcolor{darkgray}{:} \textcolor{blue}{Hakker} \textcolor{darkgray}{$\rightarrow$} \textcolor{cyan}{Prop}
+\textcolor{teal}{IsHungry} \textcolor{darkgray}{:} \textcolor{blue}{Hakker} \textcolor{darkgray}{$\rightarrow$} \textcolor{cyan}{Prop}
+\textcolor{teal}{IsThinking} \textcolor{darkgray}{:} \textcolor{blue}{Hakker} \textcolor{darkgray}{$\rightarrow$} \textcolor{cyan}{Prop}
+\textcolor{teal}{ReceivedNotDelivered} \textcolor{darkgray}{:} \textcolor{blue}{Chopstick, HakkerMsg} \textcolor{darkgray}{$\rightarrow$} \textcolor{cyan}{Prop}
+
+
+\textcolor{purple}{liveness} \textcolor{darkgray}{:} 
+  \textcolor{teal}{$\Box$} \textcolor{darkgray}{(}\textcolor{teal}{$\forall$} \textcolor{darkgray}{(}\textcolor{red}{h} \textcolor{darkgray}{:} \textcolor{blue}{Hakker}\textcolor{darkgray}{)}\textcolor{darkgray}{,} 
+    \textcolor{darkgray}{(}\textcolor{teal}{IsThinking} \textcolor{purple}{h}\textcolor{darkgray}{)} \textcolor{teal}{$\implies$} \textcolor{darkgray}{(}\textcolor{teal}{$\Diamond$} \textcolor{darkgray}{(}\textcolor{teal}{IsEating} \textcolor{purple}{h}\textcolor{darkgray}{)}\textcolor{darkgray}{)}\textcolor{darkgray}{)}
+\textcolor{purple}{receiveFromAdjacentHakkers} \textcolor{darkgray}{:} 
+  \textcolor{teal}{$\Box$} \textcolor{darkgray}{(}\textcolor{teal}{$\forall$} \textcolor{darkgray}{(}\textcolor{red}{c} \textcolor{darkgray}{:} \textcolor{blue}{Chopstick}\textcolor{darkgray}{)} \textcolor{darkgray}{(}\textcolor{red}{hm} \textcolor{darkgray}{:} \textcolor{blue}{HakkerMsg}\textcolor{darkgray}{)}\textcolor{darkgray}{,} 
+    \textcolor{darkgray}{(}\textcolor{teal}{ReceivedNotDelivered} \textcolor{purple}{c} \textcolor{purple}{hm}\textcolor{darkgray}{)} \textcolor{teal}{$\implies$} \textcolor{darkgray}{(}\textcolor{teal}{FromAdjacent} \textcolor{purple}{c} \textcolor{purple}{hm}\textcolor{darkgray}{)}\textcolor{darkgray}{)}
+\end{Verbatim}

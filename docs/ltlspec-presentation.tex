@@ -1,4 +1,8 @@
-\documentclass{beamer}
+\documentclass[aspectratio=169]{beamer}
+\usepackage[utf8]{inputenc}
+\usepackage{xcolor}
+\usepackage{fancyvrb}
+
 \title{LTLSpec}
 \subtitle{An extensible LTL verifier for distributed systems}
 \author{Eric Conlon, Yanze Li, Tarcisio Teixeira}
@@ -11,7 +15,7 @@
 \begin{frame}
 \frametitle{Our project}
 \begin{itemize}
-  \item Implemented an LTL verifier
+  \item Implemented verifier for Linear Temporal Logic (LTL)
   \item Implemented several actor (message-passing) systems
   \item Defined an LTL theory for each system
   \item Verified execution traces of those systems
@@ -28,14 +32,13 @@
 \end{itemize}
 \end{frame}
 
-
 \begin{frame}
 \frametitle{What is Linear Temporal Logic (LTL)?}
 \begin{itemize}
   \item World-relevant propositional logic
-  \item Atomic propositions: (`P`, `Q`)
+  \item Atomic propositions: \texttt{P}, \texttt{Q}
   \item Standard connectives: $\land$, $\lor$, $\neg$, $\implies$
-  \item Modal connectives: $\Box$ (Always), $\diamond$ (Eventually)
+  \item Modal connectives: $\Box$ (Always), $\Diamond$ (Eventually)
 \end{itemize}
 \end{frame}
 
@@ -49,7 +52,7 @@
 \begin{frame}
 \frametitle{Making LTL useful}
 \begin{itemize}
-  \item Add data variable quantification (`LTL-FO+`)
+  \item Add data variable quantification (\texttt{LTL-FO+})
   \begin{itemize}
     \item $\forall$, $\exists$
     \item First order - no quantifying over propositions
@@ -69,20 +72,18 @@
 \begin{frame}
 \frametitle{Example system: Ping}
 \begin{itemize}
-  \item Actors send `Ping` messages and respond with `Pong` messages
+  \item Actors send \texttt{Ping} messages and respond with \texttt{Pong} messages
   \item We want this responsiveness property to hold:
   \begin{itemize}
-    \item "Whenever I send a `Ping`, I eventually receive a `Pong`"
-    \item Not enough that a `Pong` was sent to me, I need to receive it!
+    \item "Whenever I send a \texttt{Ping}, I eventually receive a \texttt{Pong}"
+    \item Not enough that a \texttt{Pong} was sent to me, I need to receive it!
   \end{itemize}
 \end{itemize}
 \end{frame}
 
 \begin{frame}
 \frametitle{Example theory: Ping}
-\begin{itemize}
-  \item TODO
-\end{itemize}
+  \input{../gendocs/tex/ping.tex}
 \end{frame}
 
 \begin{frame}

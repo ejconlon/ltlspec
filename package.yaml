@@ -99,6 +99,7 @@ executables:
     - -with-rtsopts=-N
     dependencies:
     - ltlspec
+    - directory
     - prettyprinter-ansi-terminal
 
 tests:

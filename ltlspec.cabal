@@ -184,6 +184,7 @@ executable ltlspec-gen
       base >=4.12 && <5
     , containers
     , deepseq
+    , directory
     , hashable
     , ltlspec
     , mtl

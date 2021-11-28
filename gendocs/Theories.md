@@ -9,7 +9,10 @@
     IsPingPong : SentPing → RecvPong → Prop
 
 
-    isResponsive : □ (∀ (m1 : SentPing), ◇ (∃ (m2 : RecvPong), IsPingPong m1 m2))
+    isResponsive : 
+      □ (∀ (m1 : SentPing), 
+        ◇ (∃ (m2 : RecvPong), 
+          IsPingPong m1 m2))
 
 # Chat Theory
 
@@ -30,9 +33,16 @@
     Shared : Action → Client → Client → Prop
 
 
-    ifInChannelReceiveMessage : □ (∀ (c1 c2 : Client) (ch : Channel) (m : Action), ((¬ (IsSameClient c1 c2)) ∧ (IsMember c1 ch) ∧ (IsMember c2 ch) ∧ (Sent m c1 ch)) ⇒ (◇ (Shared m c1 c2)))
-    isMemberBetweenJoinAndLeave : □ (∀ (c : Client) (ch : Channel), ∃ (i j : Action), (Joined i c ch) ⇒ (U (IsMember c ch) (Left j c ch)))
-    neverSendMessageToMyself : □ (∀ (c : Client) (m : Action), ¬ (Shared m c c))
+    ifInChannelReceiveMessage : 
+      □ (∀ (c1 c2 : Client) (ch : Channel) (m : Action), 
+        ((¬ (IsSameClient c1 c2)) ∧ (IsMember c1 ch) ∧ (IsMember c2 ch) ∧ (Sent m c1 ch)) ⇒ (◇ (Shared m c1 c2)))
+    isMemberBetweenJoinAndLeave : 
+      □ (∀ (c : Client) (ch : Channel), 
+        ∃ (i j : Action), 
+          (Joined i c ch) ⇒ (U (IsMember c ch) (Left j c ch)))
+    neverSendMessageToMyself : 
+      □ (∀ (c : Client) (m : Action), 
+        ¬ (Shared m c c))
 
 # Dining Philosophers Theory
 
@@ -50,6 +60,10 @@
     ReceivedNotDelivered : Chopstick, HakkerMsg → Prop
 
 
-    liveness : □ (∀ (h : Hakker), (IsThinking h) ⇒ (◇ (IsEating h)))
-    receiveFromAdjacentHakkers : □ (∀ (c : Chopstick) (hm : HakkerMsg), (ReceivedNotDelivered c hm) ⇒ (FromAdjacent c hm))
+    liveness : 
+      □ (∀ (h : Hakker), 
+        (IsThinking h) ⇒ (◇ (IsEating h)))
+    receiveFromAdjacentHakkers : 
+      □ (∀ (c : Chopstick) (hm : HakkerMsg), 
+        (ReceivedNotDelivered c hm) ⇒ (FromAdjacent c hm))
 
