@@ -2,7 +2,7 @@ include Makefile.base
 
 .PHONY: cleandocs
 cleandocs:
-	rm -f docs/*.{aux,fdb_latexmk,fls,log,pdf}
+	rm -f docs/*.{aux,fdb_latexmk,fls,log,nav,out,pdf,snm,synctex.gz,toc}
 
 .PHONY: exec
 exec: build

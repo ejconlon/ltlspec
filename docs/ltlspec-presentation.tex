@@ -1,0 +1,178 @@
+\documentclass{beamer}
+\title{LTLSpec}
+\subtitle{An extensible LTL verifier for distributed systems}
+\author{Eric Conlon, Yanze Li, Tarcisio Teixeira}
+\date{2021-12-07}
+
+\begin{document}
+
+\frame{\titlepage}
+
+\begin{frame}
+\frametitle{Our project}
+\begin{itemize}
+  \item Implemented an LTL verifier
+  \item Implemented several actor (message-passing) systems
+  \item Defined an LTL theory for each system
+  \item Verified execution traces of those systems
+\end{itemize}
+\end{frame}
+
+\begin{frame}
+\frametitle{Our assumptions}
+\begin{itemize}
+  \item Can gather local or global traces of actions/messages in a distributed system
+  \item Traces don't violate causality
+  \item Traces start at the beginning
+  \item Domains are finite (per-world)
+\end{itemize}
+\end{frame}
+
+
+\begin{frame}
+\frametitle{What is Linear Temporal Logic (LTL)?}
+\begin{itemize}
+  \item World-relevant propositional logic
+  \item Atomic propositions: (`P`, `Q`)
+  \item Standard connectives: $\land$, $\lor$, $\neg$, $\implies$
+  \item Modal connectives: $\Box$ (Always), $\diamond$ (Eventually)
+\end{itemize}
+\end{frame}
+
+\begin{frame}
+\frametitle{LTL Theories}
+\begin{itemize}
+  \item TODO
+\end{itemize}
+\end{frame}
+
+\begin{frame}
+\frametitle{Making LTL useful}
+\begin{itemize}
+  \item Add data variable quantification (`LTL-FO+`)
+  \begin{itemize}
+    \item $\forall$, $\exists$
+    \item First order - no quantifying over propositions
+  \end{itemize}
+  \item Add user-defined atomic props and quantification
+  \item For each domain require user-defined "bridge"
+\end{itemize}
+\end{frame}
+
+\begin{frame}
+\frametitle{Verification is a conversation}
+\begin{itemize}
+  \item TODO
+\end{itemize}
+\end{frame}
+
+\begin{frame}
+\frametitle{Example system: Ping}
+\begin{itemize}
+  \item Actors send `Ping` messages and respond with `Pong` messages
+  \item We want this responsiveness property to hold:
+  \begin{itemize}
+    \item "Whenever I send a `Ping`, I eventually receive a `Pong`"
+    \item Not enough that a `Pong` was sent to me, I need to receive it!
+  \end{itemize}
+\end{itemize}
+\end{frame}
+
+\begin{frame}
+\frametitle{Example theory: Ping}
+\begin{itemize}
+  \item TODO
+\end{itemize}
+\end{frame}
+
+\begin{frame}
+\frametitle{Example valid trace: Ping}
+\begin{itemize}
+  \item TODO
+\end{itemize}
+\end{frame}
+
+\begin{frame}
+\frametitle{Example invalid trace: Ping}
+\begin{itemize}
+  \item TODO
+\end{itemize}
+\end{frame}
+
+\begin{frame}
+\frametitle{Encountering the infinite problem}
+\begin{itemize}
+  \item Modal connectives only have meaning on infinite traces
+  \item Can you say something `Always` happens?
+  \item Can't validate a liveness property with a finite trace... Or can you?
+  \item Trick: allow users to reason outside the logic about ALL future worlds
+\end{itemize}
+\end{frame}
+
+\begin{frame}
+\frametitle{Solving the infinite problem}
+\begin{itemize}
+  \item User bridge tells the verifier that after this world
+  \begin{itemize}
+    \item Some set of types will have empty quantification
+    \item Some set of atomic props will have constant values
+  \end{itemize}
+  \item This lets you prove responsiveness for quiescent systems
+  \item For some props the best you can say is you can't prove or disprove them
+  \item Not arbitrary: these criteria ensure no additional reduction is necessary
+\end{itemize}
+\end{frame}
+
+\begin{frame}
+\frametitle{Example truncation: Ping}
+\begin{itemize}
+  \item Trace of actions: `send/recv ping/pong message`
+  \item From initial state, fold into a trace of worlds:
+  \begin{itemize}
+    \item `(state before, current action, state after)`
+  \end{itemize}
+  \item No more actions: `SentPing` and `RecvPong` types have empty quantification
+  \item `IsPingPong` atomic prop is always a function of its arguments (all worlds)
+  \item Consequence: can evaluate responsiveness on any trace
+\end{itemize}
+\end{frame}
+
+\begin{frame}
+\frametitle{Evaluation (1/2)}
+\begin{itemize}
+  \item Defined messages, roles, and actors for three domains:
+  \begin{itemize}
+    \item Ping, Chat System, and Dining Philosophers
+  \end{itemize}
+  \item Ran these in our actor framework with multi-threading and STM
+  \begin{itemize}
+    \item Implementation and STM semantics ensure trace order does not violate causality
+    \item Wait for quiescence to ensure total trace collection
+  \end{itemize}
+\end{itemize}
+\end{frame}
+
+\begin{frame}
+\frametitle{Evaluation (2/2)}
+\begin{itemize}
+\item Primary concern: Correctness
+  \begin{itemize}
+    \item Collected traces and verified axioms of each theory
+    \item The tests pass... And we never write bugs!
+  \end{itemize}
+\item Secondary concern: Performance
+  \begin{itemize}
+    \item Passasble with naive implementation - not stress-tested
+    \item Want safe-for-space machine, term graph deduplication, predicate pushdown
+  \end{itemize}
+\end{itemize}
+\end{frame}
+
+\begin{frame}
+\frametitle{Thanks!}
+\begin{itemize}
+  \item See the repo: \url{https://github.com/ejconlon/ltlspec}
+\end{itemize}
+\end{frame}
+
+\end{document}
