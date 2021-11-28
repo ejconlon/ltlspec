@@ -348,17 +348,20 @@ texRep = \case
   SymCloseComment -> "*)"
 
 data TexOptions = TexOptions
-  { texOptFontSize :: Maybe Text
+  { texOptAddlVerbOpts :: Maybe Text
   , texOptWidth :: Maybe Int
   } deriving stock (Eq, Show)
+
+defaultTexOptions :: TexOptions
+defaultTexOptions = TexOptions Nothing Nothing
 
 texLayoutOptions :: TexOptions -> LayoutOptions
 texLayoutOptions = maybe defaultLayoutOptions (\w -> LayoutOptions (AvailablePerLine w 1.0)) . texOptWidth
 
 texVerbatimOptions :: TexOptions -> Text
-texVerbatimOptions (TexOptions mfs _) =
+texVerbatimOptions (TexOptions mavos _) =
   let base = "commandchars=\\\\\\{\\},codes={\\catcode`$=3}"
-  in maybe base (\fs -> base <> ",fontsize=\\" <> fs) mfs
+  in maybe base (\avos -> base <> "," <> avos) mavos
 
 bRenderTex :: TexOptions -> Doc Role -> TLB.Builder
 bRenderTex texOpts doc = whole where

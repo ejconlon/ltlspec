@@ -1,4 +1,9 @@
-\documentclass[aspectratio=169]{beamer}
+\documentclass[12pt,aspectratio=169]{beamer}
+\usetheme{Rochester}
+\setbeamertemplate{navigation symbols}{}
+\usecolortheme{default}
+\usefonttheme{professionalfonts}
+
 \usepackage[utf8]{inputenc}
 \usepackage{xcolor}
 \usepackage{fancyvrb}
@@ -83,7 +88,9 @@
 
 \begin{frame}
 \frametitle{Example theory: Ping}
-  \input{../gendocs/tex/ping.tex}
+  {\fontsize{10}{12}\selectfont
+    \input{../gendocs/tex/ping.tex}
+  }
 \end{frame}
 
 \begin{frame}
@@ -104,7 +111,7 @@
 \frametitle{Encountering the infinite problem}
 \begin{itemize}
   \item Modal connectives only have meaning on infinite traces
-  \item Can you say something `Always` happens?
+  \item Can you say something \texttt{Always} happens?
   \item Can't validate a liveness property with a finite trace... Or can you?
   \item Trick: allow users to reason outside the logic about ALL future worlds
 \end{itemize}
@@ -127,13 +134,11 @@
 \begin{frame}
 \frametitle{Example truncation: Ping}
 \begin{itemize}
-  \item Trace of actions: `send/recv ping/pong message`
+  \item Trace of actions: \texttt{send/recv ping/pong message}
   \item From initial state, fold into a trace of worlds:
-  \begin{itemize}
-    \item `(state before, current action, state after)`
-  \end{itemize}
-  \item No more actions: `SentPing` and `RecvPong` types have empty quantification
-  \item `IsPingPong` atomic prop is always a function of its arguments (all worlds)
+    \linebreak \texttt{(state before, current action, state after)}
+  \item No more actions: \texttt{SentPing} and \texttt{RecvPong} types have empty quantification
+  \item \texttt{IsPingPong} atomic prop is always a function of its arguments (all worlds)
   \item Consequence: can evaluate responsiveness on any trace
 \end{itemize}
 \end{frame}

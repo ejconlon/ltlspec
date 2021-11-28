@@ -8,7 +8,7 @@ import qualified Data.Text as T
 import Ltlspec.Models.Chat.Chat (chatTheory)
 import Ltlspec.Models.DinningHakker (dinningHakkerTheory)
 import Ltlspec.Models.Ping.Verification (pingTheory)
-import Ltlspec.Printer (Role (..), TexOptions (..), hRenderTex, prettyTheory, runRenderM, texRep, unicodeRep)
+import Ltlspec.Printer (Role (..), defaultTexOptions, hRenderTex, prettyTheory, runRenderM, texRep, unicodeRep)
 import Ltlspec.Types (Theory)
 import Prettyprinter (Doc, annotate, hsep, indent, pretty)
 import Prettyprinter.Render.Terminal (AnsiStyle, Color (..), color, putDoc)
@@ -61,12 +61,11 @@ printMarkdown = do
 
 printTex :: IO ()
 printTex = do
-  let texOpts = TexOptions (Just "small") Nothing
   createDirectoryIfMissing False "gendocs/tex"
   for_ theories $ \(_, slug, theory) -> do
     let filename = "gendocs/tex/" <> T.unpack slug <> ".tex"
     withFile filename WriteMode $ \handle ->
-      hRenderTex texOpts handle (runRenderM (prettyTheory theory) texRep)
+      hRenderTex defaultTexOptions handle (runRenderM (prettyTheory theory) texRep)
 
 main :: IO ()
 main = do
