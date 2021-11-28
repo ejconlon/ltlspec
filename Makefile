@@ -1,9 +1,5 @@
 include Makefile.base
 
-.PHONY: cleandocs
-cleandocs:
-	rm -f docs/*.{aux,fdb_latexmk,fls,log,nav,out,pdf,snm,synctex.gz,toc}
-
 .PHONY: exec
 exec: build
 	stack exec ltlspec-exe
@@ -24,6 +20,10 @@ ci-test:
 docker-test:
 	docker run -i -v ${PWD}:/project -w /project -t haskell:8.10.7 /bin/bash -c 'make ci-test'
 
+.PHONY: clean-docs
+clean-docs:
+	rm -f docs/*.{aux,fdb_latexmk,fls,log,nav,out,pdf,snm,synctex.gz,toc}
+
 .PHONY: preso
 preso:
-	./script/mkpreso.sh && open ./output/ltlspec-presentation.pdf
+	cd docs && pdflatex ./ltlspec-presentation.tex
