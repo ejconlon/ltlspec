@@ -25,14 +25,14 @@ pingResponsiveProp =
 pingTheory :: Theory
 pingTheory = Theory
   { theoryTypes =
-      [ YesComment "SentPing" "A pong message sent by an actor"
-      , YesComment "RecvPong" "A pong message received by an actor"
+      [ YesComment "SentPing" "A ping request sent by an actor"
+      , YesComment "RecvPong" "A pong response received by an actor"
       ]
   , theoryProps = Map.fromList
-      [ ("IsPingPong", NoComment ["SentPing", "RecvPong"])
+      [ ("IsPingPong", YesComment ["SentPing", "RecvPong"] "Characterizes a request-response pair")
       ]
   , theoryAxioms = Map.fromList
-      [ ("isResponsive", NoComment pingResponsiveProp)
+      [ ("isResponsive", YesComment pingResponsiveProp "Every ping request eventually gets a pong response")
       ]
   }
 

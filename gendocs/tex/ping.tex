@@ -1,13 +1,13 @@
 \begin{Verbatim}[commandchars=\\\{\},codes={\catcode`$=3}]
-\textcolor{black}{(*} \textcolor{black}{A pong message sent by an actor} \textcolor{black}{*)}
+\textcolor{black}{(*} \textcolor{black}{A ping request sent by an actor} \textcolor{black}{*)}
 \textcolor{blue}{SentPing} \textcolor{darkgray}{:} \textcolor{cyan}{Set}
-\textcolor{black}{(*} \textcolor{black}{A pong message received by an actor} \textcolor{black}{*)}
+\textcolor{black}{(*} \textcolor{black}{A pong response received by an actor} \textcolor{black}{*)}
 \textcolor{blue}{RecvPong} \textcolor{darkgray}{:} \textcolor{cyan}{Set}
 
-
+\textcolor{black}{(*} \textcolor{black}{Characterizes a request-response pair} \textcolor{black}{*)}
 \textcolor{teal}{IsPingPong} \textcolor{darkgray}{:} \textcolor{blue}{SentPing} \textcolor{darkgray}{$\rightarrow$} \textcolor{blue}{RecvPong} \textcolor{darkgray}{$\rightarrow$} \textcolor{cyan}{Prop}
 
-
+\textcolor{black}{(*} \textcolor{black}{Every ping request eventually gets a pong response} \textcolor{black}{*)}
 \textcolor{purple}{isResponsive} \textcolor{darkgray}{:} 
   \textcolor{teal}{$\Box$} \textcolor{darkgray}{(}\textcolor{teal}{$\forall$} \textcolor{darkgray}{(}\textcolor{red}{m1} \textcolor{darkgray}{:} \textcolor{blue}{SentPing}\textcolor{darkgray}{)}\textcolor{darkgray}{,} 
     \textcolor{teal}{$\Diamond$} \textcolor{darkgray}{(}\textcolor{teal}{$\exists$} \textcolor{darkgray}{(}\textcolor{red}{m2} \textcolor{darkgray}{:} \textcolor{blue}{RecvPong}\textcolor{darkgray}{)}\textcolor{darkgray}{,} 

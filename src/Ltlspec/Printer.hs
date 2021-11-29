@@ -306,7 +306,7 @@ renderGroup :: Group -> RenderM [Doc Role]
 renderGroup = traverse renderElement
 
 renderGroups :: [Group] -> RenderM (Doc Role)
-renderGroups = fmap (vsep . intersperse line) . traverse (fmap vsep . renderGroup)
+renderGroups = fmap (mconcat . intersperse (line <> line)) . traverse (fmap vsep . renderGroup)
 
 prettyTheory :: Theory -> RenderM (Doc Role)
 prettyTheory = renderGroups . theoryGroups

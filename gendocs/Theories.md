@@ -1,14 +1,14 @@
 # Ping Theory
 
-    (* A pong message sent by an actor *)
+    (* A ping request sent by an actor *)
     SentPing : Set
-    (* A pong message received by an actor *)
+    (* A pong response received by an actor *)
     RecvPong : Set
 
-
+    (* Characterizes a request-response pair *)
     IsPingPong : SentPing → RecvPong → Prop
 
-
+    (* Every ping request eventually gets a pong response *)
     isResponsive : 
       □ (∀ (m1 : SentPing), 
         ◇ (∃ (m2 : RecvPong), 
@@ -20,7 +20,6 @@
     Channel : Set
     Action : Set
 
-
     ChannelListNote : Action → Client → Channel → Prop
     IsMember : Client → Channel → Prop
     IsSameClient : Client → Client → Prop
@@ -31,7 +30,6 @@
     NewLeaveNote : Action → Client → Channel → Client → Prop
     Sent : Action → Client → Channel → Prop
     Shared : Action → Client → Client → Prop
-
 
     ifInChannelReceiveMessage : 
       □ (∀ (c1 c2 : Client) (ch : Channel) (m : Action), 
@@ -55,13 +53,11 @@
     (* A message sent by a chopstick *)
     ChopstickMsg : Set
 
-
     FromAdjacent : Chopstick → HakkerMsg → Prop
     InitiallyThinking : Hakker → Prop
     IsEating : Hakker → Prop
     IsHungry : Hakker → Prop
     ReceivedNotDelivered : Chopstick → HakkerMsg → Prop
-
 
     (* All hakkers that are initially thinking should eventually start eating *)
     liveness : 

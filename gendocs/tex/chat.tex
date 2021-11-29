@@ -3,7 +3,6 @@
 \textcolor{blue}{Channel} \textcolor{darkgray}{:} \textcolor{cyan}{Set}
 \textcolor{blue}{Action} \textcolor{darkgray}{:} \textcolor{cyan}{Set}
 
-
 \textcolor{teal}{ChannelListNote} \textcolor{darkgray}{:} \textcolor{blue}{Action} \textcolor{darkgray}{$\rightarrow$} \textcolor{blue}{Client} \textcolor{darkgray}{$\rightarrow$} \textcolor{blue}{Channel} \textcolor{darkgray}{$\rightarrow$} \textcolor{cyan}{Prop}
 \textcolor{teal}{IsMember} \textcolor{darkgray}{:} \textcolor{blue}{Client} \textcolor{darkgray}{$\rightarrow$} \textcolor{blue}{Channel} \textcolor{darkgray}{$\rightarrow$} \textcolor{cyan}{Prop}
 \textcolor{teal}{IsSameClient} \textcolor{darkgray}{:} \textcolor{blue}{Client} \textcolor{darkgray}{$\rightarrow$} \textcolor{blue}{Client} \textcolor{darkgray}{$\rightarrow$} \textcolor{cyan}{Prop}
@@ -14,7 +13,6 @@
 \textcolor{teal}{NewLeaveNote} \textcolor{darkgray}{:} \textcolor{blue}{Action} \textcolor{darkgray}{$\rightarrow$} \textcolor{blue}{Client} \textcolor{darkgray}{$\rightarrow$} \textcolor{blue}{Channel} \textcolor{darkgray}{$\rightarrow$} \textcolor{blue}{Client} \textcolor{darkgray}{$\rightarrow$} \textcolor{cyan}{Prop}
 \textcolor{teal}{Sent} \textcolor{darkgray}{:} \textcolor{blue}{Action} \textcolor{darkgray}{$\rightarrow$} \textcolor{blue}{Client} \textcolor{darkgray}{$\rightarrow$} \textcolor{blue}{Channel} \textcolor{darkgray}{$\rightarrow$} \textcolor{cyan}{Prop}
 \textcolor{teal}{Shared} \textcolor{darkgray}{:} \textcolor{blue}{Action} \textcolor{darkgray}{$\rightarrow$} \textcolor{blue}{Client} \textcolor{darkgray}{$\rightarrow$} \textcolor{blue}{Client} \textcolor{darkgray}{$\rightarrow$} \textcolor{cyan}{Prop}
-
 
 \textcolor{purple}{ifInChannelReceiveMessage} \textcolor{darkgray}{:} 
   \textcolor{teal}{$\Box$} \textcolor{darkgray}{(}\textcolor{teal}{$\forall$} \textcolor{darkgray}{(}\textcolor{red}{c1} \textcolor{red}{c2} \textcolor{darkgray}{:} \textcolor{blue}{Client}\textcolor{darkgray}{)} \textcolor{darkgray}{(}\textcolor{red}{ch} \textcolor{darkgray}{:} \textcolor{blue}{Channel}\textcolor{darkgray}{)} \textcolor{darkgray}{(}\textcolor{red}{m} \textcolor{darkgray}{:} \textcolor{blue}{Action}\textcolor{darkgray}{)}\textcolor{darkgray}{,} 
