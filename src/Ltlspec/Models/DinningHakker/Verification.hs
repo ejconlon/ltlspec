@@ -3,11 +3,13 @@ module Ltlspec.Models.DinningHakker.Verification where
 import Data.Either (lefts, rights)
 import qualified Data.Map.Strict as M
 import Data.Sequence (Seq (..))
+import qualified Data.Set as S
 import Ltlspec.Models.DinningHakker.Trace (Action (..), Chopstick (..), ChopstickId, ChopstickMsg, GlobalState (..),
                                            Hakker (..), HakkerId, HakkerMsg (..), HakkerState (..), TimeStamp, hkState,
                                            initState, stepPerfect)
+import Ltlspec.TriBool (TriBool (..))
 import Ltlspec.Types (Atom (..), BinderGroup (..), Bridge (..), Commented (..), Error, Prop (..), SAS (..), SProp (..),
-                      Theory (..))
+                      Theory (..), TruncBridge (..))
 
 -- avoid orphan instance
 newtype DHWorld = DHWorld { unDHWorld :: SAS GlobalState Action }
@@ -147,3 +149,7 @@ instance Bridge Error DHVal DHWorld where
     "HakkerMsg" -> Right $ fmap DHValHakkerMsg (lefts msgs)
     "ChopstickMsg" -> Right $ fmap DHValChopMsg (rights msgs)
     _ -> Left $ "Could not quantify type " ++ tyName
+
+instance TruncBridge Error DHVal DHWorld where
+  truncBridgeEmpty _ = S.fromList ["Hakker", "Chopstick", "HakkerMsg", "ChopstickMsg"]
+  truncBridgeOracle w = fmap (\b -> if b then TriBoolTrue else TriBoolFalse) . evalDHAtomProp w
