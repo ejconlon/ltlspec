@@ -1,9 +1,12 @@
 module Ltlspec.Models.DinningHakker.Verification where
 
+import Data.Either (lefts, rights)
 import qualified Data.Map.Strict as M
-import Ltlspec.Models.DinningHakker.Trace (Action (..), ChopstickId, GlobalState (..), HakkerId, TimeStamp, initState,
-                                           stepPerfect)
-import Ltlspec.Types (Atom (..), BinderGroup (..), Bridge (..), Commented (..), Error, SAS (..), SProp (..),
+import Data.Sequence (Seq (..))
+import Ltlspec.Models.DinningHakker.Trace (Action (..), Chopstick (..), ChopstickId, ChopstickMsg, GlobalState (..),
+                                           Hakker (..), HakkerId, HakkerMsg (..), HakkerState (..), TimeStamp, hkState,
+                                           initState, stepPerfect)
+import Ltlspec.Types (Atom (..), BinderGroup (..), Bridge (..), Commented (..), Error, Prop (..), SAS (..), SProp (..),
                       Theory (..))
 
 -- avoid orphan instance
@@ -41,7 +44,6 @@ dinningHakkerTheory = Theory
   { theoryTypes =
     [ YesComment "Hakker" "The id of an actor representing a hakker (philosopher)"
     , YesComment "Chopstick" "The id of an actor representing a chopstick"
-    , YesComment "TimeStamp" "The timestamp of a message"
     , YesComment "HakkerMsg" "A message sent by a hakker"
     , YesComment "ChopstickMsg" "A message sent by a chopstick"
     ]
@@ -51,8 +53,8 @@ dinningHakkerTheory = Theory
     , ("IsEating", ["Hakker"])
     -- A message that has been received but not yet delivered by a chopstick
     -- i.e., the message is currently in the chopRecvs Seq
-    , ("ReceivedNotDelivered", ["Chopstick, HakkerMsg"])
-    , ("FromAdjacent", ["Chopstick, HakkerMsg"])
+    , ("ReceivedNotDelivered", ["Chopstick", "HakkerMsg"])
+    , ("FromAdjacent", ["Chopstick", "HakkerMsg"])
   ]
   , theoryAxioms = NoComment <$> M.fromList
     [ ("liveness",
@@ -86,10 +88,62 @@ data DHVal =
     DHValHakker HakkerId
   | DHValChopstick ChopstickId
   | DHValTS TimeStamp
-  | DHValHakkerMsg
-  | DHValChopMsg
+  | DHValHakkerMsg HakkerMsg
+  | DHValChopMsg ChopstickMsg
   deriving stock (Eq, Show)
 
+lookupHakker :: DHWorld -> HakkerId -> Maybe Hakker
+lookupHakker (DHWorld (SAS (GlobalState {hakkers=hks}) _ _)) =
+  flip M.lookup hks
+
+lookupChopstick :: DHWorld -> ChopstickId -> Maybe Chopstick
+lookupChopstick (DHWorld (SAS (GlobalState {chopsticks=chops}) _ _)) =
+  flip M.lookup chops
+
+exists :: Eq a => a -> Seq a -> Bool
+exists _ Empty = False
+exists a (xs :|> x) = if a == x then True else exists a xs
+
+getHakkerIdFromMsg :: HakkerMsg -> HakkerId
+getHakkerIdFromMsg = \case
+  Take _ hid _ -> hid
+  Put _ hid _ -> hid
+
+evalDHAtomProp :: DHWorld -> Atom DHVal -> Either Error Bool
+evalDHAtomProp w (Atom prop vals) = case (prop, vals) of
+    ("IsThinking", [DHValHakker hid])  ->
+      let res = lookupHakker w hid
+      in case res of
+        Nothing -> Left "Hakker ID doesn't exist"
+        Just hk -> Right (hkState hk == Thinking)
+    ("IsEating", [DHValHakker hid]) ->
+      let res = lookupHakker w hid
+      in case res of
+        Nothing -> Left "Hakker ID doesn't exist"
+        Just hk -> Right (hkState hk == Eating)
+    ("IsHungry", [DHValHakker hid]) ->
+      let res = lookupHakker w hid
+      in case res of
+        Nothing -> Left "Hakker ID doesn't exist"
+        Just hk -> Right (hkState hk == Hungry)
+    ("ReceivedNotDelivered", [DHValChopstick cid, DHValHakkerMsg msg]) ->
+      let res = lookupChopstick w cid
+      in case res of
+        Nothing -> Left "Chopstick ID doesn't exist"
+        Just chop -> Right $ exists msg (chopRecvs chop)
+    ("FromAdjacent", [DHValChopstick cid, DHValHakkerMsg msg]) ->
+      let res2 = lookupHakker w (getHakkerIdFromMsg msg)
+      in case res2 of
+        Nothing -> Left "The sender of the message does not exist"
+        Just hk -> Right (lchop hk == cid || rchop hk == cid)
+    _ -> Left $ "Could not evaluate atomic proposition \"" ++ prop  ++ "\" with argument list " ++ (show vals)
+
 instance Bridge Error DHVal DHWorld where
-  bridgeEvalProp _ _ = error "TODO"
-  bridgeQuantify _ _ = error "TODO"
+  bridgeEvalProp w =
+    fmap (\b -> if b then PropTrue else PropFalse) . evalDHAtomProp w
+  bridgeQuantify (DHWorld (SAS _ _ (GlobalState _ hks chops msgs))) tyName = case tyName of
+    "Hakker" -> Right $ fmap DHValHakker (M.keys hks)
+    "Chopstick" -> Right $ fmap DHValChopstick (M.keys chops)
+    "HakkerMsg" -> Right $ fmap DHValHakkerMsg (lefts msgs)
+    "ChopstickMsg" -> Right $ fmap DHValChopMsg (rights msgs)
+    _ -> Left $ "Could not quantify type " ++ tyName
