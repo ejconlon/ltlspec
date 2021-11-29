@@ -7,6 +7,7 @@ import qualified Data.Map.Strict as Map
 import Ltlspec (envPropFold, propAlways, propEventually)
 import Ltlspec.Driver (DriverError (..), driveVerificationIO)
 import Ltlspec.Models.Chat.Chat (chatTheory, longTrace, shortTrace)
+import Ltlspec.Models.DinningHakker.Verification (dhtrace3, dinningHakkerTheory)
 import Ltlspec.Models.Ping.Actors (pingCase)
 import Ltlspec.Models.Ping.Verification (PingWorld (PingWorld), emptyPingState, pingTheory, pingWorldsNotOk,
                                          pingWorldsOk)
@@ -253,7 +254,7 @@ testPing = testGroup "Ping"
 testChatShortTraceOk :: TestTree
 testChatShortTraceOk = testCase "Chat short trace ok" (runLogM (assertDriverTestOk chatTheory shortTrace))
 
--- TODO figure out why this doesn't work well on CI
+-- TODO: figure out why this doesn't work well on CI
 testChatLongTraceOk :: Bool -> TestTree
 testChatLongTraceOk ci = testCaseSkip ci "Chat long trace ok" (runLogM (assertDriverTestOk chatTheory longTrace))
 
@@ -261,6 +262,14 @@ testChat :: Bool -> TestTree
 testChat ci = testGroup "Chat"
   [ testChatShortTraceOk
   , testChatLongTraceOk ci
+  ]
+
+testDHTraceOk1 :: TestTree
+testDHTraceOk1 = testCase "Dinning Hakker short trace ok" (runLogM (assertDriverTestOk dinningHakkerTheory dhtrace3))
+
+testDinningHakker :: Bool -> TestTree
+testDinningHakker _ = testGroup "Dinning Hakker"
+  [ testDHTraceOk1
   ]
 
 isTrueEnvValue :: Maybe String -> Bool
@@ -281,4 +290,5 @@ main = do
     [ testEqCases
     , testPing
     , testChat ci
+    , testDinningHakker ci
     ]

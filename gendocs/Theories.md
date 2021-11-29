@@ -46,28 +46,28 @@
 
 # Dining Philosophers Theory
 
-    (* An actor representing a hakker (philosopher) *)
+    (* The id of an actor representing a hakker (philosopher) *)
     Hakker : Set
-    (* An actor representing a chopstick *)
+    (* The id of an actor representing a chopstick *)
     Chopstick : Set
-    (* The timestamp of a message *)
-    TimeStamp : Set
     (* A message sent by a hakker *)
     HakkerMsg : Set
     (* A message sent by a chopstick *)
     ChopstickMsg : Set
 
 
-    FromAdjacent : Chopstick, HakkerMsg → Prop
+    FromAdjacent : Chopstick → HakkerMsg → Prop
+    InitiallyThinking : Hakker → Prop
     IsEating : Hakker → Prop
     IsHungry : Hakker → Prop
-    IsThinking : Hakker → Prop
-    ReceivedNotDelivered : Chopstick, HakkerMsg → Prop
+    ReceivedNotDelivered : Chopstick → HakkerMsg → Prop
 
 
+    (* All hakkers that are initially thinking should eventually start eating *)
     liveness : 
       □ (∀ (h : Hakker), 
-        (IsThinking h) ⇒ (◇ (IsEating h)))
+        (InitiallyThinking h) ⇒ (◇ (IsEating h)))
+    (* All messages a chopstick received come from its adjacent hakkers *)
     receiveFromAdjacentHakkers : 
       □ (∀ (c : Chopstick) (hm : HakkerMsg), 
         (ReceivedNotDelivered c hm) ⇒ (FromAdjacent c hm))

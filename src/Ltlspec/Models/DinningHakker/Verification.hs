@@ -26,15 +26,29 @@ genTrace (a : as) gs =
 dhinitState3 :: GlobalState
 dhinitState3 = initState ["Ghosh", "Boner", "Klang"]
 
+-- This trace is not very intuitive
 dhaction3 :: [Action]
 dhaction3 =
   [ HakkerHungry "Ghosh"
   , HakkerHungry "Boner"
   , HakkerHungry "Klang"
   , ChopstickResp 0
-  , ChopstickResp 1
   , ChopstickResp 2
   , HakkerEat "Ghosh"
+  , HakkerThink "Ghosh"
+  , ChopstickResp 0
+  , ChopstickResp 0
+  , ChopstickResp 0
+  , ChopstickResp 1
+  , HakkerEat "Boner"
+  , HakkerThink "Boner"
+  , ChopstickResp 1
+  , ChopstickResp 1
+  , ChopstickResp 1
+  , ChopstickResp 2
+  , ChopstickResp 2
+  , ChopstickResp 2
+  , HakkerEat "Klang"
   ]
 
 dhtrace3 :: [DHWorld]
@@ -50,7 +64,7 @@ dinningHakkerTheory = Theory
     , YesComment "ChopstickMsg" "A message sent by a chopstick"
     ]
   , theoryProps = NoComment <$> M.fromList [
-      ("IsThinking", ["Hakker"])
+      ("InitiallyThinking", ["Hakker"])
     , ("IsHungry", ["Hakker"])
     , ("IsEating", ["Hakker"])
     -- A message that has been received but not yet delivered by a chopstick
@@ -58,30 +72,33 @@ dinningHakkerTheory = Theory
     , ("ReceivedNotDelivered", ["Chopstick", "HakkerMsg"])
     , ("FromAdjacent", ["Chopstick", "HakkerMsg"])
   ]
-  , theoryAxioms = NoComment <$> M.fromList
+  , theoryAxioms = M.fromList
     [ ("liveness",
         -- checking liveness properties for all hakkers
-        -- All hakkers will start from thinking, and should eventually start eating
-        -- Because the Eating state is mutually exclusive for adjacent Hakkers
-        -- forall h: Hakker. isThinking(h) -> F[isEating(h)]
-        SPropAlways
-          (SPropForAll
-            [BinderGroup ["h"] "Hakker"]
-            (SPropIf
-              [SPropAtom (Atom "IsThinking" ["h"])]
-              (SPropEventually
-                (SPropAtom (Atom "IsEating" ["h"])))
+        -- FIXME: this is not fully liveness
+        -- TODO: address this in the actor model
+        YesComment
+          (SPropAlways
+            (SPropForAll
+              [BinderGroup ["h"] "Hakker"]
+              (SPropIf
+                [SPropAtom (Atom "InitiallyThinking" ["h"])]
+                (SPropEventually
+                  (SPropAtom (Atom "IsEating" ["h"])))
+              )
             )
-          )
+          ) "All hakkers that are initially thinking should eventually start eating"
       )
     , ("receiveFromAdjacentHakkers",
-        SPropAlways
-          (SPropForAll [BinderGroup ["c"] "Chopstick", BinderGroup ["hm"] "HakkerMsg"]
-            (SPropIf
-              [SPropAtom (Atom "ReceivedNotDelivered" ["c", "hm"])]
-              (SPropAtom (Atom "FromAdjacent" ["c", "hm"]))
+        YesComment
+          (SPropAlways
+            (SPropForAll [BinderGroup ["c"] "Chopstick", BinderGroup ["hm"] "HakkerMsg"]
+              (SPropIf
+                [SPropAtom (Atom "ReceivedNotDelivered" ["c", "hm"])]
+                (SPropAtom (Atom "FromAdjacent" ["c", "hm"]))
+              )
             )
-          )
+          ) "All messages a chopstick received come from its adjacent hakkers"
       )
     ]
   }
@@ -94,12 +111,12 @@ data DHVal =
   | DHValChopMsg ChopstickMsg
   deriving stock (Eq, Show)
 
-lookupHakker :: DHWorld -> HakkerId -> Maybe Hakker
-lookupHakker (DHWorld (SAS (GlobalState {hakkers=hks}) _ _)) =
+lookupHakkerAfter :: DHWorld -> HakkerId -> Maybe Hakker
+lookupHakkerAfter (DHWorld (SAS _ _ (GlobalState {hakkers=hks}))) =
   flip M.lookup hks
 
-lookupChopstick :: DHWorld -> ChopstickId -> Maybe Chopstick
-lookupChopstick (DHWorld (SAS (GlobalState {chopsticks=chops}) _ _)) =
+lookupChopstickAfter :: DHWorld -> ChopstickId -> Maybe Chopstick
+lookupChopstickAfter (DHWorld (SAS _ _ (GlobalState {chopsticks=chops}))) =
   flip M.lookup chops
 
 exists :: Eq a => a -> Seq a -> Bool
@@ -112,29 +129,29 @@ getHakkerIdFromMsg = \case
   Put _ hid _ -> hid
 
 evalDHAtomProp :: DHWorld -> Atom DHVal -> Either Error Bool
-evalDHAtomProp w (Atom prop vals) = case (prop, vals) of
-    ("IsThinking", [DHValHakker hid])  ->
-      let res = lookupHakker w hid
+evalDHAtomProp w@(DHWorld (SAS (GlobalState ts _ _ _) _ _)) (Atom prop vals) = case (prop, vals) of
+    ("InitiallyThinking", [DHValHakker hid])  ->
+      let res = lookupHakkerAfter w hid
       in case res of
         Nothing -> Left "Hakker ID doesn't exist"
-        Just hk -> Right (hkState hk == Thinking)
+        Just hk -> Right (ts == 0 && hkState hk == Thinking)
     ("IsEating", [DHValHakker hid]) ->
-      let res = lookupHakker w hid
+      let res = lookupHakkerAfter w hid
       in case res of
         Nothing -> Left "Hakker ID doesn't exist"
         Just hk -> Right (hkState hk == Eating)
     ("IsHungry", [DHValHakker hid]) ->
-      let res = lookupHakker w hid
+      let res = lookupHakkerAfter w hid
       in case res of
         Nothing -> Left "Hakker ID doesn't exist"
         Just hk -> Right (hkState hk == Hungry)
     ("ReceivedNotDelivered", [DHValChopstick cid, DHValHakkerMsg msg]) ->
-      let res = lookupChopstick w cid
+      let res = lookupChopstickAfter w cid
       in case res of
         Nothing -> Left "Chopstick ID doesn't exist"
         Just chop -> Right $ exists msg (chopRecvs chop)
     ("FromAdjacent", [DHValChopstick cid, DHValHakkerMsg msg]) ->
-      let res2 = lookupHakker w (getHakkerIdFromMsg msg)
+      let res2 = lookupHakkerAfter w (getHakkerIdFromMsg msg)
       in case res2 of
         Nothing -> Left "The sender of the message does not exist"
         Just hk -> Right (lchop hk == cid || rchop hk == cid)

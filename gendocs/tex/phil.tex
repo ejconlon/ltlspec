@@ -1,26 +1,26 @@
 \begin{Verbatim}[commandchars=\\\{\},codes={\catcode`$=3}]
-\textcolor{black}{(*} \textcolor{black}{An actor representing a hakker (philosopher)} \textcolor{black}{*)}
+\textcolor{black}{(*} \textcolor{black}{The id of an actor representing a hakker (philosopher)} \textcolor{black}{*)}
 \textcolor{blue}{Hakker} \textcolor{darkgray}{:} \textcolor{cyan}{Set}
-\textcolor{black}{(*} \textcolor{black}{An actor representing a chopstick} \textcolor{black}{*)}
+\textcolor{black}{(*} \textcolor{black}{The id of an actor representing a chopstick} \textcolor{black}{*)}
 \textcolor{blue}{Chopstick} \textcolor{darkgray}{:} \textcolor{cyan}{Set}
-\textcolor{black}{(*} \textcolor{black}{The timestamp of a message} \textcolor{black}{*)}
-\textcolor{blue}{TimeStamp} \textcolor{darkgray}{:} \textcolor{cyan}{Set}
 \textcolor{black}{(*} \textcolor{black}{A message sent by a hakker} \textcolor{black}{*)}
 \textcolor{blue}{HakkerMsg} \textcolor{darkgray}{:} \textcolor{cyan}{Set}
 \textcolor{black}{(*} \textcolor{black}{A message sent by a chopstick} \textcolor{black}{*)}
 \textcolor{blue}{ChopstickMsg} \textcolor{darkgray}{:} \textcolor{cyan}{Set}
 
 
-\textcolor{teal}{FromAdjacent} \textcolor{darkgray}{:} \textcolor{blue}{Chopstick, HakkerMsg} \textcolor{darkgray}{$\rightarrow$} \textcolor{cyan}{Prop}
+\textcolor{teal}{FromAdjacent} \textcolor{darkgray}{:} \textcolor{blue}{Chopstick} \textcolor{darkgray}{$\rightarrow$} \textcolor{blue}{HakkerMsg} \textcolor{darkgray}{$\rightarrow$} \textcolor{cyan}{Prop}
+\textcolor{teal}{InitiallyThinking} \textcolor{darkgray}{:} \textcolor{blue}{Hakker} \textcolor{darkgray}{$\rightarrow$} \textcolor{cyan}{Prop}
 \textcolor{teal}{IsEating} \textcolor{darkgray}{:} \textcolor{blue}{Hakker} \textcolor{darkgray}{$\rightarrow$} \textcolor{cyan}{Prop}
 \textcolor{teal}{IsHungry} \textcolor{darkgray}{:} \textcolor{blue}{Hakker} \textcolor{darkgray}{$\rightarrow$} \textcolor{cyan}{Prop}
-\textcolor{teal}{IsThinking} \textcolor{darkgray}{:} \textcolor{blue}{Hakker} \textcolor{darkgray}{$\rightarrow$} \textcolor{cyan}{Prop}
-\textcolor{teal}{ReceivedNotDelivered} \textcolor{darkgray}{:} \textcolor{blue}{Chopstick, HakkerMsg} \textcolor{darkgray}{$\rightarrow$} \textcolor{cyan}{Prop}
+\textcolor{teal}{ReceivedNotDelivered} \textcolor{darkgray}{:} \textcolor{blue}{Chopstick} \textcolor{darkgray}{$\rightarrow$} \textcolor{blue}{HakkerMsg} \textcolor{darkgray}{$\rightarrow$} \textcolor{cyan}{Prop}
 
 
+\textcolor{black}{(*} \textcolor{black}{All hakkers that are initially thinking should eventually start eating} \textcolor{black}{*)}
 \textcolor{purple}{liveness} \textcolor{darkgray}{:} 
   \textcolor{teal}{$\Box$} \textcolor{darkgray}{(}\textcolor{teal}{$\forall$} \textcolor{darkgray}{(}\textcolor{red}{h} \textcolor{darkgray}{:} \textcolor{blue}{Hakker}\textcolor{darkgray}{)}\textcolor{darkgray}{,} 
-    \textcolor{darkgray}{(}\textcolor{teal}{IsThinking} \textcolor{purple}{h}\textcolor{darkgray}{)} \textcolor{teal}{$\implies$} \textcolor{darkgray}{(}\textcolor{teal}{$\Diamond$} \textcolor{darkgray}{(}\textcolor{teal}{IsEating} \textcolor{purple}{h}\textcolor{darkgray}{)}\textcolor{darkgray}{)}\textcolor{darkgray}{)}
+    \textcolor{darkgray}{(}\textcolor{teal}{InitiallyThinking} \textcolor{purple}{h}\textcolor{darkgray}{)} \textcolor{teal}{$\implies$} \textcolor{darkgray}{(}\textcolor{teal}{$\Diamond$} \textcolor{darkgray}{(}\textcolor{teal}{IsEating} \textcolor{purple}{h}\textcolor{darkgray}{)}\textcolor{darkgray}{)}\textcolor{darkgray}{)}
+\textcolor{black}{(*} \textcolor{black}{All messages a chopstick received come from its adjacent hakkers} \textcolor{black}{*)}
 \textcolor{purple}{receiveFromAdjacentHakkers} \textcolor{darkgray}{:} 
   \textcolor{teal}{$\Box$} \textcolor{darkgray}{(}\textcolor{teal}{$\forall$} \textcolor{darkgray}{(}\textcolor{red}{c} \textcolor{darkgray}{:} \textcolor{blue}{Chopstick}\textcolor{darkgray}{)} \textcolor{darkgray}{(}\textcolor{red}{hm} \textcolor{darkgray}{:} \textcolor{blue}{HakkerMsg}\textcolor{darkgray}{)}\textcolor{darkgray}{,} 
     \textcolor{darkgray}{(}\textcolor{teal}{ReceivedNotDelivered} \textcolor{purple}{c} \textcolor{purple}{hm}\textcolor{darkgray}{)} \textcolor{teal}{$\implies$} \textcolor{darkgray}{(}\textcolor{teal}{FromAdjacent} \textcolor{purple}{c} \textcolor{purple}{hm}\textcolor{darkgray}{)}\textcolor{darkgray}{)}
