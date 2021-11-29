@@ -46,10 +46,15 @@
 
 # Dining Philosophers Theory
 
+    (* An actor representing a hakker (philosopher) *)
     Hakker : Set
+    (* An actor representing a chopstick *)
     Chopstick : Set
+    (* The timestamp of a message *)
     TimeStamp : Set
+    (* A message sent by a hakker *)
     HakkerMsg : Set
+    (* A message sent by a chopstick *)
     ChopstickMsg : Set
 
 

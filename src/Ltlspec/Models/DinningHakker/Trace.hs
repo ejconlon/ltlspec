@@ -2,7 +2,6 @@ module Ltlspec.Models.DinningHakker.Trace where
 
 import qualified Data.Map.Strict as M
 import Data.Sequence as S (Seq (..), empty)
-import Ltlspec.Types (SAS (..))
 
 type TimeStamp = Int
 
@@ -213,34 +212,3 @@ stepPerfect (ChopstickResp c) gs@GlobalState{timestamp=ts, hakkers=hs, chopstick
       _ -> tick gs
 -- Do not handle other cases
 stepPerfect _ gs = gs
-
-type World = SAS GlobalState Action
-
-type Trace = [World]
-
-genTrace :: [Action] -> GlobalState -> [World]
-genTrace [] _ = []
-genTrace (a : as) gs =
-  let gs' = stepPerfect a gs
-  in SAS gs a gs' : genTrace as gs'
-
-scheduler :: [HakkerId] -> [Action]
-scheduler = error "TODO"
-
-dhinitState3 :: GlobalState
-dhinitState3 = initState ["Ghosh", "Boner", "Klang"]
-
-dhaction3 :: [Action]
-dhaction3 =
-  [ HakkerHungry "Ghosh"
-  , HakkerHungry "Boner"
-  , HakkerHungry "Klang"
-  , ChopstickResp 0
-  , ChopstickResp 1
-  , ChopstickResp 2
-  , HakkerEat "Ghosh"
-  ]
-
-dhtrace3 :: [World]
-dhtrace3 = genTrace dhaction3 dhinitState3
-
