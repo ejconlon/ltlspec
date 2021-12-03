@@ -26,21 +26,37 @@ chatTheory = Theory
       , ("NewLeaveNote", ["Action", "Client", "Channel", "Client"])
       , ("ChannelListNote", ["Action", "Client", "Channel"])
       ]
-  , theoryAxioms = NoComment <$> Map.fromList
+  , theoryAxioms = NoComment <$> Map.fromList 
       [ ("isMemberBetweenJoinAndLeave",
           SPropAlways (
             SPropForAll [BinderGroup ["c"] "Client", BinderGroup ["ch"] "Channel"] (
-              SPropExists [BinderGroup ["i", "j"] "Action"] (
+              SPropExists [BinderGroup ["i"] "Action"] (
                 SPropIf
                   [SPropAtom (Atom "Joined" ["i", "c", "ch"])]
-                  (SPropUntil
-                    (SPropAtom (Atom "IsMember" ["c","ch"]))
-                    (SPropAtom (Atom "Left" ["j","c","ch"]))
+                  (SPropExists [BinderGroup ["j"] "Action"] (
+                    SPropUntil
+                      (SPropAtom (Atom "IsMember" ["c","ch"]))
+                      (SPropAtom (Atom "Left" ["j","c","ch"]))
+                  ) 
                   )
               )
             )
           )
         )
+        -- ("isMemberBetweenJoinAndLeave",
+        --   SPropAlways (
+        --     SPropForAll [BinderGroup ["c"] "Client", BinderGroup ["ch"] "Channel"] (
+        --       SPropExists [BinderGroup ["i", "j"] "Action"] (
+        --         SPropIf
+        --           [SPropAtom (Atom "Joined" ["i", "c", "ch"])]
+        --           (SPropUntil
+        --             (SPropAtom (Atom "IsMember" ["c","ch"]))
+        --             (SPropAtom (Atom "Left" ["j","c","ch"]))
+        --           )
+        --       )
+        --     )
+        --   )
+        -- )
       , ("ifInChannelReceiveMessage",
           SPropAlways (
             SPropForAll [BinderGroup ["c1", "c2"] "Client", BinderGroup ["ch"] "Channel", BinderGroup ["m"] "Action"] (
@@ -56,7 +72,8 @@ chatTheory = Theory
             )
           )
         )
-      , ("neverSendMessageToMyself",
+      , 
+      ("neverSendMessageToMyself",
           SPropAlways (
             SPropForAll [BinderGroup ["c"] "Client", BinderGroup ["m"] "Action"] (
               SPropNot (SPropAtom (Atom "Shared" ["m", "c", "c"]))
