@@ -100,8 +100,12 @@
 \begin{itemize}
   \item Add data variable quantification (\texttt{LTL-FO+})
   \begin{itemize}
-    \item $\forall$, $\exists$
-    \item First order - no quantifying over propositions
+    \item Can write propositions about all values of some type
+    \begin{itemize}
+      \item $\forall$ \texttt{(x:T), P(x)}
+      \item $\exists$ \texttt{(x:T), P(x)}
+    \end{itemize}
+    \item First order - no quantifying over propositions/types, just values
     \item Ping example: property can quantify over all \texttt{Ping} messages
   \end{itemize}
   \item Add user-defined atomic props and quantification
@@ -136,7 +140,8 @@
 
 \begin{frame}
 \frametitle{Verification is a conversation (2/2)}
-  \includegraphics[width=\textwidth]{diagram.jpg}
+  \includegraphics[scale=0.27]{diagram.jpg}
+  \centering
 \end{frame}
 
 \begin{frame}
