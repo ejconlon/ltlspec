@@ -18,9 +18,20 @@
 \frame{\titlepage}
 
 \begin{frame}
+\frametitle{What is Runtime Verification?}
+\begin{itemize}
+  \item Want to know that a distributed system adheres to some spec
+  \item Check spec against execution traces
+  \newline (local/global, online/offline, incremental/batch)
+  \item Best you can say: hasn't gone wrong yet
+  \item But that's still pretty useful!
+\end{itemize}
+\end{frame}
+
+\begin{frame}
 \frametitle{Our project}
 \begin{itemize}
-  \item Implemented verifier for Linear Temporal Logic (LTL)
+  \item Implemented a runtime verifier for Linear Temporal Logic (LTL)
   \item Implemented several actor (message-passing) systems
   \item Defined an LTL theory for each system
   \item Verified execution traces of those systems
@@ -30,10 +41,39 @@
 \begin{frame}
 \frametitle{Our assumptions}
 \begin{itemize}
-  \item Can gather local or global traces of actions/messages in a distributed system
+  \item Possible to gather local or global traces of actions/messages in a distributed system
   \item Traces don't violate causality
-  \item Traces start at the beginning
-  \item Domains are finite (per-world)
+  \item Traces begin and end where you want them to
+  \item Domains of quantification are finite (per-world)
+\end{itemize}
+\end{frame}
+
+\begin{frame}
+\frametitle{Example system: Ping}
+\begin{itemize}
+  \item Group of actors send \texttt{Ping} messages and respond with \texttt{Pong} messages
+  \item We want this responsiveness property to hold:
+  \begin{itemize}
+    \item "Whenever I send a \texttt{Ping}, I eventually receive a \texttt{Pong}"
+    \item Not enough that a \texttt{Pong} was sent to me, I need to receive it!
+    \newline (Can define program correctness in presence of faulty environment)
+    \item Need to formally specify this property to check it...
+  \end{itemize}
+\end{itemize}
+\end{frame}
+
+\begin{frame}
+\frametitle{Example traces: Ping}
+\begin{itemize}
+  \item Observing global events as \texttt{(viewpoint, action)}
+  \item Good trace
+  \begin{itemize}
+    \item \texttt{(Alice, Send Ping to Bob)}
+    \item \texttt{(Bob, Recv Ping from Alice)}
+    \item \texttt{(Bob, Send Pong to Alice)}
+    \item \texttt{(Alice, Recv Pong from Bob)}
+  \end{itemize}
+  \item Bad trace: drop the \texttt{Recv Pong from Bob}
 \end{itemize}
 \end{frame}
 
@@ -43,14 +83,15 @@
   \item World-relevant propositional logic
   \item Atomic propositions: \texttt{P}, \texttt{Q}
   \item Standard connectives: $\land$, $\lor$, $\neg$, $\implies$
-  \item Modal connectives: $\Box$ (Always), $\Diamond$ (Eventually)
-\end{itemize}
-\end{frame}
-
-\begin{frame}
-\frametitle{LTL Theories}
-\begin{itemize}
-  \item TODO
+  \item Modal connectives:
+  \begin{itemize}
+    \item $\Box$ \texttt{P} means \texttt{P} holds in \textit{all} accessible worlds
+    \newline (\texttt{P} will \texttt{Always} be true, including now)
+    \item $\Diamond$ \texttt{P} means \texttt{P} holds in \textit{some} accessible world
+    \newline (\texttt{P} will \texttt{Eventually} be true, possibly now)
+  \end{itemize}
+  \item Expressive enough to capture our Ping-Pong property!
+  \newline (...\texttt{Eventually} receive a \texttt{Pong}...)
 \end{itemize}
 \end{frame}
 
@@ -61,28 +102,11 @@
   \begin{itemize}
     \item $\forall$, $\exists$
     \item First order - no quantifying over propositions
+    \item Ping example: property can quantify over all \texttt{Ping} messages
   \end{itemize}
   \item Add user-defined atomic props and quantification
+  \item Declare types, props, and axioms in a user-defined "theory"
   \item For each domain require user-defined "bridge"
-\end{itemize}
-\end{frame}
-
-\begin{frame}
-\frametitle{Verification is a conversation}
-\begin{itemize}
-  \item TODO
-\end{itemize}
-\end{frame}
-
-\begin{frame}
-\frametitle{Example system: Ping}
-\begin{itemize}
-  \item Actors send \texttt{Ping} messages and respond with \texttt{Pong} messages
-  \item We want this responsiveness property to hold:
-  \begin{itemize}
-    \item "Whenever I send a \texttt{Ping}, I eventually receive a \texttt{Pong}"
-    \item Not enough that a \texttt{Pong} was sent to me, I need to receive it!
-  \end{itemize}
 \end{itemize}
 \end{frame}
 
@@ -94,16 +118,19 @@
 \end{frame}
 
 \begin{frame}
-\frametitle{Example valid trace: Ping}
+\frametitle{Verification is a conversation}
 \begin{itemize}
-  \item TODO
-\end{itemize}
-\end{frame}
-
-\begin{frame}
-\frametitle{Example invalid trace: Ping}
-\begin{itemize}
-  \item TODO
+  \item Verifier only understands propositions
+  \begin{itemize}
+    \item Doesn't understand user-defined types and props
+    \item Doesn't understand worlds (trace elements) or values
+  \end{itemize}
+  \item Bridge for Ping system knows these parts
+  \begin{itemize}
+    \item Can enumerate all \texttt{SentPing} values in a world
+    \item Can determine if two values satisfy \texttt{IsPingPong}
+  \end{itemize}
+  \item Driver feeds worlds to verifier, verifier works with the bridge to interpret propositions
 \end{itemize}
 \end{frame}
 
@@ -118,7 +145,7 @@
 \end{frame}
 
 \begin{frame}
-\frametitle{Solving the infinite problem}
+\frametitle{Solving the infinite problem with truncation}
 \begin{itemize}
   \item User bridge tells the verifier that after this world
   \begin{itemize}
@@ -128,24 +155,24 @@
   \item This lets you prove responsiveness for quiescent systems
   \item For some props the best you can say is you can't prove or disprove them
   \item Not arbitrary: these criteria ensure no additional reduction is necessary
+  \item (Some fragment of a higher-order 3-valued logic...)
 \end{itemize}
 \end{frame}
 
 \begin{frame}
 \frametitle{Example truncation: Ping}
 \begin{itemize}
-  \item Trace of actions: \texttt{send/recv ping/pong message}
-  \item From initial state, fold into a trace of worlds:
-    \linebreak \texttt{(state before, current action, state after)}
-  \item No more actions: \texttt{SentPing} and \texttt{RecvPong} types have empty quantification
-  \item \texttt{IsPingPong} atomic prop is always a function of its arguments (all worlds)
-  \item Consequence: can evaluate responsiveness on any trace
+  \item No messages in flight or in mailbox $\rightarrow$ no more actions
+  \item No more actions $\rightarrow$ \texttt{SentPing} and \texttt{RecvPong} types have empty quantification
+  \item \texttt{IsPingPong} atomic prop is always a pure function of its arguments (regardless of world)
+  \item Result: can evaluate responsiveness on any trace
 \end{itemize}
 \end{frame}
 
 \begin{frame}
 \frametitle{Evaluation (1/2)}
 \begin{itemize}
+  \item Implemented verifier, domains, and actor systems in Haskell
   \item Defined messages, roles, and actors for three domains:
   \begin{itemize}
     \item Ping, Chat System, and Dining Philosophers
@@ -154,6 +181,7 @@
   \begin{itemize}
     \item Implementation and STM semantics ensure trace order does not violate causality
     \item Wait for quiescence to ensure total trace collection
+    \item Future work: introduce network faults (abstracted but not implemented)
   \end{itemize}
 \end{itemize}
 \end{frame}
@@ -161,16 +189,17 @@
 \begin{frame}
 \frametitle{Evaluation (2/2)}
 \begin{itemize}
-\item Primary concern: Correctness
-  \begin{itemize}
-    \item Collected traces and verified axioms of each theory
-    \item The tests pass... And we never write bugs!
-  \end{itemize}
-\item Secondary concern: Performance
-  \begin{itemize}
-    \item Passasble with naive implementation - not stress-tested
-    \item Want safe-for-space machine, term graph deduplication, predicate pushdown
-  \end{itemize}
+  \item Primary concerns: Syntax, Semantics, and Correctness
+    \begin{itemize}
+      \item Defined interfaces that generalize well
+      \item Collected traces and verified axioms of each theory
+      \item The tests pass... And we never write bugs!
+    \end{itemize}
+  \item Secondary concern: Performance
+    \begin{itemize}
+      \item Passasble with naive interpreter - not stress-tested
+      \item Want safe-for-space machine, term graph deduplication, predicate pushdown...
+    \end{itemize}
 \end{itemize}
 \end{frame}
 
