@@ -36,8 +36,9 @@
         ((¬ (IsSameClient c1 c2)) ∧ (IsMember c1 ch) ∧ (IsMember c2 ch) ∧ (Sent m c1 ch)) ⇒ (◇ (Shared m c1 c2)))
     isMemberBetweenJoinAndLeave : 
       □ (∀ (c : Client) (ch : Channel), 
-        ∃ (i j : Action), 
-          (Joined i c ch) ⇒ (U (IsMember c ch) (Left j c ch)))
+        ∃ (i : Action), 
+          (Joined i c ch) ⇒ (∃ (j : Action), 
+            U (IsMember c ch) (Left j c ch)))
     neverSendMessageToMyself : 
       □ (∀ (c : Client) (m : Action), 
         ¬ (Shared m c c))
