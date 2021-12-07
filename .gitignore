@@ -19,3 +19,4 @@
 /docs/*.snm
 /docs/*.synctex.gz
 /docs/*.toc
+/docs/__latexindent_temp.tex
