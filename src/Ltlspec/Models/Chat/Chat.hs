@@ -113,6 +113,22 @@ data ServerResponse =
 
 type SystemEvent = Either ClientAction ServerResponse
 
+getActionID :: SystemEvent -> ActionID
+getActionID s = case s of
+  Left ca -> case ca of
+    NoOp -> 0
+    List n _ -> n
+    Join n _ _ -> n
+    Leave n _ _ -> n
+    Send n _ _ _ -> n
+  Right sr -> case sr of
+    Share n _ _ _ -> n
+    NewJoin n _ _ _ -> n
+    NewLeave n _ _ _ -> n
+    ChannelList n _ _ -> n
+    StartService -> 0
+    
+
 type Buffer = Map.Map ChannelID [SystemEvent]
 
 type ClientsState = Map.Map ClientID [ChannelID]
@@ -280,7 +296,7 @@ instance Bridge Error ChatVal ChatWorld where
     bridgeEvalProp = evalChatProp
 
     -- TODO quantify actions with the action component of the SAS
-    bridgeQuantify (SAS _ _ s2) tyname =
+    bridgeQuantify (SAS _ m s2) tyname =
         case tyname of
             "Client" -> Right (map ChatValClient (Map.keys (fst s2)))
             "Channel" -> Right (map ChatValChannel (Set.toList (Set.fromList (concat (Map.elems (fst s2))))))
