@@ -27,3 +27,7 @@ clean-docs:
 .PHONY: preso
 preso:
 	cd docs && pdflatex ./ltlspec-presentation.tex
+
+.PHONY: report
+report:
+	cd docs && pdflatex ./ltlspec-report.tex
