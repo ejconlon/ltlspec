@@ -43,7 +43,7 @@
 \begin{itemize}
   \item Possible to gather local or global traces of actions/messages in a distributed system
   \item Traces don't violate causality
-  \item Traces begin and end where you want them to
+  \item Traces start at the beginning of execution
   \item Domains of quantification are finite (per-world)
 \end{itemize}
 \end{frame}
@@ -66,14 +66,14 @@
 \frametitle{Example traces: Ping}
 \begin{itemize}
   \item Observing global events as \texttt{(viewpoint, action)}
-  \item Good trace
+  \item Good trace (demonstrates responsiveness)
   \begin{itemize}
     \item \texttt{(Alice, Send Ping to Bob)}
     \item \texttt{(Bob, Recv Ping from Alice)}
     \item \texttt{(Bob, Send Pong to Alice)}
     \item \texttt{(Alice, Recv Pong from Bob)}
   \end{itemize}
-  \item Bad trace: drop the \texttt{Recv Pong from Bob}
+  \item Bad trace (violates responsiveness): drop the \texttt{Recv Pong from Bob}
 \end{itemize}
 \end{frame}
 
@@ -100,13 +100,16 @@
 \begin{itemize}
   \item Add data variable quantification (\texttt{LTL-FO+})
   \begin{itemize}
-    \item $\forall$, $\exists$
-    \item First order - no quantifying over propositions
+    \item Can write propositions about all values of some type
+    \begin{itemize}
+      \item $\forall$ \texttt{(x:T), P(x)}
+      \item $\exists$ \texttt{(x:T), P(x)}
+    \end{itemize}
+    \item First order - no quantifying over propositions/types, just values
     \item Ping example: property can quantify over all \texttt{Ping} messages
   \end{itemize}
   \item Add user-defined atomic props and quantification
-  \item Declare types, props, and axioms in a user-defined "theory"
-  \item For each domain require user-defined "bridge"
+  \item Declare types, atomic props, and axioms in a user-defined "theory"
 \end{itemize}
 \end{frame}
 
@@ -118,13 +121,14 @@
 \end{frame}
 
 \begin{frame}
-\frametitle{Verification is a conversation}
+\frametitle{Verification is a conversation (1/2)}
 \begin{itemize}
-  \item Verifier only understands propositions
+  \item Verifier only understands LTL connectives
   \begin{itemize}
     \item Doesn't understand user-defined types and props
     \item Doesn't understand worlds (trace elements) or values
   \end{itemize}
+  \item For each domain require user-defined "bridge"
   \item Bridge for Ping system knows these parts
   \begin{itemize}
     \item Can enumerate all \texttt{SentPing} values in a world
@@ -135,9 +139,16 @@
 \end{frame}
 
 \begin{frame}
+\frametitle{Verification is a conversation (2/2)}
+  \includegraphics[scale=0.27]{diagram.jpg}
+  \centering
+\end{frame}
+
+\begin{frame}
 \frametitle{Encountering the infinite problem}
 \begin{itemize}
-  \item Modal connectives only have meaning on infinite traces
+  \item When testing, you only have \textit{finite} traces
+  \item Modal connectives only have meaning on \textit{infinite} traces
   \item Can you say something \texttt{Always} happens?
   \item Can't verify a liveness property with a finite trace... Or can you?
   \item Trick: allow users to reason outside the logic about ALL future worlds
@@ -147,7 +158,7 @@
 \begin{frame}
 \frametitle{Solving the infinite problem with truncation}
 \begin{itemize}
-  \item User bridge tells the verifier that after this world
+  \item User bridge can tell the verifier that after this world
   \begin{itemize}
     \item Some set of types will have empty quantification
     \item Some set of atomic props will have constant values
@@ -162,6 +173,8 @@
 \begin{frame}
 \frametitle{Example truncation: Ping}
 \begin{itemize}
+  \item \texttt{isResponsive :}
+  \newline $\Box$ \texttt{(}$\forall$ \texttt{m1:SentPing,} $\Diamond$ \texttt{(}$\exists$ \texttt{m2:RecvPong, IsPingPong m1 m2))}
   \item No messages in flight or in mailbox $\rightarrow$ no more actions
   \item No more actions $\rightarrow$ \texttt{SentPing} and \texttt{RecvPong} types have empty quantification
   \item \texttt{IsPingPong} atomic prop is always a pure function of its arguments (regardless of world)
