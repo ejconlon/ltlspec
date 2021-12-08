@@ -20,3 +20,4 @@
 /docs/*.synctex.gz
 /docs/*.toc
 /docs/__latexindent_temp.tex
+/docs/_minted-*

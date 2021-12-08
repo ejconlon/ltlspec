@@ -28,6 +28,10 @@ clean-docs:
 preso:
 	cd docs && pdflatex ./ltlspec-presentation.tex
 
+.PHONY: report-deps
+report-deps:
+	brew install pygments
+
 .PHONY: report
 report:
-	cd docs && pdflatex ./ltlspec-report.tex
+	cd docs && latexmk -pdf -pdflatex="pdflatex -shell-escape -interaction=nonstopmode" -use-make ./ltlspec-report.tex
