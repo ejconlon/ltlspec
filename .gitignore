@@ -16,6 +16,7 @@
 /docs/*.nav
 /docs/*.out
 /docs/*.pdf
+/docs/*.pyg
 /docs/*.snm
 /docs/*.synctex.gz
 /docs/*.toc
