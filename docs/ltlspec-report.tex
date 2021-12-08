@@ -5,6 +5,12 @@
 \usepackage{fancyvrb}
 \usepackage{minted}
 
+% Use this instead of caption to remove acmart description warnings
+\newcommand{\mycaption}[1]{\Description{#1}\caption{#1}}
+
+% This appears to fix some font problem...
+\DeclareRobustCommand{\ttfamily}{\fontencoding{T1}\fontfamily{lmtt}\selectfont}
+
 % Junk for acmart:
 \setcopyright{acmcopyright}
 \copyrightyear{2021}
@@ -65,7 +71,7 @@ First, we will loosely define a language for expressing the \textit{theory} of a
 \fontsize{10}{12}\selectfont
 \input{../gendocs/tex/ping.tex}
 }
-\caption{Theory for a trivial ping system}
+\mycaption{Theory for a trivial ping system}
 \end{figure}
 
 \subsection{Bridge}
@@ -81,7 +87,7 @@ class Eq v => Bridge e v w | w -> e v where
   bridgeQuantify :: w -> TyName -> Either e [v]
 \end{minted}
 }
-\caption{Haskell definition of a bridge}
+\mycaption{Haskell definition of a bridge}
 \end{figure}
 
 \subsection{Verifier}
@@ -101,7 +107,7 @@ Some existing works \cite{shafiei2020actor,lavery2017actor} use the actor model 
 The most relevant works we can find are \cite{cassar2015synchronous,cassar2015runtime}.
 \cite{cassar2015synchronous} studied the overhead between synchronous and asynchronous monitor instrumentation for actor-based systems and proposed a hybrid instrumentation technique that can be  integrated with RV tools to provide timely detection with low runtime overhead.
 \cite{cassar2015runtime} proposed a runtime adaptation technique based on an existing RV tool to dynamically react to violations detected in actor-based systems.
-In our project, instead of focusing on the RV techniques specifically for actor-based systems, we emphasize on how to provide an abstraction layer between the distributed application and the LTL verifiers. We want to provide an expressive specification language to help users model their application domains and specify the system’s properties at the same time. This specification later acts as the contract between the real system and the verifier. We pick the actor-based system because it’s a popular programming model and a clean abstraction for distributed systems.
+In our project, instead of focusing on the RV techniques specifically for actor-based systems, we emphasize on how to provide an abstraction layer between the distributed application and the LTL verifiers. We want to provide an expressive specification language to help users model their application domains and specify the system's properties at the same time. This specification later acts as the contract between the real system and the verifier. We pick the actor-based system because it's a popular programming model and a clean abstraction for distributed systems.
 Previous work has also shown that interesting properties about actor-based systems can be specified using an LTL-like logic[1,5].
 
 \section{Conclusion}
