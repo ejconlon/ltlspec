@@ -1,28 +1,120 @@
-\documentclass{article}
-\usepackage{fullpage}
+\documentclass[format=acmsmall, nonacm=true, review=true]{acmart}
 
-\title{LTLSpec - An extensible LTL verifier for distributed systems}
-\author{Eric Conlon, Yanze Li, Tarcisio Teixeira}
+\usepackage[utf8]{inputenc}
+\usepackage{xcolor}
+\usepackage{fancyvrb}
+\usepackage{minted}
+
+% Use this instead of caption to remove acmart description warnings
+\newcommand{\mycaption}[1]{\Description{#1}\caption{#1}}
+
+% This appears to fix some font problem...
+\DeclareRobustCommand{\ttfamily}{\fontencoding{T1}\fontfamily{lmtt}\selectfont}
+
+% Junk for acmart:
+\setcopyright{acmcopyright}
+\copyrightyear{2021}
+\acmYear{2021}
+\acmDOI{N/A}
+\acmBooktitle{N/A}
+
+\title{LTLSpec: An Extensible LTL Verifier for Distributed Systems}
+\author{Eric Conlon}
+\author{Yanze Li}
+\author{Tarcisio Teixeira}
+\authorsaddresses{}
 \date{2021-12-07}
 
 \begin{document}
+
+\begin{abstract}
+TODO. This work was prepared for CSPC 538B.
+\end{abstract}
+
 \maketitle
-
-\section{Abstract}
-
-This work was prepared for CSPC 538B.
 
 \section{Introduction}
 
-LTL is fantastic. \cite{thiemann_actor_2016}
+Proving that a distributed system operates as intended generally requires modeling the system in a formal framework equipped with its own reasoning techniques.
+At one extreme of this design space, one formally specifies the program in full in exchange for strong guarantees about its behavior in all possible executions.
+At another extreme, one “merely” specifies formal properties about the observable effects of the program, only able to guarantee that these properties have not been violated in observed executions.
+In this project, we propose using the latter strategy, Runtime Verification, as a relatively lightweight way to explore “responsiveness properties” of actor-based distributed systems.
 
-\section{Methodology and Evaluation}
+We define responsiveness properties following \cite{actorservice,parthasarathy2018modular} as a kind of liveness property of the form \(\Box \forall n. (P(n) \rightarrow \Diamond Q(n))\).
+As an example in plain English: “When I send a certain request, I eventually get a response to that particular request.” Propositions with this structure allow one to establish domain-specific causal relations more useful than the “happens-before” of logical time.
+In general, one uses a temporal logic to express these propositions. Linear Temporal Logic (LTL), with the \textit{Always} and \textit{Eventually} operators used above, is a popular choice. However, most presentations of LTL apply it to domains only with the use of atomic predicates. One cannot express dependency between these predicates as would be necessary to encode the notion of responsiveness.
+
+As a result, some researchers have introduced first order quantifiers for data variables \cite{khoury_automata-based_2021,margaria_execution_2016,halle_runtime_2012} in systems such as LTL-FO+.
+However, in an effort to increase the usefulness and applicability of the logic, we follow a slightly different path through the design space to leave the domain of quantification abstract and not internalize equality on quantified variables.
+
+We have built a runtime verification framework with data variable quantification, decoupled from any particular domain one would verify.
+In this paper, we:
+\begin{itemize}
+  \item Recall the concept of a first-order logical \textit{theory} of a domain
+  \item Define \textit{bridge} interfaces related to each theory that allow the verifier to quantify over data variables and verify inhabitance of atomic propositions from the domain
+  \item Define online and offline \textit{verifiers} to check axioms from the theory against monitored programs and traces
+  \item Suggest extensions to make verification perform better and yield more useful guarantees
+\end{itemize}
+
+\section{Background}
+
+\subsection{LTL and LTL-FO+}
+
+\section{LTLSpec}
+
+\subsection{First-order theories}
+
+First, we will loosely define a language for expressing the \textit{theory} of a user’s domain. DFOL (First Order Logic with Dependent types) as encoded in LF syntax \cite{hutchison_first-order_2006} is an excellent fit for this task. It allows one to define the types of values in a domain, as well as atomic propositions over those values. (This is called a \textit{signature}.) Additionally, it allows one to express propositions with quantifiers or \textit{axioms}. Together, the signature and axioms form a theory of the domain.
+
+\begin{figure}
+{
+\fontsize{10}{12}\selectfont
+\input{../gendocs/tex/ping.tex}
+}
+\mycaption{Theory for a trivial ping system}
+\end{figure}
+
+\subsection{Bridge}
+
+\begin{figure}
+{
+\fontsize{10}{12}\selectfont
+\begin{minted}{haskell}
+class Eq v => Bridge e v w | w -> e v where
+  -- | Evaluate the atomic proposition or fail.
+  bridgeEvalProp :: w -> Atom v -> Either e Prop
+  -- | Quantify over all values of the given type or fail.
+  bridgeQuantify :: w -> TyName -> Either e [v]
+\end{minted}
+}
+\mycaption{Haskell definition of a bridge}
+\end{figure}
+
+\subsection{Verifier}
+
+\subsection{Truncation}
+
+\section{Evaluation}
+
+TODO.
+
+\section{Related Work}
+
+Previous work has developed logical frameworks extending separation logic to specify the responsiveness properties in actor-based systems and do proofs in Hoare-Logic style \cite{actorservice, parthasarathy2018modular}.
+However, these logical frameworks have yet proven to be practical nor integrated into some existing program verification tools.
+On the other hand, there are only limited existing works adopting RV for actor-based systems.
+Some existing works \cite{shafiei2020actor,lavery2017actor} use the actor model to implement RV tools.
+The most relevant works we can find are \cite{cassar2015synchronous,cassar2015runtime}.
+\cite{cassar2015synchronous} studied the overhead between synchronous and asynchronous monitor instrumentation for actor-based systems and proposed a hybrid instrumentation technique that can be  integrated with RV tools to provide timely detection with low runtime overhead.
+\cite{cassar2015runtime} proposed a runtime adaptation technique based on an existing RV tool to dynamically react to violations detected in actor-based systems.
+In our project, instead of focusing on the RV techniques specifically for actor-based systems, we emphasize on how to provide an abstraction layer between the distributed application and the LTL verifiers. We want to provide an expressive specification language to help users model their application domains and specify the system's properties at the same time. This specification later acts as the contract between the real system and the verifier. We pick the actor-based system because it's a popular programming model and a clean abstraction for distributed systems.
+Previous work has also shown that interesting properties about actor-based systems can be specified using an LTL-like logic[1,5].
 
 \section{Conclusion}
 
-\section{References}
+TODO.
 
-\bibliographystyle{plain}
+\bibliographystyle{ACM-Reference-Format}
 \bibliography{ltlspec-report}
 
 \end{document}
