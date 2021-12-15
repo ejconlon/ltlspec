@@ -1,7 +1,7 @@
 {-# LANGUAGE DeriveAnyClass #-}
 
 module Ltlspec.System.Actors
-  ( ActorId
+  ( ActorId (..)
   , SeqNum
   , MessageId (..)
   , AppMessage (..)
