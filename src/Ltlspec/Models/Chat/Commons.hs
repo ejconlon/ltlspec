@@ -1,11 +1,11 @@
 {-# LANGUAGE OverloadedStrings #-}
 
 module Ltlspec.Models.Chat.Commons where
-import Ltlspec.System.Actors (ActorId)
-import qualified Data.Map as Map
-import Ltlspec.Types (SAS)
-import Data.Hashable (Hashable)
 import Control.DeepSeq (NFData)
+import Data.Hashable (Hashable)
+import qualified Data.Map as Map
+import Ltlspec.System.Actors (ActorId)
+import Ltlspec.Types (SAS)
 
 
 newtype ActionID = ActionID {unActionID::Int}
@@ -50,7 +50,7 @@ getActionID s = case s of
     NewLeave n _ _ _ -> n
     ChannelList n _ _ -> n
     StartService -> 0
-    
+
 
 type Buffer = Map.Map ChannelID [ChatMessage]
 

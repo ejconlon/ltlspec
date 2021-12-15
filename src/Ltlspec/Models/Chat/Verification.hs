@@ -3,12 +3,13 @@
 
 module Ltlspec.Models.Chat.Verification where
 
-import Ltlspec.Types (Atom (..), Theory(..), SAS(..), Prop(..), Bridge(..), TruncBridge(..), Error, Commented (NoComment), SProp (..), BinderGroup (..), initScanSAS, ApplyAction(..))
 import qualified Data.Map as Map
-import Ltlspec.Models.Chat.Commons (ChatMessage(..), ChatState, ChannelID, ActionID(..))
-import Ltlspec.System.Actors (ActorId(..), AnnoMessage (AnnoMessage), NetMessage (NetMessage), AppMessage(..))
 import qualified Data.Set as Set
-import Ltlspec.TriBool ( TriBool(..) )
+import Ltlspec.Models.Chat.Commons (ActionID (..), ChannelID, ChatMessage (..), ChatState)
+import Ltlspec.System.Actors (ActorId (..), AnnoMessage (AnnoMessage), AppMessage (..), NetMessage (NetMessage))
+import Ltlspec.TriBool (TriBool (..))
+import Ltlspec.Types (ApplyAction (..), Atom (..), BinderGroup (..), Bridge (..), Commented (NoComment), Error,
+                      Prop (..), SAS (..), SProp (..), Theory (..), TruncBridge (..), initScanSAS)
 chatTheory :: Theory
 chatTheory = Theory
   { theoryTypes = NoComment <$> ["Client", "Channel", "Action"]
@@ -24,7 +25,7 @@ chatTheory = Theory
       , ("NewLeaveNote", ["Action", "Client", "Channel", "Client"])
       , ("ChannelListNote", ["Action", "Client", "Channel"])
       ]
-  , theoryAxioms = NoComment <$> Map.fromList 
+  , theoryAxioms = NoComment <$> Map.fromList
       [ ("isMemberBetweenJoinAndLeave",
           SPropAlways (
             SPropForAll [BinderGroup ["c"] "Client", BinderGroup ["ch"] "Channel"] (
@@ -35,7 +36,7 @@ chatTheory = Theory
                     SPropUntil
                       (SPropAtom (Atom "IsMember" ["c","ch"]))
                       (SPropAtom (Atom "Left" ["j","c","ch"]))
-                  ) 
+                  )
                   )
               )
             )
@@ -70,7 +71,7 @@ chatTheory = Theory
             )
           )
         )
-      , 
+      ,
       ("neverSendMessageToMyself",
           SPropAlways (
             SPropForAll [BinderGroup ["c"] "Client", BinderGroup ["m"] "Action"] (
@@ -80,7 +81,7 @@ chatTheory = Theory
         )
       ]
   }
-    
+
 
 newtype ChatWorld = ChatWorld {unChatWorld :: SAS ChatState (AnnoMessage ChatMessage)}
 
@@ -131,8 +132,8 @@ initialChatState nclients = (Map.fromList [(ActorId i,[]) | i <- [1..nclients]],
 -- generateTraceGivenMessages nclients = initScanSAS processEvent (initialChatState nclients)
 
 instance ApplyAction (AnnoMessage ChatMessage) ChatState where
-  applyAction w msg = 
-    case msg of 
+  applyAction w msg =
+    case msg of
       AnnoMessage _ (NetMessage _ (AppMessage _ m)) -> processEvent w m
 
 instance Bridge Error ChatVal ChatWorld where

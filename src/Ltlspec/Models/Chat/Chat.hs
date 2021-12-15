@@ -1,4 +1,3 @@
-
 module Ltlspec.Models.Chat.Chat where
 
 -- import qualified Data.Bifunctor
@@ -25,7 +24,7 @@ module Ltlspec.Models.Chat.Chat where
 --       , ("NewLeaveNote", ["Action", "Client", "Channel", "Client"])
 --       , ("ChannelListNote", ["Action", "Client", "Channel"])
 --       ]
---   , theoryAxioms = NoComment <$> Map.fromList 
+--   , theoryAxioms = NoComment <$> Map.fromList
 --       [ ("isMemberBetweenJoinAndLeave",
 --           SPropAlways (
 --             SPropForAll [BinderGroup ["c"] "Client", BinderGroup ["ch"] "Channel"] (
@@ -36,7 +35,7 @@ module Ltlspec.Models.Chat.Chat where
 --                     SPropUntil
 --                       (SPropAtom (Atom "IsMember" ["c","ch"]))
 --                       (SPropAtom (Atom "Left" ["j","c","ch"]))
---                   ) 
+--                   )
 --                   )
 --               )
 --             )
@@ -71,7 +70,7 @@ module Ltlspec.Models.Chat.Chat where
 --             )
 --           )
 --         )
---       , 
+--       ,
 --       ("neverSendMessageToMyself",
 --           SPropAlways (
 --             SPropForAll [BinderGroup ["c"] "Client", BinderGroup ["m"] "Action"] (
@@ -126,7 +125,7 @@ module Ltlspec.Models.Chat.Chat where
 --     NewLeave n _ _ _ -> n
 --     ChannelList n _ _ -> n
 --     StartService -> 0
-    
+
 
 -- type Buffer = Map.Map ChannelID [SystemEvent]
 

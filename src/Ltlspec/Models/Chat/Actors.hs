@@ -1,18 +1,18 @@
 {-# OPTIONS_GHC -Wno-incomplete-patterns #-}
 {-# OPTIONS_GHC -Wno-name-shadowing #-}
 module Ltlspec.Models.Chat.Actors where
-import Ltlspec.System.Actors (ActorId (ActorId), Behavior, TickMessage (TickMessageFire, TickMessageEmbed), AppMessage (AppMessage), ActorConstructor, mkTickConfig, ActorCase (ActorCase), minimalTickMessageFilter, AnnoMessage, runActorCaseSimple)
-import Ltlspec.System.Time (TimeDelta, timeDeltaFromFracSecs)
-import qualified Data.Map as Map
-import Control.Concurrent.STM (TVar, newTVarIO, writeTVar, readTVar)
+import Control.Concurrent.STM (TVar, newTVarIO, readTVar, writeTVar)
 import Control.Monad (replicateM)
-import System.Random (StdGen, mkStdGen, randomR)
+import qualified Data.Map as Map
 import qualified Data.Set as Set
-import Data.Hashable ( Hashable )
-import Control.DeepSeq (NFData)
-import Ltlspec.System.Logging (consoleLogger, Logger)
+import Ltlspec.Models.Chat.Commons (ActionID (..), ChannelID (..), ChatMessage (..))
+import Ltlspec.System.Actors (ActorCase (ActorCase), ActorConstructor, ActorId (ActorId), AnnoMessage,
+                              AppMessage (AppMessage), Behavior, TickMessage (TickMessageEmbed, TickMessageFire),
+                              minimalTickMessageFilter, mkTickConfig, runActorCaseSimple)
+import Ltlspec.System.Logging (Logger, consoleLogger)
+import Ltlspec.System.Time (TimeDelta, timeDeltaFromFracSecs)
+import System.Random (StdGen, mkStdGen, randomR)
 import Text.Pretty.Simple (pPrint)
-import Ltlspec.Models.Chat.Commons (ChatMessage(..), ChannelID(..), ActionID(..))
 
 
 type MessageContent = String
@@ -195,7 +195,7 @@ runChatSim :: Logger -> Int -> TimeDelta -> [ChatConfig] -> IO [AnnoMessage Chat
 runChatSim logger limit interval pairs = runActorCaseSimple logger (chatCase limit interval pairs)
 
 main :: IO ()
-main = do 
+main = do
   logger <- consoleLogger
   configs <- chatConfigs
   messages <- runChatSim logger 10 (timeDeltaFromFracSecs (1 :: Double)) configs
