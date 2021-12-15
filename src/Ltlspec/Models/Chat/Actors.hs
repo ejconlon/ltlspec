@@ -12,14 +12,8 @@ import Data.Hashable ( Hashable )
 import Control.DeepSeq (NFData)
 import Ltlspec.System.Logging (consoleLogger, Logger)
 import Text.Pretty.Simple (pPrint)
+import Ltlspec.Models.Chat.Commons (ChatMessage(..), ChannelID(..), ActionID(..))
 
-newtype ActionID = ActionID {unActionID::Int}
-  deriving stock (Show)
-  deriving newtype (Eq, Ord, Num, Hashable, NFData)
-
-newtype ChannelID = ChannelID {unChannelID::Int}
-  deriving stock (Show)
-  deriving newtype (Eq, Ord, Num, Hashable, NFData)
 
 type MessageContent = String
 type ServerState = Map.Map ActorId [ChannelID]
@@ -41,24 +35,24 @@ instance Show ChatConfig where
       Client n _ -> "Client: " ++ show n
       Server _ -> "Server"
 
-data ChatMessage =
-  NoOp
-  | List ActionID ActorId
-  | Join ActionID ActorId ChannelID
-  | Leave ActionID ActorId ChannelID
-  | Send ActionID ActorId MessageContent ChannelID
-  | Share ActionID ActorId MessageContent ActorId
-  | NewJoin ActionID ActorId ChannelID ActorId
-  | NewLeave ActionID ActorId ChannelID ActorId
-  | ChannelList ActionID ActorId ChannelID
-  | StartService
-  deriving stock (Eq, Show)
+-- data ChatMessage =
+--   NoOp
+--   | List ActionID ActorId
+--   | Join ActionID ActorId ChannelID
+--   | Leave ActionID ActorId ChannelID
+--   | Send ActionID ActorId MessageContent ChannelID
+--   | Share ActionID ActorId MessageContent ActorId
+--   | NewJoin ActionID ActorId ChannelID ActorId
+--   | NewLeave ActionID ActorId ChannelID ActorId
+--   | ChannelList ActionID ActorId ChannelID
+--   | StartService
+--   deriving stock (Eq, Show)
 
 getRandomElementOfList :: [a] -> StdGen -> a
 getRandomElementOfList l gen = let randomIndex = fst (randomR (0, length l - 1) gen) in l !! randomIndex
 
 mkChatConfigs_ :: Int -> [TVar ClientState] -> TVar ServerState -> [ChatConfig]
-mkChatConfigs_ nc css ss = Server ss : [Client (ActorId i) (css !! i) | i <-[1..nc]]
+mkChatConfigs_ nc css ss = Server ss : [Client (ActorId (i+1)) (css !! i) | i <-[0..(nc-1)]]
 
 mkChatConfigs :: Int -> IO [ChatConfig]
 mkChatConfigs nclients =
@@ -204,5 +198,5 @@ main :: IO ()
 main = do 
   logger <- consoleLogger
   configs <- chatConfigs
-  messages <- runChatSim logger 15 (timeDeltaFromFracSecs (1 :: Double)) configs
+  messages <- runChatSim logger 10 (timeDeltaFromFracSecs (1 :: Double)) configs
   pPrint messages

@@ -6,7 +6,7 @@ import Data.Functor (($>))
 import qualified Data.Map.Strict as Map
 import Ltlspec (envPropFold, propAlways, propEventually)
 import Ltlspec.Driver (DriverError (..), driveVerificationIO)
-import Ltlspec.Models.Chat.Chat (chatTheory, longTrace, shortTrace)
+import Ltlspec.Models.Chat.Verification (ChatWorld(..), initialChatState, chatTheory)
 import Ltlspec.Models.DinningHakker.Verification (dhtrace3, dinningHakkerTheory)
 import Ltlspec.Models.Ping.Actors (pingCase)
 import Ltlspec.Models.Ping.Verification (PingWorld (PingWorld), emptyPingState, pingTheory, pingWorldsNotOk,
@@ -21,6 +21,7 @@ import System.Environment (lookupEnv, setEnv)
 import System.IO (BufferMode (NoBuffering), hSetBuffering, stderr, stdout)
 import Test.Tasty (TestTree, defaultMain, testGroup)
 import Test.Tasty.HUnit (testCase, testCaseInfo, (@?=))
+import Ltlspec.Models.Chat.Actors (chatCase, mkChatConfigs)
 
 testCaseSkip :: Bool -> String -> IO () -> TestTree
 testCaseSkip ci name body = testCaseInfo name (if ci then pure "SKIPPED" else body $> "")
@@ -251,17 +252,25 @@ testPing = testGroup "Ping"
   , testPingActors
   ]
 
-testChatShortTraceOk :: TestTree
-testChatShortTraceOk = testCase "Chat short trace ok" (runLogM (assertDriverTestOk chatTheory shortTrace))
+-- testChatShortTraceOk :: TestTree
+-- testChatShortTraceOk = testCase "Chat short trace ok" (runLogM (assertDriverTestOk chatTheory shortTrace))
 
 -- TODO: figure out why this doesn't work well on CI
-testChatLongTraceOk :: Bool -> TestTree
-testChatLongTraceOk ci = testCaseSkip ci "Chat long trace ok" (runLogM (assertDriverTestOk chatTheory longTrace))
+-- testChatLongTraceOk :: Bool -> TestTree
+-- testChatLongTraceOk ci = testCaseSkip ci "Chat long trace ok" (runLogM (assertDriverTestOk chatTheory longTrace))
+
+testChatActors :: TestTree 
+testChatActors = testCase "Chat actors" $ runLogM $ do 
+  pairs <- liftIO (mkChatConfigs 5)
+  xs <- runActorTest (chatCase 10 shortTickInterval pairs) (initialChatState 5)
+  assertDriverTestOk chatTheory (fmap ChatWorld xs)
 
 testChat :: Bool -> TestTree
-testChat ci = testGroup "Chat"
-  [ testChatShortTraceOk
-  , testChatLongTraceOk ci
+testChat _ = testGroup "Chat"
+  -- [ testChatShortTraceOk
+  -- , testChatLongTraceOk ci
+  -- ,
+  [ testChatActors
   ]
 
 testDHTraceOk1 :: TestTree

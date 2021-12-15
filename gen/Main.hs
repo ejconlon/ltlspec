@@ -5,7 +5,7 @@ module Main (main) where
 import Data.Foldable (for_)
 import Data.Text (Text)
 import qualified Data.Text as T
-import Ltlspec.Models.Chat.Chat (chatTheory)
+import Ltlspec.Models.Chat.Verification (chatTheory)
 import Ltlspec.Models.DinningHakker.Verification (dinningHakkerTheory)
 import Ltlspec.Models.Ping.Verification (pingTheory)
 import Ltlspec.Printer (Role (..), defaultTexOptions, hRenderTex, prettyTheory, runRenderM, texRep, unicodeRep)
