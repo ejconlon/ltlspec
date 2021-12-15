@@ -28,6 +28,7 @@ library
       Ltlspec.Driver
       Ltlspec.Models.Chat.Actors
       Ltlspec.Models.Chat.Chat
+      Ltlspec.Models.DinningHakker.Actor
       Ltlspec.Models.DinningHakker.Trace
       Ltlspec.Models.DinningHakker.Verification
       Ltlspec.Models.Ping.Actors
