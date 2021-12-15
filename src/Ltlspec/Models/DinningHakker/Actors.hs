@@ -1,4 +1,4 @@
-module Ltlspec.Models.DinningHakker.Actor where
+module Ltlspec.Models.DinningHakker.Actors where
 import Control.Concurrent.STM (TVar, newTVarIO, readTVar, writeTVar)
 import Control.Monad (replicateM)
 import Data.Maybe (fromJust)
@@ -31,6 +31,11 @@ data DHConfig =
   | DHChopstick DHId (TVar DHChopstickState)
   deriving stock (Eq)
 
+instance Show DHConfig where
+  show = \case
+    DHHakker l r _ -> "DHHakker: (" ++ show l ++ ", " ++ show r ++ ")"
+    DHChopstick i _ -> "DHChopstick: " ++ show i
+
 data DHMessage =
     DHTake -- Hakker attemps to take chopstick
   | DHPut -- Hakker attempts to put down chopstick
@@ -41,7 +46,7 @@ data DHMessage =
 dhGenConfigs :: Int -> [TVar DHHakkerState] -> [TVar DHChopstickState] -> [DHConfig]
 dhGenConfigs n hs cs =
   [DHHakker ((i-1+n) `mod` n) i (hs !! i) | i <- [0..n-1]] ++
-  [DHChopstick i (cs !! i) | i <- [1..n]]
+  [DHChopstick i (cs !! i) | i <- [0..n-1]]
 
 dhConfigs :: IO [DHConfig]
 dhConfigs = do
@@ -52,7 +57,7 @@ dhConfigs = do
 findChopsticks :: DHConfig -> [(ActorId, DHConfig)] -> (ActorId, ActorId)
 findChopsticks (DHHakker l r _) as = case findActorsWhere findLR as of
   [(lid, _), (rid, _)] -> (lid, rid)
-  _ -> error "Found more than two adjacent "
+  res -> error (show as ++ " found not exactly two adjacent actors: " ++ show (map fst res))
   where
     findLR = \case
       DHHakker {} -> False
