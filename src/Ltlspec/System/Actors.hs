@@ -18,6 +18,7 @@ module Ltlspec.System.Actors
   , runActorSystemSimple
   , TickMessage (..)
   , mkTickConfig
+  , mkEndConfig
   , extractTickEmbed
   , MessageView (..)
   , AnnoMessage (..)
@@ -367,6 +368,7 @@ runActorSystemSimple logger ctor configs = do
 data TickMessage msg =
     TickMessageFire
   | TickMessageEmbed !msg
+  | TickMessageEnd
   deriving stock (Eq, Show)
 
 -- | Makes a timer config for a tick message fire
@@ -374,9 +376,16 @@ mkTickConfig :: Maybe TimeDelta -> TimeDelta -> Maybe Int -> ActorId -> TimerCon
 mkTickConfig mayDelay interval mayLimit recvAid =
   TimerConfig mayDelay (Just (interval, mayLimit)) [recvAid] TickMessageFire
 
+-- | Makes a timer that broadcasts a tick message to end the whole system
+mkEndConfig :: Maybe TimeDelta -> [ActorId] -> TimerConfig (TickMessage msg)
+mkEndConfig mayDelay aids = TimerConfig mayDelay Nothing aids TickMessageEnd
+
 -- | Extracts embedded message from a tick message
 extractTickEmbed :: TickMessage msg -> Maybe msg
-extractTickEmbed = \case { TickMessageFire -> Nothing; TickMessageEmbed msg -> Just msg }
+extractTickEmbed = \case
+  TickMessageFire -> Nothing
+  TickMessageEnd -> Nothing
+  TickMessageEmbed msg -> Just msg
 
 -- | Is the annotated message from the sender's view or the receiver's?
 data MessageView =
