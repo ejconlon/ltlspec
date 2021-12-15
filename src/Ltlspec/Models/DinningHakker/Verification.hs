@@ -112,16 +112,16 @@ data DHVal =
   deriving stock (Eq, Show)
 
 lookupHakkerAfter :: DHWorld -> HakkerId -> Maybe Hakker
-lookupHakkerAfter (DHWorld (SAS _ _ (GlobalState {hakkers=hks}))) =
+lookupHakkerAfter (DHWorld (SAS _ _ GlobalState {hakkers=hks})) =
   flip M.lookup hks
 
 lookupChopstickAfter :: DHWorld -> ChopstickId -> Maybe Chopstick
-lookupChopstickAfter (DHWorld (SAS _ _ (GlobalState {chopsticks=chops}))) =
+lookupChopstickAfter (DHWorld (SAS _ _ GlobalState {chopsticks=chops})) =
   flip M.lookup chops
 
 exists :: Eq a => a -> Seq a -> Bool
 exists _ Empty = False
-exists a (xs :|> x) = if a == x then True else exists a xs
+exists a (xs :|> x) = (a == x) || exists a xs
 
 getHakkerIdFromMsg :: HakkerMsg -> HakkerId
 getHakkerIdFromMsg = \case
