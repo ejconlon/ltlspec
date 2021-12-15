@@ -3,7 +3,7 @@ import Control.Concurrent.STM (TVar, newTVarIO, readTVar, writeTVar)
 import Control.Monad (replicateM)
 import Data.Maybe (fromJust)
 import Ltlspec.System.Actors (ActorCase (..), ActorConstructor, ActorId, AnnoMessage, AppMessage (AppMessage), Behavior,
-                              TickMessage (..), findActorsWhere, minimalTickMessageFilter, mkTickConfig,
+                              TickMessage (..), findActorsWhere, minimalTickMessageFilter, mkEndConfig, mkTickConfig,
                               runActorCaseSimple)
 import Ltlspec.System.Logging (Logger, consoleLogger)
 import Ltlspec.System.Time (TimeDelta, timeDeltaFromFracSecs)
@@ -15,6 +15,7 @@ type DHId = Int
 data DHChopstickState =
     Taken
   | Free
+  | End -- special state to end the system
   deriving stock (Eq, Show)
 
 -- | hakker state
@@ -23,6 +24,7 @@ data DHHakkerState =
   -- The Int stands for the number of chopsticks the hakker currently holding
   | Hungry Int
   | Eating
+  | Dead -- special state to end the system
   deriving stock (Eq, Show)
 
 -- | actor config in dinning hakker
@@ -85,6 +87,7 @@ dhBehavior _ (DHHakker _ _ stvar) lr sendMsg (AppMessage sendAid tm) = case tm o
         sendMsg (AppMessage rid (TickMessageEmbed DHPut))
         writeTVar stvar Thinking
       _ -> return ()
+  TickMessageEnd -> writeTVar stvar Dead
   TickMessageEmbed msg -> case msg of
     DHTaken -> do
       st <- readTVar stvar
@@ -98,6 +101,7 @@ dhBehavior _ (DHHakker _ _ stvar) lr sendMsg (AppMessage sendAid tm) = case tm o
     _ -> error ("Wrong type of message received by Hakker: " ++ show msg)
 dhBehavior aid (DHChopstick _ stvar) _ sendMsg (AppMessage sendAid tm) = case tm of
   TickMessageFire -> return ()
+  TickMessageEnd -> writeTVar stvar End
   TickMessageEmbed msg -> case msg of
     DHTake -> do
       st <- readTVar stvar
@@ -106,20 +110,26 @@ dhBehavior aid (DHChopstick _ stvar) _ sendMsg (AppMessage sendAid tm) = case tm
         Free -> do
           sendMsg (AppMessage sendAid (TickMessageEmbed DHTaken))
           writeTVar stvar Taken
+        End -> return ()
     DHPut -> do
       st <- readTVar stvar
       case st of
         Taken -> do
           writeTVar stvar Free
         Free -> error "Chopstick should not receive Put message when Free"
+        End -> return ()
     _ -> error ("Wrong type of message received by Chopstick " ++ show aid ++ ": " ++ show msg)
 
 dhCtor :: Int -> TimeDelta -> ActorConstructor DHConfig (TickMessage DHMessage)
 dhCtor limit interval pairs myId = \case
-  hk@DHHakker{} ->
+  hk@(DHHakker l _ _) ->
     let chops = findChopsticks hk pairs
         tickConfig = mkTickConfig Nothing interval (Just limit) myId
-    in ([tickConfig], dhBehavior myId hk (Just chops))
+        timers =
+          if l == 0
+            then [tickConfig, mkEndConfig (Just 15) (map fst pairs)]
+            else [tickConfig]
+    in (timers, dhBehavior myId hk (Just chops))
   chop@DHChopstick{} -> ([], dhBehavior myId chop Nothing)
 
 dhCase :: Int -> TimeDelta -> [DHConfig] -> ActorCase DHMessage
@@ -132,5 +142,6 @@ main :: IO ()
 main = do
   logger <- consoleLogger
   configs <- dhConfigs
-  messages <- runDhSim logger 10 (timeDeltaFromFracSecs (1 :: Double)) configs
+  messages <- runDhSim logger 10 (timeDeltaFromFracSecs (0.5 :: Double)) configs
   pPrint messages
+  pPrint $ "Total message number: " ++ show (length messages)

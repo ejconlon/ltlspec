@@ -41,6 +41,7 @@ pingBehavior nextId sendMsg (AppMessage sendAid tm) =
       case msg of
         PingMessagePing -> sendMsg (AppMessage sendAid (TickMessageEmbed PingMessagePong))
         _ -> pure ()
+    TickMessageEnd -> pure ()
 
 -- | Each actor is instantiated with a tick timer and the above behavior.
 pingCtor :: Int -> TimeDelta -> ActorConstructor PingConfig (TickMessage PingMessage)
