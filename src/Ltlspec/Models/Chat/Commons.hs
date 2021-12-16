@@ -5,7 +5,6 @@ import Control.DeepSeq (NFData)
 import Data.Hashable (Hashable)
 import qualified Data.Map as Map
 import Ltlspec.System.Actors (ActorId)
-import Ltlspec.Types (SAS)
 
 
 newtype ActionID = ActionID {unActionID::Int}

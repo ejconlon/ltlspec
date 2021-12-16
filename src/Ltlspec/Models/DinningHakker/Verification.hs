@@ -155,7 +155,7 @@ evalDHAtomProp w@(DHWorld (SAS (GlobalState ts _ _ _) _ _)) (Atom prop vals) = c
       in case res2 of
         Nothing -> Left "The sender of the message does not exist"
         Just hk -> Right (lchop hk == cid || rchop hk == cid)
-    _ -> Left $ "Could not evaluate atomic proposition \"" ++ prop  ++ "\" with argument list " ++ (show vals)
+    _ -> Left $ "Could not evaluate atomic proposition \"" ++ prop  ++ "\" with argument list " ++ show vals
 
 instance Bridge Error DHVal DHWorld where
   bridgeEvalProp w =

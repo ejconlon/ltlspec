@@ -9,7 +9,7 @@ import Ltlspec.Models.Chat.Commons (ActionID (..), ChannelID, ChatMessage (..), 
 import Ltlspec.System.Actors (ActorId (..), AnnoMessage (AnnoMessage), AppMessage (..), NetMessage (NetMessage))
 import Ltlspec.TriBool (TriBool (..))
 import Ltlspec.Types (ApplyAction (..), Atom (..), BinderGroup (..), Bridge (..), Commented (NoComment), Error,
-                      Prop (..), SAS (..), SProp (..), Theory (..), TruncBridge (..), initScanSAS)
+                      Prop (..), SAS (..), SProp (..), Theory (..), TruncBridge (..))
 chatTheory :: Theory
 chatTheory = Theory
   { theoryTypes = NoComment <$> ["Client", "Channel", "Action"]
