@@ -19,6 +19,7 @@
 \acmBooktitle{N/A}
 
 \title{LTLSpec: An Extensible LTL Verifier for Distributed Systems}
+\subtitle{CPSC 538B Final Project Report}
 \author{Eric Conlon}
 \author{Yanze Li}
 \author{Tarcisio Teixeira}
@@ -28,7 +29,7 @@
 \begin{document}
 
 \begin{abstract}
-TODO. This work was prepared for CSPC 538B.
+  TODO. This work was prepared for CSPC 538B.
 \end{abstract}
 
 \maketitle
@@ -67,27 +68,27 @@ In this paper, we:
 First, we will loosely define a language for expressing the \textit{theory} of a user’s domain. DFOL (First Order Logic with Dependent types) as encoded in LF syntax \cite{hutchison_first-order_2006} is an excellent fit for this task. It allows one to define the types of values in a domain, as well as atomic propositions over those values. (This is called a \textit{signature}.) Additionally, it allows one to express propositions with quantifiers or \textit{axioms}. Together, the signature and axioms form a theory of the domain.
 
 \begin{figure}
-{
-\fontsize{10}{12}\selectfont
-\input{../gendocs/tex/ping.tex}
-}
-\mycaption{Theory for a trivial ping system}
+  {
+    \fontsize{10}{12}\selectfont
+    \input{../gendocs/tex/ping.tex}
+  }
+  \mycaption{Theory for a trivial ping system}
 \end{figure}
 
 \subsection{Bridge}
 
 \begin{figure}
-{
-\fontsize{10}{12}\selectfont
-\begin{minted}{haskell}
+  {
+    \fontsize{10}{12}\selectfont
+    \begin{minted}{haskell}
 class Eq v => Bridge e v w | w -> e v where
   -- | Evaluate the atomic proposition or fail.
   bridgeEvalProp :: w -> Atom v -> Either e Prop
   -- | Quantify over all values of the given type or fail.
   bridgeQuantify :: w -> TyName -> Either e [v]
 \end{minted}
-}
-\mycaption{Haskell definition of a bridge}
+  }
+  \mycaption{Haskell definition of a bridge}
 \end{figure}
 
 \subsection{Verifier}
