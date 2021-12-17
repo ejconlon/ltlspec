@@ -79,7 +79,7 @@ In this paper, we:
 
 First, we will loosely define a language for expressing the \textit{theory} of a user’s domain. DFOL (First Order Logic with Dependent types) as encoded in LF syntax \cite{hutchison_first-order_2006} is an excellent fit for this task. It allows one to define the types of values in a domain, as well as atomic propositions over those values. (This is called a \textit{signature}.) Additionally, it allows one to express propositions with quantifiers or \textit{axioms}. Together, the signature and axioms form a theory of the domain.
 
-\begin{figure}
+\begin{figure}[h]
   {
     \fontsize{10}{12}\selectfont
     \input{../gendocs/tex/ping.tex}
@@ -89,14 +89,14 @@ First, we will loosely define a language for expressing the \textit{theory} of a
 
 \subsection{Bridge}
 
-\begin{figure}
+\begin{figure}[h]
   {
     \fontsize{10}{12}\selectfont
     \begin{minted}{haskell}
 class Eq v => Bridge e v w | w -> e v where
-  -- | Evaluate the atomic proposition or fail.
+  -- Evaluate the atomic proposition or fail.
   bridgeEvalProp :: w -> Atom v -> Either e Prop
-  -- | Quantify over all values of the given type or fail.
+  -- Quantify over all values of the given type or fail.
   bridgeQuantify :: w -> TyName -> Either e [v]
 \end{minted}
   }
@@ -105,7 +105,38 @@ class Eq v => Bridge e v w | w -> e v where
 
 \subsection{Verifier}
 
+\begin{figure}[h]
+  {
+    \fontsize{10}{12}\selectfont
+    \begin{minted}{haskell}
+-- EnvProp is an LTL proposition with its environment
+-- The environment carries the data variable v
+-- introduced by quantifiers in the parent propositions.
+data EnvProp v =
+  EnvProp !(Env v) !Prop
+
+envPropEval :: Bridge e v w => EnvProp v -> w -> EnvPropRes e v
+\end{minted}
+  }
+  \mycaption{Haskell definition of the verifier}
+\end{figure}
+
 \subsection{Truncation}
+
+\begin{figure}[h]
+  {
+    \fontsize{10}{12}\selectfont
+    \begin{minted}{haskell}
+-- A 'Bridge' that supports proposition truncation.
+class Bridge e v w => TruncBridge e v w where
+  -- The set of types with empty quantification in *all reachable worlds*
+  truncBridgeEmpty :: w -> Set TyName
+  -- An oracle for atomic propositions in *all reachable worlds*
+  truncBridgeOracle :: w -> Atom v -> Either e TriBool
+\end{minted}
+  }
+  \mycaption{Haskell definition of the truncation}
+\end{figure}
 
 \section{Evaluation}
 
