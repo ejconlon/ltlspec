@@ -23,7 +23,7 @@
 \acmBooktitle{N/A}
 
 \title{LTLSpec: An Extensible LTL Verifier for Distributed Systems}
-\subtitle{CPSC 538B Final Project Report}
+\subtitle{CPSC 538B Final Project Report, 2021 Winter Term 1}
 \author{Eric Conlon}
 \author{Yanze Li}
 \author{Tarcisio Teixeira}
@@ -73,6 +73,26 @@ In this paper, we:
 
 \section{LTLSpec}
 
+\begin{figure}[h]
+  \includegraphics[width=0.6\textwidth]{ltlspec-overview.pdf}
+  \centering
+  \caption{Overview of LTLSpec}
+  \label{fig:overview}
+\end{figure}
+
+\ltlspec is a verification framework aiming at providing a canonical way for specifying arbitrary LTL properties in distributed system.
+Figure~\ref{fig:overview} shows the overview of the framework.
+At a high level, \ltlspec consists of three components.
+The \textit{theory} is a user-defined domain for verification that includes the definitions of \textit{value types}, \textit{atomic propositions}, and \textit{axioms} about the system.
+The \textit{bridge} defines how to evaluate quantifiers over value types and atomic propositions in the axioms.
+The LTL verifier is an interpreter over the LTL abstract syntax tree.
+The details about the components will be further explained in the following subsections, along with our extension to the bridge, namely \textit{truncation}.
+
+The verification is performed over a trace, where each element inside is called a \textit{world}.
+Each axiom is verified against a world. The LTL verifier is in charge of interpreting the LTL connectives.
+Once the verifier hits a quantifier or atomic proposition, it passes the current world and the corresponding quantifier or proposition to the bridge for evaluation.
+This interaction ends until the axiom can no longer be evaluated.
+Since proposition written in LTL talks about system properties spanning multiple worlds, the residual of the current evaluation will be carried along for further evaluation in the next world.
 
 
 \subsection{First-order theories}
@@ -85,6 +105,7 @@ First, we will loosely define a language for expressing the \textit{theory} of a
     \input{../gendocs/tex/ping.tex}
   }
   \mycaption{Theory for a trivial ping system}
+  \label{fig:ping-theory}
 \end{figure}
 
 \subsection{Bridge}
@@ -101,6 +122,7 @@ class Eq v => Bridge e v w | w -> e v where
 \end{minted}
   }
   \mycaption{Haskell definition of a bridge}
+  \label{fig:bridge-sig}
 \end{figure}
 
 \subsection{Verifier}
@@ -119,6 +141,7 @@ envPropEval :: Bridge e v w => EnvProp v -> w -> EnvPropRes e v
 \end{minted}
   }
   \mycaption{Haskell definition of the verifier}
+  \label{fig:verifier-sig}
 \end{figure}
 
 \subsection{Truncation}
@@ -136,6 +159,7 @@ class Bridge e v w => TruncBridge e v w where
 \end{minted}
   }
   \mycaption{Haskell definition of the truncation}
+  \label{fig:truncation-sig}
 \end{figure}
 
 \section{Evaluation}
