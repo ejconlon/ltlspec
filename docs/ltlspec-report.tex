@@ -130,10 +130,12 @@ class Eq v => Bridge e v w | w -> e v where
 
 Figure~\ref{fig:bridge-sig} presents the typeclass definition for bridges.
 Two functions \texttt{bridgeEvalProp} and \texttt{bridgeQuantify} needs to be implemented.
-\texttt{bridgeEvalProp} decides how to evaluate an atomic proposition when given correct inputs. It takes the current world \texttt{w} and the atomic proposition \texttt{Atom v} of interest as arguments. It either returns an error message \texttt{e}, if the proposition could not be successfully evaluated, or a resulting proposition \texttt{Prop} if the evaluation succeeded.
+\texttt{bridgeEvalProp} decides how to evaluate an atomic proposition when given correct inputs. It takes the current world \texttt{w} and the atomic proposition \texttt{Atom v} of interest as arguments.
+It either returns an error message \texttt{e}, if the proposition could not be successfully evaluated, or a resulting proposition \texttt{Prop} if the evaluation succeeded.
 For most bridge definitions, the value of \texttt{Prop} here should be either one of the constants between \texttt{PropTrue} and \texttt{PropFalse}.
 
-\texttt{bridgeQuantify} decides how to quantify over a specific type name regarding the current world. Similarly, it takes the current world \texttt{w} and a type name as arguments, and produce either an error \texttt{e} or a list of values \texttt{v} of the given type for quantification results.
+\texttt{bridgeQuantify} decides how to quantify over a specific type name regarding the current world.
+Similarly, it takes the current world \texttt{w} and a type name as arguments, and produce either an error \texttt{e} or a list of values \texttt{v} of the given type for quantification results.
 
 In our current implementation, there isn't a mechanism to guarantee the correspondence between the theory and the bridge, and it is users' duty to make sure all types and propositions are correctly quantified or evaluated.
 It is possible to provide users with a surface language where the compiler guarantees all bridge definitions respects the theory of the distributed system. We consider this as a future work.
