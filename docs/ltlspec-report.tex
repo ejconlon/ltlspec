@@ -141,7 +141,7 @@ Since proposition written in LTL talks about system properties spanning multiple
 \begin{figure}[h]
   {
     \fontsize{10}{12}\selectfont
-    \input{../gendocs/tex/ping.tex}
+    \input{theories/ping.tex}
   }
   \mycaption{Theory for a trivial ping system}
   \label{fig:ping-theory}
@@ -200,8 +200,7 @@ The verifier is an interpreter over the abstract syntax tree of an LTL propositi
 -- EnvProp is an LTL proposition with its environment
 -- The environment carries the data variable v
 -- introduced by quantifiers in the parent propositions.
-data EnvProp v =
-  EnvProp !(Env v) !Prop
+data EnvProp v = EnvProp !(Env v) !Prop
 -- Evaluate an LTL Proposition based on a world
 envPropEval :: Bridge e v w => EnvProp v -> w -> EnvPropRes e v
 \end{minted}
@@ -285,7 +284,7 @@ The theory for chatting room example is presented in Figure~\ref{fig:chat-theory
 \begin{figure}[ht]
   {
     \fontsize{10}{12}\selectfont
-    \input{../gendocs/tex/chat.tex}
+    \input{theories/chat.tex}
   }
   \mycaption{Theory for a chat room system}
   \label{fig:chat-theory}
@@ -298,7 +297,7 @@ The theory for Dinning Philosopher example is presented in Figure~\ref{fig:phil-
 \begin{figure}[ht]
   {
     \fontsize{10}{12}\selectfont
-    \input{../gendocs/tex/phil.tex}
+    \input{theories/phil.tex}
   }
   \mycaption{Theory for the dinning philosopher problem}
   \label{fig:phil-theory}
