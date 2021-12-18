@@ -17,4 +17,4 @@
     cpan YAML::Tiny
     perl -MCPAN -e 'install "File::HomeDir"'
 
-3) When making big changes, try a clean build before pushing: `make clean-docs report`
+3) When making big changes, try a clean build before pushing: `make full-report`

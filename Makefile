@@ -36,3 +36,10 @@ report-deps:
 .PHONY: report
 report:
 	cd docs && latexmk -pdf -pdflatex="pdflatex -shell-escape -interaction=nonstopmode" -use-make ./ltlspec-report.tex
+
+.PHONY: full-report
+full-report:
+	# For some reason having these as make deps is racy. Just run them in sequence.
+	$(MAKE) clean-docs
+	$(MAKE) gen
+	$(MAKE) report
