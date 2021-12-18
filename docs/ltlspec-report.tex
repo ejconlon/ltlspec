@@ -1,10 +1,11 @@
-\documentclass[format=acmsmall, nonacm=true, review=true]{acmart}
+\documentclass[format=acmsmall, nonacm=true, review=true, screen=true]{acmart}
 
 \usepackage[utf8]{inputenc}
 \usepackage{xcolor}
 \usepackage{fancyvrb}
 \usepackage{minted}
 \usepackage{xspace}
+\usepackage{hyperref}
 
 % Use this instead of caption to remove acmart description warnings
 \newcommand{\mycaption}[1]{\Description{#1}\caption{#1}}
@@ -72,9 +73,9 @@ In this paper, we:
 
 \section{Background}
 \subsection{Runtime Verification}
-Runtime Verification (RV), sometimes also referred to as Runtime Monitoring, Trace Analysis, or Dynamic Analysis, is a lightweight formal method that, instead of exhaustively analyzing all possible program executions, only verifies the specified properties based on the current execution trace. Though limited by traces, RV can scale well and be practically integrated with existing complex systems. Moreover, it provides the most precise information regarding the current execution. Typical usage of RV includes checking the correctness of runtime behavior, detecting bugs exhibited at runtime, and enforcing runtime invariants on live systems. 
+Runtime Verification (RV), sometimes also referred to as Runtime Monitoring, Trace Analysis, or Dynamic Analysis, is a lightweight formal method that, instead of exhaustively analyzing all possible program executions, only verifies the specified properties based on the current execution trace. Though limited by traces, RV can scale well and be practically integrated with existing complex systems. Moreover, it provides the most precise information regarding the current execution. Typical usage of RV includes checking the correctness of runtime behavior, detecting bugs exhibited at runtime, and enforcing runtime invariants on live systems.
 
-Several types of monitoring methodologies are found in the current literature, REF different approaches may vary a lot in terms of interaction with the system under verification. On one extreme we have offline monitors verifying the execution trace much later it is produced whereas some online monitors may verify the trace along with the system execution. Different approaches result in different concerns, while more intrusive strategies allow early detection and even repair at runtime, offline monitors do verification at almost no overhead for the system.  
+Several types of monitoring methodologies are found in the current literature, REF different approaches may vary a lot in terms of interaction with the system under verification. On one extreme we have offline monitors verifying the execution trace much later it is produced whereas some online monitors may verify the trace along with the system execution. Different approaches result in different concerns, while more intrusive strategies allow early detection and even repair at runtime, offline monitors do verification at almost no overhead for the system.
 
 Nowadays, distributed systems are ubiquitous and complex, and they suffer malfunctions for many reasons. It is desirable to monitor their correct behaviors at runtime, ensuring various safety and liveness guarantees. However, distributed systems pose new challenges to RV. The monitors need to be distributed and coordinate the distributed logs. An expressive enough specification language is also needed to describe the reactive and asynchronous nature of the system.
 
@@ -97,12 +98,12 @@ $$\forall_{p} x : \phi \equiv \lnot(\exists_{p}x: \lnot\phi)$$
 
 Note that the domain whose we quantify over is a function of the parameter identifier and the trace at the current time.
 
-For example, let's assume that one wants to check if the property “At some point in the system there exists one messageId with value $v$ such that some atomic proposition $\phi(v)$ holds” is satisfied at the current time. Then, using LTL-FO+ we would write the above as follows: 
+For example, let's assume that one wants to check if the property “At some point in the system there exists one messageId with value $v$ such that some atomic proposition $\phi(v)$ holds” is satisfied at the current time. Then, using LTL-FO+ we would write the above as follows:
 
 $$ \rho \vDash \lozenge(\exists_{p} v :\phi(v)) $$
 
 
-The quantifier in LTL-FO+ only quantifies over data variables, therefore it cannot express propositions that quantifies over time. Since it is based on first order logic, it also disallows user to quantify over things like properties. 
+The quantifier in LTL-FO+ only quantifies over data variables, therefore it cannot express propositions that quantifies over time. Since it is based on first order logic, it also disallows user to quantify over things like properties.
 
 \section{LTLSpec}
 
@@ -217,6 +218,8 @@ Users can easily integrate the verifier with either a pre-collected trace (offli
 
 \subsection{Truncation}
 
+
+
 \begin{figure}[h]
   {
     \fontsize{10}{12}\selectfont
@@ -235,7 +238,13 @@ class Bridge e v w => TruncBridge e v w where
 
 \section{Evaluation}
 
+We evaluate our \ltlspec by verifying three simple distributed systems, i.e. a ping-pong system, a chat room implementation, and an implementation of the dinning philosopher problem.
+
 \subsection{Implementation}
+
+The \ltlspec framework, all example systems, and the corresponding theories and bridges are implemented in Haskell. We use software transactional memory (STM) to implement the logging system to guarantee the causality of the entire traces.
+
+The project is open-sourced and can be found \href{https://github.com/ejconlon/ltlspec}{here}
 
 \subsection{Ping-Pong}
 
@@ -252,7 +261,9 @@ Some existing works \cite{shafiei2020actor,lavery2017actor} use the actor model 
 The most relevant works we can find are \cite{cassar2015synchronous,cassar2015runtime}.
 \cite{cassar2015synchronous} studied the overhead between synchronous and asynchronous monitor instrumentation for actor-based systems and proposed a hybrid instrumentation technique that can be  integrated with RV tools to provide timely detection with low runtime overhead.
 \cite{cassar2015runtime} proposed a runtime adaptation technique based on an existing RV tool to dynamically react to violations detected in actor-based systems.
-In our project, instead of focusing on the RV techniques specifically for actor-based systems, we emphasize on how to provide an abstraction layer between the distributed application and the LTL verifiers. We want to provide an expressive specification language to help users model their application domains and specify the system's properties at the same time. This specification later acts as the contract between the real system and the verifier. We pick the actor-based system because it's a popular programming model and a clean abstraction for distributed systems.
+In our project, instead of focusing on the RV techniques specifically for actor-based systems, we emphasize on how to provide an abstraction layer between the distributed application and the LTL verifiers.
+We want to provide an expressive specification language to help users model their application domains and specify the system's properties at the same time. This specification later acts as the contract between the real system and the verifier.
+We pick the actor-based system because it's a popular programming model and a clean abstraction for distributed systems.
 Previous work has also shown that interesting properties about actor-based systems can be specified using an LTL-like logic[1,5].
 
 \section{Conclusion}
