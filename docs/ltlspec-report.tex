@@ -75,16 +75,16 @@ In this paper, we:
 \subsection{Runtime Verification}
 Runtime Verification (RV), sometimes also referred to as Runtime Monitoring, Trace Analysis, or Dynamic Analysis, is a lightweight formal method that, instead of exhaustively analyzing all possible program executions, only verifies the specified properties based on the current execution trace. Though limited by traces, RV can scale well and be practically integrated with existing complex systems. Moreover, it provides the most precise information regarding the current execution. Typical usage of RV includes checking the correctness of runtime behavior, detecting bugs exhibited at runtime, and enforcing runtime invariants on live systems.
 
-Several types of monitoring methodologies are found in the current literature, REF different approaches may vary a lot in terms of interaction with the system under verification. On one extreme we have offline monitors verifying the execution trace much later it is produced whereas some online monitors may verify the trace along with the system execution. Different approaches result in different concerns, while more intrusive strategies allow early detection and even repair at runtime, offline monitors do verification at almost no overhead for the system.
+Several types of monitoring methodologies are found in the current literature, \red{REF} different approaches may vary a lot in terms of interaction with the system under verification. On one extreme we have offline monitors verifying the execution trace much later it is produced whereas some online monitors may verify the trace along with the system execution. Different approaches result in different concerns, while more intrusive strategies allow early detection and even repair at runtime, offline monitors do verification at almost no overhead for the system.
 
 Nowadays, distributed systems are ubiquitous and complex, and they suffer malfunctions for many reasons. It is desirable to monitor their correct behaviors at runtime, ensuring various safety and liveness guarantees. However, distributed systems pose new challenges to RV. The monitors need to be distributed and coordinate the distributed logs. An expressive enough specification language is also needed to describe the reactive and asynchronous nature of the system.
 
 \subsection{LTL and LTL-FO+}
 Linear Temporal Logic (LTL) is a commonly used specification language in formal methods to express properties in reactive and concurrent systems. The basic building blocks for LTL are called atomic propositions, which are opaque, domain-specific symbols (like $P$ or $Q$). Atomic propositions can then be connected or negate with standard boolean operators, including $\land$ (and), $\lor$ (or), $\lnot$ (not), and $\Rightarrow$ (implies), following their classical logic meaning. Most importantly, LTL introduces a set of temporal operators. Let $\phi$ be a proposition:
 \begin{itemize}
-  \item Operator $\square$ means "always", $\square \phi$ means that $\phi$ is true in \textbf{every} future time step.
-  \item Operator $\lozenge$ means “eventually”, $\lozenge \phi$ means that $\phi$ holds for \textbf{some} future time steps.
-  \item Operator $\bigcirc$ means “next”, $\bigcirc\phi$ means that $\phi$ holds for the next time step.
+  \item Operator $\Box$ means "always", $\Box \phi$ means that $\phi$ is true in \textit{every} future time step.
+  \item Operator $\Diamond$ means “eventually”, $\Diamond \phi$ means that $\phi$ holds for \textit{some} future time steps.
+  \item Operator $\bigcirc$ means “next”, $\bigcirc \phi$ means that $\phi$ holds for the \textit{next} time step.
   \item Operator $\mathcal{U}$ means “Until”, $\phi \mathcal{U}\psi$ means that $\phi$ holds for all time steps until at some step $\psi$ holds. $\psi$ must hold at the current step or in the future.
   \item Operator $\mathcal{W}$ means “Weak Until”, $\phi \mathcal{W}\psi$ means that $\phi$ holds for all time steps until at some step $\psi$ holds. If $\psi$ never holds, then $\phi$ must hold forever.
 \end{itemize}
@@ -100,7 +100,7 @@ Note that the domain whose we quantify over is a function of the parameter ident
 
 For example, let's assume that one wants to check if the property “At some point in the system there exists one messageId with value $v$ such that some atomic proposition $\phi(v)$ holds” is satisfied at the current time. Then, using LTL-FO+ we would write the above as follows:
 
-$$ \rho \vDash \lozenge(\exists_{p} v :\phi(v)) $$
+$$ \rho \vDash \Diamond(\exists_{p} v :\phi(v)) $$
 
 
 The quantifier in LTL-FO+ only quantifies over data variables, therefore it cannot express propositions that quantifies over time. Since it is based on first order logic, it also disallows user to quantify over things like properties.
@@ -130,6 +130,7 @@ Since proposition written in LTL talks about system properties spanning multiple
 
 
 \subsection{First-order theories}
+\label{subsec:theory}
 
 \red{
   First, we will loosely define a language for expressing the \textit{theory} of a user’s domain.
@@ -218,7 +219,15 @@ Users can easily integrate the verifier with either a pre-collected trace (offli
 
 \subsection{Truncation}
 
+One issue for all LTL-based runtime verification technique is that modal connectives are only meaningful regarding infinite traces.
+Take the ping-pong system in section~\ref{subsec:theory} for example, the axiom (invariant) we want the system to hold is \texttt{isResponsive}.
+This proposition start with the modal connective ``$\Diamond$ (always)'', meaning the proposition needs to hold in \textit{all} future executions.
+However, in practice we can only do runtime verification on finite traces, thus this proposition can never be proven true but only disproven when a violation is detected.
 
+Such behaviour is not always desirable when a system has been monitored for sufficiently long and certain assumptions can be made for its future executions.
+To allow users to make assumptions for their systems' behaviors \textit{after} the current traces, we provide a mechanism called \textit{truncation}.
+
+The definition of truncation is essentially an extension to the bridge, as shown in figure~\ref{fig:truncation-sig}.
 
 \begin{figure}[h]
   {
@@ -236,14 +245,22 @@ class Bridge e v w => TruncBridge e v w where
   \label{fig:truncation-sig}
 \end{figure}
 
+Similar to bridges, users need to implement two functions that talks about quantifications and atomic propositions respectively.
+\texttt{truncBridgeEmpty} takes the last world in the trace, and decides which set of types have empty quantification.
+\texttt{truncBridgeOracle} evaluates atomic propositions based on the last world.
+
+As a result, all propositions will be truncated into a ternary value, namely \textit{true}, \textit{false}, and \textit{unknown}.
+For example, propositions that are universally (existentially) quantified over these truncated types will be evaluated to be true (false) while the rest being unknown.
+An unknown proposition preserves the original LTL semantics, meaning it is not violated up to the point the monitoring ends, but it remains unknown whether the proposition holds in the future.
+
 \section{Evaluation}
 
 We evaluate our \ltlspec by verifying three simple distributed systems, i.e. a ping-pong system, a chat room implementation, and an implementation of the dinning philosopher problem.
 
 \subsection{Implementation}
 
-The \ltlspec framework, all example systems, and the corresponding theories and bridges are implemented in Haskell. We use software transactional memory (STM) to implement the logging system to guarantee the causality of the entire traces.
-
+The \ltlspec framework, all example systems, and the corresponding theories and bridges are implemented in Haskell.
+We use software transactional memory (STM) to implement the tracing to preserve the causality of the entire traces.
 The project is open-sourced and can be found \href{https://github.com/ejconlon/ltlspec}{here}
 
 \subsection{Ping-Pong}
