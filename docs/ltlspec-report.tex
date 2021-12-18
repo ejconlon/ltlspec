@@ -12,6 +12,9 @@
 % Project name
 \newcommand{\ltlspec}{\textit{LTLSpec}\xspace}
 
+% For highlighting some texts
+\newcommand{\red}[1]{\textcolor{red}{#1}}
+
 % This appears to fix some font problem...
 \DeclareRobustCommand{\ttfamily}{\fontencoding{T1}\fontfamily{lmtt}\selectfont}
 
@@ -97,7 +100,11 @@ Since proposition written in LTL talks about system properties spanning multiple
 
 \subsection{First-order theories}
 
-First, we will loosely define a language for expressing the \textit{theory} of a user’s domain. DFOL (First Order Logic with Dependent types) as encoded in LF syntax \cite{hutchison_first-order_2006} is an excellent fit for this task. It allows one to define the types of values in a domain, as well as atomic propositions over those values. (This is called a \textit{signature}.) Additionally, it allows one to express propositions with quantifiers or \textit{axioms}. Together, the signature and axioms form a theory of the domain.
+\red{
+  First, we will loosely define a language for expressing the \textit{theory} of a user’s domain.
+  DFOL (First Order Logic with Dependent types) as encoded in LF syntax \cite{hutchison_first-order_2006} is an excellent fit for this task. It allows one to define the types of values in a domain, as well as atomic propositions over those values. (This is called a \textit{signature}.)
+  Additionally, it allows one to express propositions with quantifiers or \textit{axioms}. Together, the signature and axioms form a theory of the domain.
+}
 
 \begin{figure}[h]
   {
@@ -109,6 +116,7 @@ First, we will loosely define a language for expressing the \textit{theory} of a
 \end{figure}
 
 \subsection{Bridge}
+\label{subsec:bridge}
 
 The theory provides a set of interfaces restricting what types, propositions, and invariants we can talk about regarding a specific distributed system trace, yet it does not provide an interpretation about for propositions and quantifiers over types.
 The bridge is the component answering those questions.
@@ -137,12 +145,12 @@ For most bridge definitions, the value of \texttt{Prop} here should be either on
 \texttt{bridgeQuantify} decides how to quantify over a specific type name regarding the current world.
 Similarly, it takes the current world \texttt{w} and a type name as arguments, and produce either an error \texttt{e} or a list of values \texttt{v} of the given type for quantification results.
 
-In our current implementation, there isn't a mechanism to guarantee the correspondence between the theory and the bridge, and it is users' duty to make sure all types and propositions are correctly quantified or evaluated.
+In our current implementation, there isn't a mechanism to guarantee the correspondence between the theory and the bridge, and it is users' responsibility to make sure all types and propositions are correctly quantified or evaluated in the brdige.
 It is possible to provide users with a surface language where the compiler guarantees all bridge definitions respects the theory of the distributed system. We consider this as a future work.
 
 \subsection{Verifier}
 
-The verifier is an interpreter over the abstract syntax tree of an LTL proposition. Figure~\ref{fig:verifier-sig} gives the the data type definition of \texttt{EnvProp} and the signature of main evaluation function \texttt{envPropEval}.
+The verifier is an interpreter over the abstract syntax tree of an LTL proposition. Figure~\ref{fig:verifier-sig} gives the data type definition of \texttt{EnvProp} and the signature of the evaluation function \texttt{envPropEval}.
 
 \begin{figure}[h]
   {
@@ -153,13 +161,29 @@ The verifier is an interpreter over the abstract syntax tree of an LTL propositi
 -- introduced by quantifiers in the parent propositions.
 data EnvProp v =
   EnvProp !(Env v) !Prop
-
+-- Evaluate LTL Proposition
 envPropEval :: Bridge e v w => EnvProp v -> w -> EnvPropRes e v
 \end{minted}
   }
-  \mycaption{Haskell definition of the verifier}
+  \mycaption{Haskell definition of the data type \texttt{EnvProp} and the evaluation function}
   \label{fig:verifier-sig}
 \end{figure}
+
+\texttt{EnvProp} is a wrapper for primitive LTL propositions \texttt{Prop}.
+It carries an additional field \texttt{Env v} that keeps track of the variable bindings introduced by quantifiers in the parent propositions.
+
+To evaluate an LTL proposition, \texttt{envPropEval} takes an \texttt{EnvProp} and the current world \texttt{w} to compute a resulting proposition \texttt{EnvPropRes}.
+The result can be a boolean value, when a proposition is fully evaluated in the current world.
+If the proposition involves modal connectives that cannot be evaluated immediate, the function returns a residual proposition that will be carried along to the next world.
+If the proposition involves any quantifiers or atomic propositions, the evaluator will invoke the corresponding bridge functions explained in section~\ref{subsec:bridge} using the current world \texttt{w}.
+
+The \texttt{envPropEval} only evaluate the LTL proposition on a single world, i.e., one element in the distributed system trace.
+To fully verify the system, we call \texttt{envPropEval} iteratively over an entire system trace.
+At each iteration \texttt{envPropEval} take the residual proposition from last one together with the current world as arguments.
+The verification process stops when either the proposition is evaluated to be true or false, the whole trace is consumed, or the evaluator throws an exception.
+
+It is worth noticing that our implementation does not assume a specific way of doing the verification.
+Users can easily integrate the verifier with either a pre-collected trace (offline verification) or a running system actively generating new traces (online verification).
 
 \subsection{Truncation}
 
@@ -181,7 +205,13 @@ class Bridge e v w => TruncBridge e v w where
 
 \section{Evaluation}
 
-TODO.
+\subsection{Implementation}
+
+\subsection{Ping-Pong}
+
+\subsection{Chat Room}
+
+\subsection{Dinning Philosopher}
 
 \section{Related Work}
 
