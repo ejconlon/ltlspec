@@ -22,7 +22,8 @@ docker-test:
 
 .PHONY: clean-docs
 clean-docs:
-	rm -f docs/*.{aux,fdb_latexmk,fls,log,nav,out,pdf,snm,synctex.gz,toc}
+	rm -f docs/*.{aux,bbl,blg,fdb_latexmk,fls,log,nav,out,pdf,snm,synctex.gz,toc}
+	rm -rf docs/_minted-ltlspec-report
 
 .PHONY: preso
 preso:
