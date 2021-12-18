@@ -71,8 +71,38 @@ In this paper, we:
 \end{itemize}
 
 \section{Background}
+\subsection{Runtime Verification}
+Runtime Verification (RV), sometimes also referred to as Runtime Monitoring, Trace Analysis, or Dynamic Analysis, is a lightweight formal method that, instead of exhaustively analyzing all possible program executions, only verifies the specified properties based on the current execution trace. Though limited by traces, RV can scale well and be practically integrated with existing complex systems. Moreover, it provides the most precise information regarding the current execution. Typical usage of RV includes checking the correctness of runtime behavior, detecting bugs exhibited at runtime, and enforcing runtime invariants on live systems. 
+
+Several types of monitoring methodologies are found in the current literature, REF different approaches may vary a lot in terms of interaction with the system under verification. On one extreme we have offline monitors verifying the execution trace much later it is produced whereas some online monitors may verify the trace along with the system execution. Different approaches result in different concerns, while more intrusive strategies allow early detection and even repair at runtime, offline monitors do verification at almost no overhead for the system.  
+
+Nowadays, distributed systems are ubiquitous and complex, and they suffer malfunctions for many reasons. It is desirable to monitor their correct behaviors at runtime, ensuring various safety and liveness guarantees. However, distributed systems pose new challenges to RV. The monitors need to be distributed and coordinate the distributed logs. An expressive enough specification language is also needed to describe the reactive and asynchronous nature of the system.
 
 \subsection{LTL and LTL-FO+}
+Linear Temporal Logic (LTL) is a commonly used specification language in formal methods to express properties in reactive and concurrent systems. The basic building blocks for LTL are called atomic propositions, which are opaque, domain-specific symbols (like $P$ or $Q$). Atomic propositions can then be connected or negate with standard boolean operators, including $\land$ (and), $\lor$ (or), $\lnot$ (not), and $\Rightarrow$ (implies), following their classical logic meaning. Most importantly, LTL introduces a set of temporal operators. Let $\phi$ be a proposition:
+\begin{itemize}
+  \item Operator $\square$ means "always", $\square \phi$ means that $\phi$ is true in \textbf{every} future time step.
+  \item Operator $\lozenge$ means “eventually”, $\lozenge \phi$ means that $\phi$ holds for \textbf{some} future time steps.
+  \item Operator $\bigcirc$ means “next”, $\bigcirc\phi$ means that $\phi$ holds for the next time step.
+  \item Operator $\mathcal{U}$ means “Until”, $\phi \mathcal{U}\psi$ means that $\phi$ holds for all time steps until at some step $\psi$ holds. $\psi$ must hold at the current step or in the future.
+  \item Operator $\mathcal{W}$ means “Weak Until”, $\phi \mathcal{W}\psi$ means that $\phi$ holds for all time steps until at some step $\psi$ holds. If $\psi$ never holds, then $\phi$ must hold forever.
+\end{itemize}
+
+To achieve stronger expressiveness, different extensions of LTL are proposed. Early work by Emerson [7] extended LTL with standard first order quantifiers, where the variables are quantified over a fixed domain. A different approach, inspired by the database community, quantifies the variables over a dynamic domain, i.e., variables appear in the trace. The latter is more favorable for RV, since the dynamic domain is more tractable algorithmically. Hence, in our project, we decided to use an LTL extension called LTL-FO+.
+
+LTL-FO+ allows users to quantify over the values seen at the current time step. Given a parameter identifier $p$ and a proposition $\phi$, then $\exists_{p} x : \phi$ and $\forall_{p} x:\phi$ are also propositions. Assume $\rho$ is the trace of the system at the current time, then the semantics of the quantifiers can be formalized as below:
+
+$$\rho\vDash \exists_p x:\phi \Leftrightarrow \phi[b/x] \text{for some }b\in Dom_{\rho}(p)$$
+$$\forall_{p} x : \phi \equiv \lnot(\exists_{p}x: \lnot\phi)$$
+
+Note that the domain whose we quantify over is a function of the parameter identifier and the trace at the current time.
+
+For example, let's assume that one wants to check if the property “At some point in the system there exists one messageId with value $v$ such that some atomic proposition $\phi(v)$ holds” is satisfied at the current time. Then, using LTL-FO+ we would write the above as follows: 
+
+$$ \rho \vDash \lozenge(\exists_{p} v :\phi(v)) $$
+
+
+The quantifier in LTL-FO+ only quantifies over data variables, therefore it cannot express propositions that quantifies over time. Since it is based on first order logic, it also disallows user to quantify over things like properties. 
 
 \section{LTLSpec}
 
