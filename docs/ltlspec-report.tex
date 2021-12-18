@@ -147,6 +147,15 @@ Since proposition written in LTL talks about system properties spanning multiple
   \label{fig:ping-theory}
 \end{figure}
 
+We use a simple ping-pong system as the example. Each node will send a ping message to a different node in the system, then expecting the pong message to come from the receiver. We want to verify the
+responsiveness property below:
+
+\textit{It is always true that, if a node send a ping message to some other node, a pong message will eventually be received by this node sending from the receiver of the ping message.}
+
+To define a theory that can express such axioms, we need to first define the value types exist needed for verification. In this case, we are only interested in \textit{ping} and \textit{pong} messages (\texttt{SentPing} and \texttt{RecvPong}).
+Secondly, we need an atomic proposition to check if a pair of ping-pong messages has the matching sender and receiver (\texttt{isPingPong}).
+Finally, our axiom can be defined using the value types, atomic propositions, and LTL connectives, i.e. \texttt{isResponsive}.
+
 \subsection{Bridge}
 \label{subsec:bridge}
 
@@ -193,7 +202,7 @@ The verifier is an interpreter over the abstract syntax tree of an LTL propositi
 -- introduced by quantifiers in the parent propositions.
 data EnvProp v =
   EnvProp !(Env v) !Prop
--- Evaluate LTL Proposition
+-- Evaluate an LTL Proposition based on a world
 envPropEval :: Bridge e v w => EnvProp v -> w -> EnvPropRes e v
 \end{minted}
   }
@@ -257,6 +266,8 @@ An unknown proposition preserves the original LTL semantics, meaning it is not v
 
 We evaluate our \ltlspec by verifying three simple distributed systems, i.e. a ping-pong system, a chat room implementation, and an implementation of the dinning philosopher problem.
 
+For each example, we can verify its theory according to the collected traces. Detailed implementation for each example is omitted due to page limit.
+
 \subsection{Implementation}
 
 The \ltlspec framework, all example systems, and the corresponding theories and bridges are implemented in Haskell.
@@ -265,7 +276,12 @@ The project is open-sourced and can be found \href{https://github.com/ejconlon/l
 
 \subsection{Ping-Pong}
 
-\subsection{Chat Room}
+The theory for ping-pong example is already presented in Figure~\ref{fig:ping-theory}, Section~\ref{subsec:theory}.
+
+\subsection{Chatting Room}
+
+The theory for chatting room example is presented in Figure~\ref{fig:chat-theory}.
+
 \begin{figure}[ht]
   {
     \fontsize{10}{12}\selectfont
@@ -276,6 +292,9 @@ The project is open-sourced and can be found \href{https://github.com/ejconlon/l
 \end{figure}
 
 \subsection{Dinning Philosopher}
+
+The theory for Dinning Philosopher example is presented in Figure~\ref{fig:phil-theory}.
+
 \begin{figure}[ht]
   {
     \fontsize{10}{12}\selectfont
