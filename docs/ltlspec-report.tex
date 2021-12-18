@@ -147,14 +147,14 @@ Since proposition written in LTL talks about system properties spanning multiple
   \label{fig:ping-theory}
 \end{figure}
 
-We use a simple ping-pong system as the example. Each node will send a ping message to a different node in the system, then expecting the pong message to come from the receiver. We want to verify the
-responsiveness property below:
+We use a simple ping-pong system as the example. Each node will send a ping message to a different node in the system, then expecting the pong message to come from the receiver.
+We want to verify the responsiveness property below:
 
 \textit{It is always true that, if a node send a ping message to some other node, a pong message will eventually be received by this node sending from the receiver of the ping message.}
 
-To define a theory that can express such axioms, we need to first define the value types exist needed for verification. In this case, we are only interested in \textit{ping} and \textit{pong} messages (\texttt{SentPing} and \texttt{RecvPong}).
-Secondly, we need an atomic proposition to check if a pair of ping-pong messages has the matching sender and receiver (\texttt{isPingPong}).
-Finally, our axiom can be defined using the value types, atomic propositions, and LTL connectives, i.e. \texttt{isResponsive}.
+To define a theory that can express such axioms, we need to first define the value types needed for verification. In this case, we are only interested in \textit{ping} and \textit{pong} messages (\texttt{SentPing} and \texttt{RecvPong}).
+Secondly, we need an atomic proposition that checks if a pair of ping-pong messages has the matching sender and receiver (\texttt{isPingPong}).
+Finally, the axiom \texttt{isResponsive} can be defined using the value types, atomic propositions, and LTL connectives.
 
 \subsection{Bridge}
 \label{subsec:bridge}
@@ -180,7 +180,7 @@ class Eq v => Bridge e v w | w -> e v where
 Figure~\ref{fig:bridge-sig} presents the typeclass definition for bridges.
 Two functions \texttt{bridgeEvalProp} and \texttt{bridgeQuantify} needs to be implemented.
 \texttt{bridgeEvalProp} decides how to evaluate an atomic proposition when given correct inputs. It takes the current world \texttt{w} and the atomic proposition \texttt{Atom v} of interest as arguments.
-It either returns an error message \texttt{e}, if the proposition could not be successfully evaluated, or a resulting proposition \texttt{Prop} if the evaluation succeeded.
+It either returns an error message \texttt{e}, if the proposition could not be successfully evaluated, or a result proposition \texttt{Prop} if the evaluation succeeded.
 For most bridge definitions, the value of \texttt{Prop} here should be either one of the constants between \texttt{PropTrue} and \texttt{PropFalse}.
 
 \texttt{bridgeQuantify} decides how to quantify over a specific type name regarding the current world.
@@ -213,8 +213,8 @@ envPropEval :: Bridge e v w => EnvProp v -> w -> EnvPropRes e v
 \texttt{EnvProp} is a wrapper for primitive LTL propositions \texttt{Prop}.
 It carries an additional field \texttt{Env v} that keeps track of the variable bindings introduced by quantifiers in the parent propositions.
 
-To evaluate an LTL proposition, \texttt{envPropEval} takes an \texttt{EnvProp} and the current world \texttt{w} to compute a resulting proposition \texttt{EnvPropRes}.
-The result can be a boolean value, when a proposition is fully evaluated in the current world.
+To evaluate an LTL proposition, \texttt{envPropEval} takes an \texttt{EnvProp} and the current world \texttt{w} to compute a result proposition \texttt{EnvPropRes}.
+The result is a boolean value when a proposition can be fully evaluated in the current world.
 If the proposition involves modal connectives that cannot be evaluated immediate, the function returns a residual proposition that will be carried along to the next world.
 If the proposition involves any quantifiers or atomic propositions, the evaluator will invoke the corresponding bridge functions explained in section~\ref{subsec:bridge} using the current world \texttt{w}.
 
@@ -229,9 +229,9 @@ Users can easily integrate the verifier with either a pre-collected trace (offli
 \subsection{Truncation}
 
 One issue for all LTL-based runtime verification techniques is that modal connectives are only meaningful regarding infinite traces.
-Taking the ping-pong system in section~\ref{subsec:theory} for example, the axiom (invariant) we want the system to hold is \texttt{isResponsive}.
-This proposition start with the modal connective ``$\Diamond$ (always)'', meaning the proposition needs to hold in \textit{all} future executions.
-However, in practice we can only do runtime verification on finite traces, thus this proposition can never be proven true but only disproven when a violation is detected.
+In the ping-pong system in subsection~\ref{subsec:theory}, the axiom we want to prove is \texttt{isResponsive}.
+This axiom starts with the modal connective ``$\Diamond$ (always)'', meaning it is a global invariant that holds in \textit{all} future executions.
+However, in practice we can only do runtime verification on finite traces, thus this axiom can never be proven true but only disproven when a violation is observed.
 
 Such behaviour is not always desirable when a system has been monitored for sufficiently long and certain assumptions can be made for its future executions.
 To allow users to make assumptions for their systems' behaviors \textit{after} the current traces, we provide a mechanism called \textit{truncation}.
@@ -254,13 +254,13 @@ class Bridge e v w => TruncBridge e v w where
   \label{fig:truncation-sig}
 \end{figure}
 
-Similar to bridges, users need to implement two functions that talks about quantifications and atomic propositions respectively.
-\texttt{truncBridgeEmpty} takes the last world in the trace, and decides which set of types have empty quantification.
-\texttt{truncBridgeOracle} evaluates atomic propositions based on the last world.
+Similar to bridges, users need to implement two functions that talks about quantification and atomic propositions respectively.
+\texttt{truncBridgeEmpty} takes the last world in the trace and decides which set of types have empty quantification.
+\texttt{truncBridgeOracle} evaluates atomic propositions for all future executions based on the last world.
 
 As a result, all propositions will be truncated into a ternary value, namely \textit{true}, \textit{false}, or \textit{unknown}.
 For example, propositions that are universally (existentially) quantified over these truncated types will be evaluated to be true (false) while the rest being unknown.
-An unknown proposition preserves the original LTL semantics, meaning it is not violated up to the point the monitoring ends, but it remains unknown whether the proposition holds in the future.
+An unknown proposition preserves the original LTL semantics, meaning it has not been disproven up to the point the monitoring ends. But it is unknown whether the proposition will hold in the future.
 
 \section{Evaluation}
 
