@@ -228,7 +228,7 @@ Users can easily integrate the verifier with either a pre-collected trace (offli
 
 \subsection{Truncation}
 
-One issue for all LTL-based runtime verification technique is that modal connectives are only meaningful regarding infinite traces.
+One issue for all LTL-based runtime verification techniques is that modal connectives are only meaningful regarding infinite traces.
 Taking the ping-pong system in section~\ref{subsec:theory} for example, the axiom (invariant) we want the system to hold is \texttt{isResponsive}.
 This proposition start with the modal connective ``$\Diamond$ (always)'', meaning the proposition needs to hold in \textit{all} future executions.
 However, in practice we can only do runtime verification on finite traces, thus this proposition can never be proven true but only disproven when a violation is detected.
