@@ -82,11 +82,11 @@ Nowadays, distributed systems are ubiquitous and complex, and they suffer malfun
 \subsection{LTL and LTL-FO+}
 Linear Temporal Logic (LTL) is a commonly used specification language in formal methods to express properties in reactive and concurrent systems. The basic building blocks for LTL are called atomic propositions, which are opaque, domain-specific symbols (like $P$ or $Q$). Atomic propositions can then be connected or negate with standard boolean operators, including $\land$ (and), $\lor$ (or), $\lnot$ (not), and $\Rightarrow$ (implies), following their classical logic meaning. Most importantly, LTL introduces a set of temporal operators. Let $\phi$ be a proposition:
 \begin{itemize}
-  \item Operator $\Box$ means "always", $\Box \phi$ means that $\phi$ is true in \textit{every} future time step.
-  \item Operator $\Diamond$ means “eventually”, $\Diamond \phi$ means that $\phi$ holds for \textit{some} future time steps.
-  \item Operator $\bigcirc$ means “next”, $\bigcirc \phi$ means that $\phi$ holds for the \textit{next} time step.
-  \item Operator $\mathcal{U}$ means “Until”, $\phi \mathcal{U}\psi$ means that $\phi$ holds for all time steps until at some step $\psi$ holds. $\psi$ must hold at the current step or in the future.
-  \item Operator $\mathcal{W}$ means “Weak Until”, $\phi \mathcal{W}\psi$ means that $\phi$ holds for all time steps until at some step $\psi$ holds. If $\psi$ never holds, then $\phi$ must hold forever.
+  \item Operator $\Box$ means  ``always'', $\Box \phi$ means that $\phi$ is true in \textit{every} future time step.
+  \item Operator $\Diamond$ means ``eventually'', $\Diamond \phi$ means that $\phi$ holds for \textit{some} future time steps.
+  \item Operator $\bigcirc$ means ``next'', $\bigcirc \phi$ means that $\phi$ holds for the \textit{next} time step.
+  \item Operator $\mathcal{U}$ means ``Until'', $\phi \mathcal{U}\psi$ means that $\phi$ holds for all time steps until at some step $\psi$ holds. $\psi$ must hold at the current step or in the future.
+  \item Operator $\mathcal{W}$ means ``Weak Until'', $\phi \mathcal{W}\psi$ means that $\phi$ holds for all time steps until at some step $\psi$ holds. If $\psi$ never holds, then $\phi$ must hold forever.
 \end{itemize}
 
 To achieve stronger expressiveness, different extensions of LTL are proposed. Early work by Emerson [7] extended LTL with standard first order quantifiers, where the variables are quantified over a fixed domain. A different approach, inspired by the database community, quantifies the variables over a dynamic domain, i.e., variables appear in the trace. The latter is more favorable for RV, since the dynamic domain is more tractable algorithmically. Hence, in our project, we decided to use an LTL extension called LTL-FO+.
@@ -220,7 +220,7 @@ Users can easily integrate the verifier with either a pre-collected trace (offli
 \subsection{Truncation}
 
 One issue for all LTL-based runtime verification technique is that modal connectives are only meaningful regarding infinite traces.
-Take the ping-pong system in section~\ref{subsec:theory} for example, the axiom (invariant) we want the system to hold is \texttt{isResponsive}.
+Taking the ping-pong system in section~\ref{subsec:theory} for example, the axiom (invariant) we want the system to hold is \texttt{isResponsive}.
 This proposition start with the modal connective ``$\Diamond$ (always)'', meaning the proposition needs to hold in \textit{all} future executions.
 However, in practice we can only do runtime verification on finite traces, thus this proposition can never be proven true but only disproven when a violation is detected.
 
@@ -241,7 +241,7 @@ class Bridge e v w => TruncBridge e v w where
   truncBridgeOracle :: w -> Atom v -> Either e TriBool
 \end{minted}
   }
-  \mycaption{Haskell definition of the truncation}
+  \mycaption{Haskell definition of a truncation bridge}
   \label{fig:truncation-sig}
 \end{figure}
 
@@ -249,7 +249,7 @@ Similar to bridges, users need to implement two functions that talks about quant
 \texttt{truncBridgeEmpty} takes the last world in the trace, and decides which set of types have empty quantification.
 \texttt{truncBridgeOracle} evaluates atomic propositions based on the last world.
 
-As a result, all propositions will be truncated into a ternary value, namely \textit{true}, \textit{false}, and \textit{unknown}.
+As a result, all propositions will be truncated into a ternary value, namely \textit{true}, \textit{false}, or \textit{unknown}.
 For example, propositions that are universally (existentially) quantified over these truncated types will be evaluated to be true (false) while the rest being unknown.
 An unknown proposition preserves the original LTL semantics, meaning it is not violated up to the point the monitoring ends, but it remains unknown whether the proposition holds in the future.
 
@@ -266,8 +266,24 @@ The project is open-sourced and can be found \href{https://github.com/ejconlon/l
 \subsection{Ping-Pong}
 
 \subsection{Chat Room}
+\begin{figure}[ht]
+  {
+    \fontsize{10}{12}\selectfont
+    \input{../gendocs/tex/chat.tex}
+  }
+  \mycaption{Theory for a chat room system}
+  \label{fig:chat-theory}
+\end{figure}
 
 \subsection{Dinning Philosopher}
+\begin{figure}[ht]
+  {
+    \fontsize{10}{12}\selectfont
+    \input{../gendocs/tex/phil.tex}
+  }
+  \mycaption{Theory for the dinning philosopher problem}
+  \label{fig:phil-theory}
+\end{figure}
 
 \section{Related Work}
 
@@ -286,6 +302,8 @@ Previous work has also shown that interesting properties about actor-based syste
 \section{Conclusion}
 
 TODO.
+
+\pagebreak
 
 \bibliographystyle{ACM-Reference-Format}
 \bibliography{ltlspec-report}
