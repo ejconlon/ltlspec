@@ -14,7 +14,7 @@
 \newcommand{\ltlspec}{\textit{LTLSpec}\xspace}
 
 % For highlighting some texts
-\newcommand{\red}[1]{\textcolor{red}{#1}}
+% \newcommand{\red}[1]{\textcolor{red}{#1}}
 
 % This appears to fix some font problem...
 \DeclareRobustCommand{\ttfamily}{\fontencoding{T1}\fontfamily{lmtt}\selectfont}
@@ -75,7 +75,7 @@ In this paper, we:
 \subsection{Runtime Verification}
 Runtime verification (RV), sometimes also referred to as runtime monitoring, trace analysis, or dynamic analysis, is a lightweight formal method that, instead of exhaustively analyzing all possible program executions, only verifies the specified properties based on the current execution trace. Though limited by traces, RV can scale well and be practically integrated with existing complex systems. Moreover, it provides the most precise information regarding the current execution. Typical usage of RV includes checking the correctness of runtime behavior, detecting bugs exhibited at runtime, and enforcing runtime invariants on live systems.
 
-Several types of monitoring methodologies are found in the current literature, \red{!REF HERE!} different approaches may vary a lot in terms of interaction with the system under verification. On one extreme we have offline monitors verifying the execution trace much later it is produced whereas some online monitors may verify the trace along with the system execution. Different approaches result in different concerns, while more intrusive strategies allow early detection and even repair at runtime, offline monitors do verification at almost no overhead for the system.
+Several types of monitoring methodologies are found in the current literature, and these approaches vary significantly in terms of interaction with the system under verification. On one extreme we have offline monitors verifying the execution trace much later it is produced whereas some online monitors may verify the trace along with the system execution. Different approaches result in different concerns, while more intrusive strategies allow early detection and even repair at runtime, offline monitors do verification at almost no overhead for the system.
 
 Nowadays, distributed systems are ubiquitous and complex, and they suffer malfunctions for many reasons. It is desirable to monitor their correct behaviors at runtime, ensuring various safety and liveness guarantees. However, distributed systems pose new challenges to RV. The monitors need to be distributed and coordinate the distributed logs. An expressive enough specification language is also needed to describe the reactive and asynchronous nature of the system.
 
@@ -103,6 +103,8 @@ For example, let's assume that one wants to check if the property “At some poi
 $$ \rho \vDash \Diamond(\exists_{p} v :\phi(v)) $$
 
 The quantifier in LTL-FO+ only quantifies over data variables, therefore it cannot express propositions that quantifies over time. Since it is based on first order logic, it also disallows quantification over things like properties.
+
+Subsection~\ref{subsec:theory} presents the syntax we use for LTL propositions.
 
 \section{LTLSpec}
 
@@ -145,6 +147,27 @@ We want to verify the following responsiveness property: \textit{It is always tr
 The theory that captures this property is shown in Figure~\ref{fig:ping-theory}. First, we must declare the value types needed for verification. In this case, we are only interested in events related to \textit{ping} and \textit{pong} messages (\texttt{SentPing} and \texttt{RecvPong}).
 Second, we need an atomic proposition that checks if a pair of ping-pong messages has the matching sender and receiver (\texttt{isPingPong}).
 Finally, the axiom \texttt{isResponsive} can be declared using the value types, atomic propositions, and LTL connectives.
+
+Figure~\ref{fig:theory-sig} shows a simplified AST of a theory in \ltlspec. The restrictions mentioned above can be shown here in the structure of types and proposisions. The actual representation contains comments and syntax sugar we remove before interpretation.
+
+\begin{figure}[h]
+  {
+    \fontsize{10}{12}\selectfont
+    \begin{minted}{haskell}
+type TyDefs = [TyName]
+type PropDefs = Map PropName [TyName]
+type AxiomDefs = Map AxiomName Prop
+
+data Theory = Theory
+  { theoryTypes :: !TyDefs
+  , theoryProps :: !PropDefs
+  , theoryAxioms :: !AxiomDefs
+  }
+\end{minted}
+  }
+  \mycaption{Haskell definition of a theory}
+  \label{fig:theory-sig}
+\end{figure}
 
 \subsection{Bridge}
 \label{subsec:bridge}
@@ -247,23 +270,24 @@ These operations are not arbitrary - they allow bottom up interpretation of a re
 
 As a result, all propositions will be truncated into a ternary value, namely \textit{true}, \textit{false}, or \textit{unknown}.
 For example, propositions that are universally (existentially) quantified over these truncated types will be evaluated to be true (false) while the rest being unknown.
-An unknown proposition preserves the original LTL semantics, meaning it has not been disproven up to the point the monitoring ends. But it is unknown whether the proposition will hold in the future.
+An unknown proposition preserves the original LTL semantics, meaning it has not been disproven up to the point the monitoring ends, but it is unknown whether the proposition will hold in the future.
+
+We believe that this technique is valid reasoning in a higher-order ternary metalogic. Loosely speaking, this shifts the infinite quantification over reachable worlds from the verifier to the bridge.
 
 \section{Evaluation}
 
-We evaluate \ltlspec by verifying three simple distributed systems, i.e. a ping system, a chat system, and an implementation of the dining philosophers problem.
-
-For each example, we can verify its theory according to the collected traces. Detailed implementation and complete for each example is omitted due to page limit.
+We evaluate \ltlspec by verifying three simple distributed systems: a ping system, a chat system, and an implementation of the dining philosophers problem. For each example, we verify the corresponding theory according to the collected traces. Due to the page limit, we abbreviate our descriptions and theory listings.
 
 \subsection{Implementation}
 
-The \ltlspec framework, all example systems, and the corresponding theories and bridges are implemented in Haskell.
+The \ltlspec framework, all example systems, and the corresponding bridges are implemented in Haskell.
 The project is open-source and can be found \href{https://github.com/ejconlon/ltlspec}{here}.
-We simulate a multinode environment with multithreading and a centralized ``network'' coordinator.
-These components use software transactional memory (STM) to preclude unobservable side effects and ensure causal trace collection.
+For each system, we defined actors, messages, and system configurations that ensured that we were able to collect traces and verify theories with the aid of the corresponding bridge.
+
+We simulated a multinode environment with multithreading and a centralized ``network'' coordinator.
+These components use software transactional memory (STM) \cite{harris2005composable} to preclude unobservable side effects and ensure causal trace collection.
 Though we have not implemented it, it is possible to replace the behavior of the network coordinator to inject faults into the system, allowing verification of the system under test in the presence of faults.
-We run a global monitor that is able to detect quiesence and terminate the simulation promptly.
-Knowing that our simulations go quiescent allows us to implement truncation for these systems.
+We run a global monitor that is able to detect quiesence and terminate the simulation promptly, since knowing that our simulations go quiescent allows us to implement truncation for these systems.
 
 \subsection{Ping system}
 
@@ -285,7 +309,7 @@ Relevant axioms include message delivery responsiveness (\texttt{ifInChannelRece
 
 \subsection{Dining philosophers}
 
-We also simulate the classic concurrency scenario of dining philosophers. Figure~\ref{fig:phil-theory} shows some of the liveness and safety properties we've axiomatized.
+We also simulate the classic concurrency scenario of dining philosophers. Figure~\ref{fig:phil-theory} shows some of the liveness and safety properties we've axiomatized. This encoding of the problem as ``chopstick'' and ``philosopher'' actors mimics an \href{https://github.com/akka/akka-samples/blob/2.6/akka-sample-fsm-scala/src/main/scala/sample/DiningHakkers.scala}{Akka FSM example}.
 
 \begin{figure}[ht]
   {
@@ -295,6 +319,13 @@ We also simulate the classic concurrency scenario of dining philosophers. Figure
   \mycaption{Theory for the dining philosophers problem}
   \label{fig:phil-theory}
 \end{figure}
+
+\subsection{Analysis}
+
+Our primary concerns in this work were determining a useful and generalizable syntax and semantics for runtime verification.
+We believe that our example domains exhibit a representative range of theory sizes and structures with examples of responsiveness, liveness, and safety properties. The LTL verifier itself is comprehensively unit tested and we have verified simulated and manually-constructed traces for each theory.
+
+Performance was a secondary concern, and we don't say much on the topic because there are many design decisions when integrating runtime verification that have contrasting effects on performance and verifiability. That said, we have found evalution passable with our naive LTL interpreter, but we highlight that real-world performance is going to depend on the size and structure of a theory and the efficiency of a bridge. In terms of pure interpreter optimizations, one may want to implement a safe-for-space machine, perform term graph deduplication, or perform predicate pushdown, none of which we have done in this work.
 
 \section{Related Work}
 
@@ -313,9 +344,7 @@ Previous work has also shown that interesting properties about actor-based syste
 
 \section{Conclusion}
 
-TODO.
-
-\pagebreak
+We have presented \ltlspec, an extensible system for runtime verification of actor-based distributed systems, and we have shown the applicability of our abstractions to several distinct problem domains. We believe that LTL with data variable quantification as we have implemented it is a useful and expressive language for modeling these systems, and we believe that describing systems with first-order theories with per-theory interpretations (bridges) gives rich enough structure to exploit in online or offline verification. As we have mentioned, future work may expand the space of supported theories, prove these assertions in the presence of injected faults, or attempt on deeper language-level integration of interpretations.
 
 \bibliographystyle{ACM-Reference-Format}
 \bibliography{ltlspec-report}
