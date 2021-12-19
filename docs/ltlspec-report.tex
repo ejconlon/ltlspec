@@ -89,7 +89,7 @@ Linear Temporal Logic (LTL) is a commonly used specification language in formal 
   \item Operator $\mathcal{W}$ means ``Weak Until'', $\phi \mathcal{W}\psi$ means that $\phi$ holds for all time steps until at some step $\psi$ holds. If $\psi$ never holds, then $\phi$ must hold forever.
 \end{itemize}
 
-To achieve stronger expressiveness, different extensions of LTL are proposed. Early work by Emerson \red{!REF HERE!} extended LTL with standard first order quantifiers, where the variables are quantified over a fixed domain. A different approach, inspired by the database community, quantifies the variables over a dynamic domain, i.e., variables appear in the trace. The latter is more favorable for RV, since the dynamic domain is more tractable algorithmically. Hence, in our project, we decided to use an LTL extension called LTL-FO+.
+To achieve stronger expressiveness, different extensions of LTL are proposed. Early work by Emerson \cite{emerson1990temporal} extended LTL with standard first order quantifiers, where the variables are quantified over a fixed domain. A different approach, inspired by the database community, quantifies the variables over a dynamic domain, i.e., variables appear in the trace. The latter is more favorable for RV, since the dynamic domain is more tractable algorithmically. Hence, in our project, we decided to use an LTL extension called LTL-FO+.
 
 LTL-FO+ allows users to quantify over the values seen at the current time step. Given a parameter identifier $p$ and a proposition $\phi$, then $\exists_{p} x : \phi$ and $\forall_{p} x:\phi$ are also propositions. Assume $\rho$ is the trace of the system at the current time (i.e. a \textit{world} in the Kripke sense), then the semantics of the quantifiers can be formalized as below:
 
@@ -251,23 +251,28 @@ An unknown proposition preserves the original LTL semantics, meaning it has not 
 
 \section{Evaluation}
 
-We evaluate our \ltlspec by verifying three simple distributed systems, i.e. a ping system, a chat system, and an implementation of the dining philosophers problem.
+We evaluate \ltlspec by verifying three simple distributed systems, i.e. a ping system, a chat system, and an implementation of the dining philosophers problem.
 
-For each example, we can verify its theory according to the collected traces. Detailed implementation and complete theory for each example is omitted due to page limit.
+For each example, we can verify its theory according to the collected traces. Detailed implementation and complete for each example is omitted due to page limit.
 
 \subsection{Implementation}
 
 The \ltlspec framework, all example systems, and the corresponding theories and bridges are implemented in Haskell.
-We use software transactional memory (STM) to implement the tracing to preserve the causality of the entire traces.
 The project is open-source and can be found \href{https://github.com/ejconlon/ltlspec}{here}.
+We simulate a multinode environment with multithreading and a centralized ``network'' coordinator.
+These components use software transactional memory (STM) to preclude unobservable side effects and ensure causal trace collection.
+Though we have not implemented it, it is possible to replace the behavior of the network coordinator to inject faults into the system, allowing verification of the system under test in the presence of faults.
+We run a global monitor that is able to detect quiesence and terminate the simulation promptly.
+Knowing that our simulations go quiescent allows us to implement truncation for these systems.
 
 \subsection{Ping system}
 
-The theory for ping system example is already presented in Figure~\ref{fig:ping-theory} and Section~\ref{subsec:theory}.
+The theory for ping system example has already been presented in Figure~\ref{fig:ping-theory} and Section~\ref{subsec:theory}.
 
 \subsection{Chat system}
 
-The theory for chat system example is presented in Figure~\ref{fig:chat-theory}.
+We verify correct behavior for a chat room system with a centralized server architecture.
+Relevant axioms include message delivery responsiveness (\texttt{ifInChannelReceiveMessage}), persistence of presence in joined rooms (\texttt{isMemberBetweenJoinAndLeave}), and a safety property around never receiving one's own messages (\texttt{neverSendMessageToMyself}). Parts of the theory are presented in Figure~\ref{fig:chat-theory}.
 
 \begin{figure}[ht]
   {
@@ -280,7 +285,7 @@ The theory for chat system example is presented in Figure~\ref{fig:chat-theory}.
 
 \subsection{Dining philosophers}
 
-The theory for the dining philosophers example is presented in Figure~\ref{fig:phil-theory}.
+We also simulate the classic concurrency scenario of dining philosophers. Figure~\ref{fig:phil-theory} shows some of the liveness and safety properties we've axiomatized.
 
 \begin{figure}[ht]
   {
@@ -300,10 +305,11 @@ Some existing works \cite{shafiei2020actor,lavery2017actor} use the actor model 
 The most relevant works we can find are \cite{cassar2015synchronous,cassar2015runtime}.
 \cite{cassar2015synchronous} studied the overhead between synchronous and asynchronous monitor instrumentation for actor-based systems and proposed a hybrid instrumentation technique that can be  integrated with RV tools to provide timely detection with low runtime overhead.
 \cite{cassar2015runtime} proposed a runtime adaptation technique based on an existing RV tool to dynamically react to violations detected in actor-based systems.
-In our project, instead of focusing on the RV techniques specifically for actor-based systems, we emphasize on how to provide an abstraction layer between the distributed application and the LTL verifiers.
-We want to provide an expressive specification language to help users model their application domains and specify the system's properties at the same time. This specification later acts as the contract between the real system and the verifier.
+
+In our project, instead of focusing on the RV techniques specifically for actor-based systems, we emphasize how to provide an abstraction layer between the distributed application and the LTL verifiers.
+We provide an expressive specification language and simple bridge interface to help users model their application domains and specify the system's properties at the same time. This specification later acts as the contract between the real system and the verifier.
 We pick the actor-based system because it's a popular programming model and a clean abstraction for distributed systems.
-Previous work has also shown that interesting properties about actor-based systems can be specified using an LTL-like logic[1,5].
+Previous work has also shown that interesting properties about actor-based systems can be specified using an LTL-like logic \cite{actorservice, parthasarathy2018modular}.
 
 \section{Conclusion}
 
