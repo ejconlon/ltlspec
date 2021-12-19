@@ -91,7 +91,7 @@ Linear Temporal Logic (LTL) is a commonly used specification language in formal 
 
 To achieve stronger expressiveness, different extensions of LTL are proposed. Early work by Emerson \red{!REF HERE!} extended LTL with standard first order quantifiers, where the variables are quantified over a fixed domain. A different approach, inspired by the database community, quantifies the variables over a dynamic domain, i.e., variables appear in the trace. The latter is more favorable for RV, since the dynamic domain is more tractable algorithmically. Hence, in our project, we decided to use an LTL extension called LTL-FO+.
 
-LTL-FO+ allows users to quantify over the values seen at the current time step. Given a parameter identifier $p$ and a proposition $\phi$, then $\exists_{p} x : \phi$ and $\forall_{p} x:\phi$ are also propositions. Assume $\rho$ is the trace of the system at the current time (i.e. a \textit{world}), then the semantics of the quantifiers can be formalized as below:
+LTL-FO+ allows users to quantify over the values seen at the current time step. Given a parameter identifier $p$ and a proposition $\phi$, then $\exists_{p} x : \phi$ and $\forall_{p} x:\phi$ are also propositions. Assume $\rho$ is the trace of the system at the current time (i.e. a \textit{world} in the Kripke sense), then the semantics of the quantifiers can be formalized as below:
 
 $$\rho\vDash \exists_p x:\phi \Leftrightarrow \phi[b/x] \text{for some }b\in Dom_{\rho}(p)$$
 $$\forall_{p} x : \phi \equiv \lnot(\exists_{p}x: \lnot\phi)$$
@@ -101,7 +101,6 @@ Note that the domain we quantify over is a function of the parameter identifier 
 For example, let's assume that one wants to check if the property “At some point in the system there exists one value $v$ such that some atomic proposition $\phi(v)$ holds” is satisfied at the current time. Then, using LTL-FO+ we would write the above as follows:
 
 $$ \rho \vDash \Diamond(\exists_{p} v :\phi(v)) $$
-
 
 The quantifier in LTL-FO+ only quantifies over data variables, therefore it cannot express propositions that quantifies over time. Since it is based on first order logic, it also disallows quantification over things like properties.
 
@@ -122,20 +121,14 @@ The \textit{bridge} defines how to evaluate quantifiers over value types and ato
 The \textit{LTL verifier} is an interpreter over the LTL abstract syntax tree.
 These components will be further explained in following subsections along with our extensions to the bridge (\textit{truncation}).
 
-The LTL verifier operates incrementally over trace elements (what we call \textit{worlds} in the Kripke sense), allowing it to be used online as a monitor or offline as a trace analyzer.
-For each world, it evaluates each axiom of the theory. Internally, the verifier understands how to interpret standard LTL connectives, but when it hits a quantifier or atomic proposition, it yields the current world and the corresponding quantifier or proposition to the bridge for evaluation.
-This interaction continues until the axiom can no longer be evaluated due to error or satisfaction.
-Since propositions written in LTL define system properties spanning multiple worlds, there may be residual proof burdens from the current world carried along for further evaluation in the subsequent worlds.
-
-
 \subsection{First-order theories}
 \label{subsec:theory}
 
 \ltlspec uses \textit{first-order logical theories} to model user domains.
 The specific syntax we use for this purpose is DFOL (First Order Logic with Dependent types) \cite{hutchison_first-order_2006}, which allows one to define the types of values in a domain as well as atomic propositions over those values. (This is called a \textit{signature}.)
-Additionally, DFOL allows one to express \textit{axioms} of the system as propositions with quantifiers. Together, the signature and axioms form the theory of the domain. The \textit{dependent} part is a language formality that allows the declaration of propositions indexed by values, as any dependent type system would. This presentation exploits the Curry-Howard correspondence of propositions as types: an axiom's type is a first-order LTL proposition. (In this syntax everything appears as a type declaration without a corresponding definition.)
+Additionally, DFOL allows one to express \textit{axioms} of the system as propositions with quantifiers. Together, the signature and axioms form the theory of the domain. The \textit{dependent} part is a language formality that allows the declaration of propositions indexed by values, as any dependent type system would. This presentation exploits the Curry-Howard correspondence of propositions as types: an axiom's type is a first-order LTL proposition. (In this syntax everything appears as a type declaration without a corresponding definition.) Our LTL verifier interprets these propositions as expressions.
 
-At this time our implementation supports only a subset of possible theories. First, only simple types are supported, meaning there are no type constructors. Second, only simple atomic propositions are supported, meaning these propositions can only take types (not propositions) as arguments. We made these restrictions to simplify the bridge interface, but future implementations may lift them. Also, at this time we do not parse theories in the textual format presented here, but we do render theory syntax trees that way.
+At this time our implementation supports only a subset of possible theories. First, only simple types are supported, meaning there are no type constructors. Second, only simple atomic propositions are supported, meaning these propositions can only take types (not propositions) as arguments. Finally, no value declarations are supported. We made these restrictions to simplify the bridge interface, but future implementations may lift them. Also, at this time we do not parse theories in the textual format presented here, but we do render theory syntax trees this way.
 
 \begin{figure}[h]
   {
@@ -156,8 +149,8 @@ Finally, the axiom \texttt{isResponsive} can be declared using the value types, 
 \subsection{Bridge}
 \label{subsec:bridge}
 
-The theory provides an interface restricting what types, propositions, and invariants we can talk about regarding a specific distributed system trace, yet it does not provide an interpretation for propositions and quantifiers over types.
-The bridge is the component answering those questions.
+The types, propositions, and axioms of a theory characterize a domain but by themselves are not sufficient to verify traces. The user must provide some code we call a \textit{bridge} to interpret those propositions and quantifiers over those types.
+Figure~\ref{fig:bridge-sig} presents the typeclass definition for such a component.
 
 \begin{figure}[h]
   {
@@ -174,28 +167,29 @@ class Eq v => Bridge e v w | w -> e v where
   \label{fig:bridge-sig}
 \end{figure}
 
-Figure~\ref{fig:bridge-sig} presents the typeclass definition for bridges.
-Two functions \texttt{bridgeEvalProp} and \texttt{bridgeQuantify} needs to be implemented.
-\texttt{bridgeEvalProp} decides how to evaluate an atomic proposition when given correct inputs. It takes the current world \texttt{w} and the atomic proposition \texttt{Atom v} of interest as arguments.
-It either returns an error message \texttt{e}, if the proposition could not be successfully evaluated, or a result proposition \texttt{Prop} if the evaluation succeeded.
-For most bridge definitions, the value of \texttt{Prop} here should be either one of the constants between \texttt{PropTrue} and \texttt{PropFalse}.
+\texttt{bridgeEvalProp} evaluates an atomic proposition when given correct inputs. It takes the current world \texttt{w} and the atomic proposition \texttt{Atom v} of interest as arguments.
+For most bridge definitions, the value of the returned \texttt{Prop} will be either one of the constants between \texttt{PropTrue} and \texttt{PropFalse}.
 
 \texttt{bridgeQuantify} decides how to quantify over a specific type name regarding the current world.
-Similarly, it takes the current world \texttt{w} and a type name as arguments, and produce either an error \texttt{e} or a list of values \texttt{v} of the given type for quantification results.
+Similarly, it takes the current world \texttt{w} and a type name as arguments and will list of values \texttt{v} of the given type for quantification results.
 
-In our current implementation, there isn't a mechanism to guarantee the correspondence between the theory and the bridge, and it is users' responsibility to make sure all types and propositions are correctly quantified or evaluated in the brdige.
-It is possible to provide users with a surface language where the compiler guarantees all bridge definitions respects the theory of the distributed system. We consider this as a future work.
+In our current implementation, there isn't a mechanism to guarantee the correspondence between the theory and the bridge, and it is the user's responsibility to make sure all types and propositions are correctly quantified or evaluated in the bridge. For this reason we allow the bridge to return some user-defined error (the type parameter \texttt{e}) if there are any inconsistencies.
+It is possible to provide users with a surface language where the compiler guarantees that a bridge completely interprets its corresponding theory (possibly using code generation), but we consider this future work.
 
-\subsection{Verifier}
+\subsection{LTL verifier}
 
-The verifier is an interpreter over the abstract syntax tree of an LTL proposition. Figure~\ref{fig:verifier-sig} gives the data type definition of \texttt{EnvProp} and the signature of the evaluation function \texttt{envPropEval}.
+The LTL verifier operates incrementally over trace elements (i.e. \textit{worlds}), allowing it to be used online as a monitor or offline as a trace analyzer.
+For each world, it evaluates each axiom of the theory. Internally, the verifier understands how to interpret standard LTL connectives, but when it encounters a quantifier or atomic proposition it yields the current world and the corresponding quantifier or proposition to the bridge for evaluation.
+This interaction continues until the axiom can no longer be evaluated due to error or satisfaction.
+Since propositions written in LTL define system properties spanning multiple worlds, there may be residual proof burdens from the current world carried along for further evaluation in the subsequent worlds.
+
+Figure~\ref{fig:verifier-sig} gives the data type definition of \texttt{EnvProp} and the signature of the evaluation function \texttt{envPropEval}.
 
 \begin{figure}[h]
   {
     \fontsize{10}{12}\selectfont
     \begin{minted}{haskell}
--- EnvProp is an LTL proposition with its environment. The environment has
--- data variables v introduced by quantifiers in the parent propositions.
+-- EnvProp is an LTL proposition with its environment.
 data EnvProp v = EnvProp !(Env v) !Prop
 -- Evaluates an LTL Proposition based in a given world
 envPropEval :: Bridge e v w => EnvProp v -> w -> EnvPropRes e v
@@ -205,30 +199,27 @@ envPropEval :: Bridge e v w => EnvProp v -> w -> EnvPropRes e v
   \label{fig:verifier-sig}
 \end{figure}
 
-\texttt{EnvProp} is a wrapper for primitive LTL propositions \texttt{Prop}.
-It carries an additional field \texttt{Env v} that keeps track of the variable bindings introduced by quantifiers in the parent propositions.
 
-To evaluate an LTL proposition, \texttt{envPropEval} takes an \texttt{EnvProp} and the current world \texttt{w} to compute a result proposition \texttt{EnvPropRes}.
+\texttt{EnvProp} is a wrapper for primitive LTL propositions \texttt{Prop}.
+It carries an additional field \texttt{Env v} that keeps track of the variable bindings introduced by quantifiers from enclosing propositions.
+
+To evaluate an LTL proposition, \texttt{envPropEval} takes an \texttt{EnvProp} and the current world \texttt{w} to compute a result \texttt{EnvPropRes}.
 The result is a boolean value when a proposition can be fully evaluated in the current world.
-If the proposition involves modal connectives that cannot be evaluated immediate, the function returns a residual proposition that will be carried along to the next world.
+If the proposition involves modal connectives that cannot be evaluated immediately, the result is a residual proposition (possibly composed of logical conjunctions or disjunctions introduced by quantification) that will be carried along to the next world.
 If the proposition involves any quantifiers or atomic propositions, the evaluator will invoke the corresponding bridge functions explained in section~\ref{subsec:bridge} using the current world \texttt{w}.
 
-The \texttt{envPropEval} only evaluate the LTL proposition on a single world, i.e., one element in the distributed system trace.
+\texttt{envPropEval} only evaluates the LTL proposition on a single world, i.e. one element in the distributed system trace.
 To fully verify the system, we call \texttt{envPropEval} iteratively over an entire system trace.
-At each iteration \texttt{envPropEval} take the residual proposition from last one together with the current world as arguments.
-The verification process stops when either the proposition is evaluated to be true or false, the whole trace is consumed, or the evaluator throws an exception.
-
-It is worth noticing that our implementation does not assume a specific way of doing the verification.
-Users can easily integrate the verifier with either a pre-collected trace (offline verification) or a running system actively generating new traces (online verification).
+At each iteration, \texttt{envPropEval} takes as arguments a residual proposition along with the current world.
 
 \subsection{Truncation}
 
-One issue for all LTL-based runtime verification techniques is that modal connectives are only meaningful regarding infinite traces.
+One issue for all LTL-based runtime verification techniques is that modal connectives are only meaningful for infinite traces.
 In the ping system in subsection~\ref{subsec:theory}, the axiom we want to prove is \texttt{isResponsive}.
-This axiom starts with the modal connective ``$\Diamond$ (always)'', meaning it is a global invariant that holds in \textit{all} future executions.
-However, in practice we can only do runtime verification on finite traces, thus this axiom can never be proven true but only disproven when a violation is observed.
+This axiom starts with the modal connective ``$\Diamond$ (always)'', meaning that it is a global invariant that holds in \textit{all} future executions.
+However, in practice we can only do runtime verification on finite traces, so this axiom can never be proven true but only disproven when a violation is observed.
 
-Such behavior is not always desirable when a system has been monitored for sufficiently long and certain assumptions can be made for its future executions.
+Such behavior is not always desirable when a system has been monitored for sufficiently long and certain assumptions can be made about its future executions.
 To allow users to make assumptions for their systems' behaviors \textit{after} the current traces, we provide a mechanism called \textit{truncation}.
 
 The definition of truncation is essentially an extension to the bridge, as shown in figure~\ref{fig:truncation-sig}.
@@ -249,9 +240,10 @@ class Bridge e v w => TruncBridge e v w where
   \label{fig:truncation-sig}
 \end{figure}
 
-Similar to bridges, users need to implement two functions that talks about quantification and atomic propositions respectively.
-\texttt{truncBridgeEmpty} takes the last world in the trace and decides which set of types have empty quantification.
-\texttt{truncBridgeOracle} evaluates atomic propositions for all future executions based on the last world.
+Similar to a bridge, users need to implement two functions that interpret quantifiers and atomic propositions in all reachable worlds (i.e. in all possible traces).
+\texttt{truncBridgeEmpty} takes the last world in the trace and decides which set of types now always have empty quantification.
+\texttt{truncBridgeOracle} also takes the last world and evaluates atomic propositions that are now constant in all future worlds.
+These operations are not arbitrary - they allow bottom up interpretation of a residual proposition in such a way that requires no evaluation under binders nor introduces any additional redexes.
 
 As a result, all propositions will be truncated into a ternary value, namely \textit{true}, \textit{false}, or \textit{unknown}.
 For example, propositions that are universally (existentially) quantified over these truncated types will be evaluated to be true (false) while the rest being unknown.
@@ -261,7 +253,7 @@ An unknown proposition preserves the original LTL semantics, meaning it has not 
 
 We evaluate our \ltlspec by verifying three simple distributed systems, i.e. a ping system, a chat system, and an implementation of the dining philosophers problem.
 
-For each example, we can verify its theory according to the collected traces. Detailed implementation for each example is omitted due to page limit.
+For each example, we can verify its theory according to the collected traces. Detailed implementation and complete theory for each example is omitted due to page limit.
 
 \subsection{Implementation}
 
