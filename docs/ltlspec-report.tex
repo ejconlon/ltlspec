@@ -37,12 +37,12 @@
 \begin{document}
 
 \begin{abstract}
-  Specifying and proving properties about distributed system is hard.
-  To the best of our knowledge, there isn't a canonical way of defining distributed system models for runtime verification.
-  In this project, we develop \ltlspec, a runtime verification framework which allow users to take arbitrary distributed system traces and efficiently define a formal model to specify system properties in Linear Temporal Logic (LTL).
-  Our framework then provide a simple LTL verifier implementation for verifying the LTL specification regarding the formal system model.
-  To address the issue that LTL is only meaning on infinite traces, we introduce a simple mechanism called \textit{truncation} that allows users to define the default behaviours of quantifiers and atomic propositions after the traces end.
-  To evaluate \ltlspec, we implement three actor-based distributed system examples and their corresponding specifications. The \ltlspec can successfully verify specified properties for all three examples.
+  Specifying and proving properties about distributed systems is difficult enough that it's often not even attempted.
+  One tractable method is runtime verification, which settles for proofs of invariants over observed traces.
+  In this project, we develop \ltlspec, a runtime verification framework that allows users to model system properties in Linear Temporal Logic (LTL).
+  Given this, our framework provides a simple LTL verifier for use as an online monitor or offline trace analyzer.
+  To address the issue that LTL only has meaning on infinite traces, we introduce a simple mechanism called \textit{truncation} that allows users to define the default behaviours of quantifiers and atomic propositions after the traces end.
+  To evaluate \ltlspec, we implement three actor-based distributed systems with corresponding specifications. \ltlspec successfully verifies specified properties for all three systems.
 \end{abstract}
 
 \maketitle
@@ -52,7 +52,7 @@
 Proving that a distributed system operates as intended generally requires modeling the system in a formal framework equipped with its own reasoning techniques.
 At one extreme of this design space, one formally specifies the program in full in exchange for strong guarantees about its behavior in all possible executions.
 At another extreme, one “merely” specifies formal properties about the observable effects of the program, only able to guarantee that these properties have not been violated in observed executions.
-In this project, we propose using the latter strategy, Runtime Verification, as a relatively lightweight way to explore “responsiveness properties” of actor-based distributed systems.
+In this project, we propose using the latter strategy, runtime verification, as a relatively lightweight way to explore “responsiveness properties” of actor-based distributed systems.
 
 We define responsiveness properties following \cite{actorservice,parthasarathy2018modular} as a kind of liveness property of the form \(\Box \forall n. (P(n) \rightarrow \Diamond Q(n))\).
 As an example in plain English: “When I send a certain request, I eventually get a response to that particular request.” Propositions with this structure allow one to establish domain-specific causal relations more useful than the “happens-before” of logical time.
@@ -73,9 +73,9 @@ In this paper, we:
 
 \section{Background}
 \subsection{Runtime Verification}
-Runtime Verification (RV), sometimes also referred to as Runtime Monitoring, Trace Analysis, or Dynamic Analysis, is a lightweight formal method that, instead of exhaustively analyzing all possible program executions, only verifies the specified properties based on the current execution trace. Though limited by traces, RV can scale well and be practically integrated with existing complex systems. Moreover, it provides the most precise information regarding the current execution. Typical usage of RV includes checking the correctness of runtime behavior, detecting bugs exhibited at runtime, and enforcing runtime invariants on live systems.
+Runtime verification (RV), sometimes also referred to as runtime monitoring, trace analysis, or dynamic analysis, is a lightweight formal method that, instead of exhaustively analyzing all possible program executions, only verifies the specified properties based on the current execution trace. Though limited by traces, RV can scale well and be practically integrated with existing complex systems. Moreover, it provides the most precise information regarding the current execution. Typical usage of RV includes checking the correctness of runtime behavior, detecting bugs exhibited at runtime, and enforcing runtime invariants on live systems.
 
-Several types of monitoring methodologies are found in the current literature, \red{REF} different approaches may vary a lot in terms of interaction with the system under verification. On one extreme we have offline monitors verifying the execution trace much later it is produced whereas some online monitors may verify the trace along with the system execution. Different approaches result in different concerns, while more intrusive strategies allow early detection and even repair at runtime, offline monitors do verification at almost no overhead for the system.
+Several types of monitoring methodologies are found in the current literature, \red{!REF HERE!} different approaches may vary a lot in terms of interaction with the system under verification. On one extreme we have offline monitors verifying the execution trace much later it is produced whereas some online monitors may verify the trace along with the system execution. Different approaches result in different concerns, while more intrusive strategies allow early detection and even repair at runtime, offline monitors do verification at almost no overhead for the system.
 
 Nowadays, distributed systems are ubiquitous and complex, and they suffer malfunctions for many reasons. It is desirable to monitor their correct behaviors at runtime, ensuring various safety and liveness guarantees. However, distributed systems pose new challenges to RV. The monitors need to be distributed and coordinate the distributed logs. An expressive enough specification language is also needed to describe the reactive and asynchronous nature of the system.
 
@@ -89,7 +89,7 @@ Linear Temporal Logic (LTL) is a commonly used specification language in formal 
   \item Operator $\mathcal{W}$ means ``Weak Until'', $\phi \mathcal{W}\psi$ means that $\phi$ holds for all time steps until at some step $\psi$ holds. If $\psi$ never holds, then $\phi$ must hold forever.
 \end{itemize}
 
-To achieve stronger expressiveness, different extensions of LTL are proposed. Early work by Emerson [7] extended LTL with standard first order quantifiers, where the variables are quantified over a fixed domain. A different approach, inspired by the database community, quantifies the variables over a dynamic domain, i.e., variables appear in the trace. The latter is more favorable for RV, since the dynamic domain is more tractable algorithmically. Hence, in our project, we decided to use an LTL extension called LTL-FO+.
+To achieve stronger expressiveness, different extensions of LTL are proposed. Early work by Emerson \red{!REF HERE!} extended LTL with standard first order quantifiers, where the variables are quantified over a fixed domain. A different approach, inspired by the database community, quantifies the variables over a dynamic domain, i.e., variables appear in the trace. The latter is more favorable for RV, since the dynamic domain is more tractable algorithmically. Hence, in our project, we decided to use an LTL extension called LTL-FO+.
 
 LTL-FO+ allows users to quantify over the values seen at the current time step. Given a parameter identifier $p$ and a proposition $\phi$, then $\exists_{p} x : \phi$ and $\forall_{p} x:\phi$ are also propositions. Assume $\rho$ is the trace of the system at the current time, then the semantics of the quantifiers can be formalized as below:
 
@@ -110,7 +110,7 @@ The quantifier in LTL-FO+ only quantifies over data variables, therefore it cann
 \begin{figure}[h]
   \includegraphics[width=0.6\textwidth]{images/ltlspec-overview.pdf}
   \centering
-  \caption{Overview of LTLSpec}
+  \mycaption{Overview of LTLSpec}
   \label{fig:overview}
 \end{figure}
 
@@ -119,41 +119,38 @@ Figure~\ref{fig:overview} shows the overview of the framework.
 At a high level, \ltlspec consists of three components.
 The \textit{theory} is a user-defined domain for verification that includes the definitions of \textit{value types}, \textit{atomic propositions}, and \textit{axioms} about the system.
 The \textit{bridge} defines how to evaluate quantifiers over value types and atomic propositions in the axioms.
-The LTL verifier is an interpreter over the LTL abstract syntax tree.
-The details about the components will be further explained in the following subsections, along with our extension to the bridge, namely \textit{truncation}.
+The \textit{LTL verifier} is an interpreter over the LTL abstract syntax tree.
+These components will be further explained in following subsections along with our extensions to the bridge (\textit{truncation}).
 
-The verification is performed over a trace, where each element inside is called a \textit{world}.
-Each axiom is verified against a world. The LTL verifier is in charge of interpreting the LTL connectives.
-Once the verifier hits a quantifier or atomic proposition, it passes the current world and the corresponding quantifier or proposition to the bridge for evaluation.
-This interaction ends until the axiom can no longer be evaluated.
-Since proposition written in LTL talks about system properties spanning multiple worlds, the residual of the current evaluation will be carried along for further evaluation in the next world.
+The LTL verifier operates incrementally over trace elements (what we call \textit{worlds} in the Kripke sense), allowing it to be used online as a monitor or offline as a trace analyzer.
+For each world, it evaluates each axiom of the theory. Internally, the verifier understands how to interpret standard LTL connectives, but when it hits a quantifier or atomic proposition, it yields the current world and the corresponding quantifier or proposition to the bridge for evaluation.
+This interaction continues until the axiom can no longer be evaluated due to error or satisfaction.
+Since propositions written in LTL define system properties spanning multiple worlds, there may be residual proof burdens from the current world carried along for further evaluation in the subsequent worlds.
 
 
 \subsection{First-order theories}
 \label{subsec:theory}
 
-\red{
-  First, we will loosely define a language for expressing the \textit{theory} of a user’s domain.
-  DFOL (First Order Logic with Dependent types) as encoded in LF syntax \cite{hutchison_first-order_2006} is an excellent fit for this task. It allows one to define the types of values in a domain, as well as atomic propositions over those values. (This is called a \textit{signature}.)
-  Additionally, it allows one to express propositions with quantifiers or \textit{axioms}. Together, the signature and axioms form a theory of the domain.
-}
+\ltlspec standardizes on \textit{first-order logical theories} for modeling user domains.
+DFOL (First Order Logic with Dependent types) as encoded in LF syntax \cite{hutchison_first-order_2006} is an excellent fit for this task. It allows one to define the types of values in a domain, as well as atomic propositions over those values. (This is called a \textit{signature}.)
+Additionally, it allows one to express \textit{axioms} of the system as propositions with quantifiers. Together, the signature and axioms form the theory of the domain. The \textit{dependent} part of DFOL currently plays a purely formal role in structuring axioms with LTL connectives.
+
+At this time, our implementation supports only a subset of possible theories. First, only simple types are supported, meaning there are no type constructors. Second, only simple atomic propositions are supported, meaning these propositions can only take types (not propositions) as arguments. We made these restrictions to simplify the bridge interface, but future implementations may lift them.
 
 \begin{figure}[h]
   {
     \fontsize{10}{12}\selectfont
     \input{theories/ping.tex}
   }
-  \mycaption{Theory for a trivial ping system}
+  \mycaption{Theory for a the ping system}
   \label{fig:ping-theory}
 \end{figure}
 
-We use a simple ping-pong system as the example. Each node will send a ping message to a different node in the system, then expecting the pong message to come from the receiver.
-We want to verify the responsiveness property below:
+As an example, consider a simple system in which actors sends a ping messages to a other actors in the system, expecting pong messages as replies.
+We want to verify the following responsiveness property: \textit{It is always true that if a node A sends a ping message to node B, then node A will eventually receive a pong message from node B.}
 
-\textit{It is always true that, if a node send a ping message to some other node, a pong message will eventually be received by this node sending from the receiver of the ping message.}
-
-To define a theory that can express such axioms, we need to first define the value types needed for verification. In this case, we are only interested in \textit{ping} and \textit{pong} messages (\texttt{SentPing} and \texttt{RecvPong}).
-Secondly, we need an atomic proposition that checks if a pair of ping-pong messages has the matching sender and receiver (\texttt{isPingPong}).
+The theory that captures this property is shown in Figure~\ref{fig:ping-theory}. First, we define the value types needed for verification. In this case, we are only interested in events related to \textit{ping} and \textit{pong} messages (\texttt{SentPing} and \texttt{RecvPong}).
+Second, we need an atomic proposition that checks if a pair of ping-pong messages has the matching sender and receiver (\texttt{isPingPong}).
 Finally, the axiom \texttt{isResponsive} can be defined using the value types, atomic propositions, and LTL connectives.
 
 \subsection{Bridge}
@@ -197,11 +194,10 @@ The verifier is an interpreter over the abstract syntax tree of an LTL propositi
   {
     \fontsize{10}{12}\selectfont
     \begin{minted}{haskell}
--- EnvProp is an LTL proposition with its environment
--- The environment carries the data variable v
--- introduced by quantifiers in the parent propositions.
+-- EnvProp is an LTL proposition with its environment. The environment has
+-- data variables v introduced by quantifiers in the parent propositions.
 data EnvProp v = EnvProp !(Env v) !Prop
--- Evaluate an LTL Proposition based on a world
+-- Evaluates an LTL Proposition based in a given world
 envPropEval :: Bridge e v w => EnvProp v -> w -> EnvPropRes e v
 \end{minted}
   }
@@ -228,7 +224,7 @@ Users can easily integrate the verifier with either a pre-collected trace (offli
 \subsection{Truncation}
 
 One issue for all LTL-based runtime verification techniques is that modal connectives are only meaningful regarding infinite traces.
-In the ping-pong system in subsection~\ref{subsec:theory}, the axiom we want to prove is \texttt{isResponsive}.
+In the ping system in subsection~\ref{subsec:theory}, the axiom we want to prove is \texttt{isResponsive}.
 This axiom starts with the modal connective ``$\Diamond$ (always)'', meaning it is a global invariant that holds in \textit{all} future executions.
 However, in practice we can only do runtime verification on finite traces, thus this axiom can never be proven true but only disproven when a violation is observed.
 
@@ -263,7 +259,7 @@ An unknown proposition preserves the original LTL semantics, meaning it has not 
 
 \section{Evaluation}
 
-We evaluate our \ltlspec by verifying three simple distributed systems, i.e. a ping-pong system, a chat room implementation, and an implementation of the dinning philosopher problem.
+We evaluate our \ltlspec by verifying three simple distributed systems, i.e. a ping system, a chat system, and an implementation of the dining philosophers problem.
 
 For each example, we can verify its theory according to the collected traces. Detailed implementation for each example is omitted due to page limit.
 
@@ -271,35 +267,35 @@ For each example, we can verify its theory according to the collected traces. De
 
 The \ltlspec framework, all example systems, and the corresponding theories and bridges are implemented in Haskell.
 We use software transactional memory (STM) to implement the tracing to preserve the causality of the entire traces.
-The project is open-sourced and can be found \href{https://github.com/ejconlon/ltlspec}{here}
+The project is open-source and can be found \href{https://github.com/ejconlon/ltlspec}{here}.
 
-\subsection{Ping-Pong}
+\subsection{Ping system}
 
-The theory for ping-pong example is already presented in Figure~\ref{fig:ping-theory}, Section~\ref{subsec:theory}.
+The theory for ping system example is already presented in Figure~\ref{fig:ping-theory} and Section~\ref{subsec:theory}.
 
-\subsection{Chatting Room}
+\subsection{Chat system}
 
-The theory for chatting room example is presented in Figure~\ref{fig:chat-theory}.
+The theory for chat system example is presented in Figure~\ref{fig:chat-theory}.
 
 \begin{figure}[ht]
   {
     \fontsize{10}{12}\selectfont
     \input{theories/chat.tex}
   }
-  \mycaption{Theory for a chat room system}
+  \mycaption{Theory for the chat system}
   \label{fig:chat-theory}
 \end{figure}
 
-\subsection{Dinning Philosopher}
+\subsection{Dining philosophers}
 
-The theory for Dinning Philosopher example is presented in Figure~\ref{fig:phil-theory}.
+The theory for the dining philosophers example is presented in Figure~\ref{fig:phil-theory}.
 
 \begin{figure}[ht]
   {
     \fontsize{10}{12}\selectfont
     \input{theories/phil.tex}
   }
-  \mycaption{Theory for the dinning philosopher problem}
+  \mycaption{Theory for the dining philosophers problem}
   \label{fig:phil-theory}
 \end{figure}
 
