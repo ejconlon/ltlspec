@@ -37,11 +37,11 @@
 \begin{document}
 
 \begin{abstract}
-  Specifying and proving properties about distributed systems is difficult enough that it's often not even attempted.
+  Specifying and proving properties about distributed systems is difficult enough that often it's not attempted even when it's needed!
   One tractable method is runtime verification, which settles for proofs of invariants over observed traces.
   In this project, we develop \ltlspec, a runtime verification framework that allows users to model system properties in Linear Temporal Logic (LTL).
   Given this, our framework provides a simple LTL verifier for use as an online monitor or offline trace analyzer.
-  To address the issue that LTL only has meaning on infinite traces, we introduce a simple mechanism called \textit{truncation} that allows users to define the default behaviours of quantifiers and atomic propositions after the traces end.
+  To address the issue that LTL only has meaning on infinite traces, we introduce a simple mechanism called \textit{truncation} that allows users to exploit known interpretations of quantifiers and atomic propositions after traces end.
   To evaluate \ltlspec, we implement three actor-based distributed systems with corresponding specifications. \ltlspec successfully verifies specified properties for all three systems.
 \end{abstract}
 
@@ -52,11 +52,11 @@
 Proving that a distributed system operates as intended generally requires modeling the system in a formal framework equipped with its own reasoning techniques.
 At one extreme of this design space, one formally specifies the program in full in exchange for strong guarantees about its behavior in all possible executions.
 At another extreme, one “merely” specifies formal properties about the observable effects of the program, only able to guarantee that these properties have not been violated in observed executions.
-In this project, we propose using the latter strategy, runtime verification, as a relatively lightweight way to explore “responsiveness properties” of actor-based distributed systems.
+In this project, we use the latter strategy, runtime verification, as a relatively lightweight way to explore “responsiveness properties” of actor-based distributed systems.
 
 We define responsiveness properties following \cite{actorservice,parthasarathy2018modular} as a kind of liveness property of the form \(\Box \forall n. (P(n) \rightarrow \Diamond Q(n))\).
 As an example in plain English: “When I send a certain request, I eventually get a response to that particular request.” Propositions with this structure allow one to establish domain-specific causal relations more useful than the “happens-before” of logical time.
-In general, one uses a temporal logic to express these propositions. Linear Temporal Logic (LTL), with the \textit{Always} and \textit{Eventually} operators used above, is a popular choice. However, most presentations of LTL apply it to domains only with the use of atomic predicates. One cannot express dependency between these predicates as would be necessary to encode the notion of responsiveness.
+In general, one uses a temporal logic to express these propositions. Linear Temporal Logic (LTL), with the \textit{Always} and \textit{Eventually} operators used above, is a popular choice. However, most presentations of LTL apply it to domains only with the use of atomic propositions. One cannot express dependency between these propositions as would be necessary to encode the notion of responsiveness.
 
 As a result, some researchers have introduced first order quantifiers for data variables \cite{khoury_automata-based_2021,margaria_execution_2016,halle_runtime_2012} in systems such as LTL-FO+.
 However, in an effort to increase the usefulness and applicability of the logic, we follow a slightly different path through the design space to leave the domain of quantification abstract and not internalize equality on quantified variables.
@@ -67,8 +67,8 @@ In this paper, we:
   \item Define the \textit{theory} of a distributed system, based on the concept of a first-order logical \textit{theory} of a domain
   \item Define \textit{bridge} interfaces related to each theory that allow the verifier to quantify over data variables and verify inhabitance of atomic propositions from the domain
   \item Implement an LTL \textit{verifiers} to check axioms from the theory against monitored programs and traces
-  \item Introduce the \textit{truncation} mechanism to make verification perform better and yield more meaningful results against finite traces.
-  \item Evaluate the effectiveness of \ltlspec on both three distributed system examples.
+  \item Introduce the \textit{truncation} mechanism to yield more meaningful results against finite traces
+  \item Evaluate the effectiveness of \ltlspec on both three distributed system examples
 \end{itemize}
 
 \section{Background}
@@ -80,9 +80,9 @@ Several types of monitoring methodologies are found in the current literature, \
 Nowadays, distributed systems are ubiquitous and complex, and they suffer malfunctions for many reasons. It is desirable to monitor their correct behaviors at runtime, ensuring various safety and liveness guarantees. However, distributed systems pose new challenges to RV. The monitors need to be distributed and coordinate the distributed logs. An expressive enough specification language is also needed to describe the reactive and asynchronous nature of the system.
 
 \subsection{LTL and LTL-FO+}
-Linear Temporal Logic (LTL) is a commonly used specification language in formal methods to express properties in reactive and concurrent systems. The basic building blocks for LTL are called atomic propositions, which are opaque, domain-specific symbols (like $P$ or $Q$). Atomic propositions can then be connected or negate with standard boolean operators, including $\land$ (and), $\lor$ (or), $\lnot$ (not), and $\Rightarrow$ (implies), following their classical logic meaning. Most importantly, LTL introduces a set of temporal operators. Let $\phi$ be a proposition:
+Linear Temporal Logic (LTL) is a commonly used specification language in formal methods to express properties in reactive and concurrent systems. The basic building blocks for LTL are called atomic propositions, which are opaque, domain-specific symbols (like $P$ or $Q$). Atomic propositions can then be connected or negate with standard boolean operators, including $\land$ (and), $\lor$ (or), $\lnot$ (not), and $\Rightarrow$ (implies), following their classical logic meaning. Most importantly, LTL introduces a set of temporal operators. For all propositions $\phi$ and $\psi$,
 \begin{itemize}
-  \item Operator $\Box$ means  ``always'', $\Box \phi$ means that $\phi$ is true in \textit{every} future time step.
+  \item Operator $\Box$ means ``always'', $\Box \phi$ means that $\phi$ is true in \textit{every} future time step.
   \item Operator $\Diamond$ means ``eventually'', $\Diamond \phi$ means that $\phi$ holds for \textit{some} future time steps.
   \item Operator $\bigcirc$ means ``next'', $\bigcirc \phi$ means that $\phi$ holds for the \textit{next} time step.
   \item Operator $\mathcal{U}$ means ``Until'', $\phi \mathcal{U}\psi$ means that $\phi$ holds for all time steps until at some step $\psi$ holds. $\psi$ must hold at the current step or in the future.
@@ -91,19 +91,19 @@ Linear Temporal Logic (LTL) is a commonly used specification language in formal 
 
 To achieve stronger expressiveness, different extensions of LTL are proposed. Early work by Emerson \red{!REF HERE!} extended LTL with standard first order quantifiers, where the variables are quantified over a fixed domain. A different approach, inspired by the database community, quantifies the variables over a dynamic domain, i.e., variables appear in the trace. The latter is more favorable for RV, since the dynamic domain is more tractable algorithmically. Hence, in our project, we decided to use an LTL extension called LTL-FO+.
 
-LTL-FO+ allows users to quantify over the values seen at the current time step. Given a parameter identifier $p$ and a proposition $\phi$, then $\exists_{p} x : \phi$ and $\forall_{p} x:\phi$ are also propositions. Assume $\rho$ is the trace of the system at the current time, then the semantics of the quantifiers can be formalized as below:
+LTL-FO+ allows users to quantify over the values seen at the current time step. Given a parameter identifier $p$ and a proposition $\phi$, then $\exists_{p} x : \phi$ and $\forall_{p} x:\phi$ are also propositions. Assume $\rho$ is the trace of the system at the current time (i.e. a \textit{world}), then the semantics of the quantifiers can be formalized as below:
 
 $$\rho\vDash \exists_p x:\phi \Leftrightarrow \phi[b/x] \text{for some }b\in Dom_{\rho}(p)$$
 $$\forall_{p} x : \phi \equiv \lnot(\exists_{p}x: \lnot\phi)$$
 
-Note that the domain whose we quantify over is a function of the parameter identifier and the trace at the current time.
+Note that the domain we quantify over is a function of the parameter identifier and the trace at the current time.
 
-For example, let's assume that one wants to check if the property “At some point in the system there exists one messageId with value $v$ such that some atomic proposition $\phi(v)$ holds” is satisfied at the current time. Then, using LTL-FO+ we would write the above as follows:
+For example, let's assume that one wants to check if the property “At some point in the system there exists one value $v$ such that some atomic proposition $\phi(v)$ holds” is satisfied at the current time. Then, using LTL-FO+ we would write the above as follows:
 
 $$ \rho \vDash \Diamond(\exists_{p} v :\phi(v)) $$
 
 
-The quantifier in LTL-FO+ only quantifies over data variables, therefore it cannot express propositions that quantifies over time. Since it is based on first order logic, it also disallows user to quantify over things like properties.
+The quantifier in LTL-FO+ only quantifies over data variables, therefore it cannot express propositions that quantifies over time. Since it is based on first order logic, it also disallows quantification over things like properties.
 
 \section{LTLSpec}
 
@@ -114,7 +114,7 @@ The quantifier in LTL-FO+ only quantifies over data variables, therefore it cann
   \label{fig:overview}
 \end{figure}
 
-\ltlspec is a verification framework aiming at providing a canonical way for specifying arbitrary LTL properties in distributed system.
+\ltlspec is a verification framework aiming at providing a canonical way for specifying arbitrary first-order LTL properties in distributed system.
 Figure~\ref{fig:overview} shows the overview of the framework.
 At a high level, \ltlspec consists of three components.
 The \textit{theory} is a user-defined domain for verification that includes the definitions of \textit{value types}, \textit{atomic propositions}, and \textit{axioms} about the system.
@@ -131,11 +131,11 @@ Since propositions written in LTL define system properties spanning multiple wor
 \subsection{First-order theories}
 \label{subsec:theory}
 
-\ltlspec standardizes on \textit{first-order logical theories} for modeling user domains.
-DFOL (First Order Logic with Dependent types) as encoded in LF syntax \cite{hutchison_first-order_2006} is an excellent fit for this task. It allows one to define the types of values in a domain, as well as atomic propositions over those values. (This is called a \textit{signature}.)
-Additionally, it allows one to express \textit{axioms} of the system as propositions with quantifiers. Together, the signature and axioms form the theory of the domain. The \textit{dependent} part of DFOL currently plays a purely formal role in structuring axioms with LTL connectives.
+\ltlspec uses \textit{first-order logical theories} to model user domains.
+The specific syntax we use for this purpose is DFOL (First Order Logic with Dependent types) \cite{hutchison_first-order_2006}, which allows one to define the types of values in a domain as well as atomic propositions over those values. (This is called a \textit{signature}.)
+Additionally, DFOL allows one to express \textit{axioms} of the system as propositions with quantifiers. Together, the signature and axioms form the theory of the domain. The \textit{dependent} part is a language formality that allows the declaration of propositions indexed by values, as any dependent type system would. This presentation exploits the Curry-Howard correspondence of propositions as types: an axiom's type is a first-order LTL proposition. (In this syntax everything appears as a type declaration without a corresponding definition.)
 
-At this time, our implementation supports only a subset of possible theories. First, only simple types are supported, meaning there are no type constructors. Second, only simple atomic propositions are supported, meaning these propositions can only take types (not propositions) as arguments. We made these restrictions to simplify the bridge interface, but future implementations may lift them.
+At this time our implementation supports only a subset of possible theories. First, only simple types are supported, meaning there are no type constructors. Second, only simple atomic propositions are supported, meaning these propositions can only take types (not propositions) as arguments. We made these restrictions to simplify the bridge interface, but future implementations may lift them. Also, at this time we do not parse theories in the textual format presented here, but we do render theory syntax trees that way.
 
 \begin{figure}[h]
   {
@@ -149,9 +149,9 @@ At this time, our implementation supports only a subset of possible theories. Fi
 As an example, consider a simple system in which actors sends a ping messages to a other actors in the system, expecting pong messages as replies.
 We want to verify the following responsiveness property: \textit{It is always true that if a node A sends a ping message to node B, then node A will eventually receive a pong message from node B.}
 
-The theory that captures this property is shown in Figure~\ref{fig:ping-theory}. First, we define the value types needed for verification. In this case, we are only interested in events related to \textit{ping} and \textit{pong} messages (\texttt{SentPing} and \texttt{RecvPong}).
+The theory that captures this property is shown in Figure~\ref{fig:ping-theory}. First, we must declare the value types needed for verification. In this case, we are only interested in events related to \textit{ping} and \textit{pong} messages (\texttt{SentPing} and \texttt{RecvPong}).
 Second, we need an atomic proposition that checks if a pair of ping-pong messages has the matching sender and receiver (\texttt{isPingPong}).
-Finally, the axiom \texttt{isResponsive} can be defined using the value types, atomic propositions, and LTL connectives.
+Finally, the axiom \texttt{isResponsive} can be declared using the value types, atomic propositions, and LTL connectives.
 
 \subsection{Bridge}
 \label{subsec:bridge}
@@ -228,7 +228,7 @@ In the ping system in subsection~\ref{subsec:theory}, the axiom we want to prove
 This axiom starts with the modal connective ``$\Diamond$ (always)'', meaning it is a global invariant that holds in \textit{all} future executions.
 However, in practice we can only do runtime verification on finite traces, thus this axiom can never be proven true but only disproven when a violation is observed.
 
-Such behaviour is not always desirable when a system has been monitored for sufficiently long and certain assumptions can be made for its future executions.
+Such behavior is not always desirable when a system has been monitored for sufficiently long and certain assumptions can be made for its future executions.
 To allow users to make assumptions for their systems' behaviors \textit{after} the current traces, we provide a mechanism called \textit{truncation}.
 
 The definition of truncation is essentially an extension to the bridge, as shown in figure~\ref{fig:truncation-sig}.
