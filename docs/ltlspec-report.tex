@@ -148,7 +148,7 @@ The theory that captures this property is shown in Figure~\ref{fig:ping-theory}.
 Second, we need an atomic proposition that checks if a pair of ping-pong messages has the matching sender and receiver (\texttt{isPingPong}).
 Finally, the axiom \texttt{isResponsive} can be declared using the value types, atomic propositions, and LTL connectives.
 
-Figure~\ref{fig:theory-sig} shows a simplified AST of a theory in \ltlspec. The restrictions mentioned above can be shown here in the structure of types and proposisions. The actual representation contains comments and syntax sugar we remove before interpretation.
+Figure~\ref{fig:theory-sig} shows a simplified AST of a theory in \ltlspec. The restrictions mentioned above can be shown here in the structure of types and propositions. The actual representation contains comments and syntax sugar we remove before interpretation.
 
 \begin{figure}[h]
   {
@@ -284,10 +284,10 @@ The \ltlspec framework, all example systems, and the corresponding bridges are i
 The project is open-source and can be found \href{https://github.com/ejconlon/ltlspec}{here}.
 For each system, we defined actors, messages, and system configurations that ensured that we were able to collect traces and verify theories with the aid of the corresponding bridge.
 
-We simulated a multinode environment with multithreading and a centralized ``network'' coordinator.
+We simulated a multi-node environment with multithreading and a centralized ``network'' coordinator.
 These components use software transactional memory (STM) \cite{harris2005composable} to preclude unobservable side effects and ensure causal trace collection.
 Though we have not implemented it, it is possible to replace the behavior of the network coordinator to inject faults into the system, allowing verification of the system under test in the presence of faults.
-We run a global monitor that is able to detect quiesence and terminate the simulation promptly, since knowing that our simulations go quiescent allows us to implement truncation for these systems.
+We run a global monitor that is able to detect quiescence and terminate the simulation promptly, since knowing that our simulations go quiescent allows us to implement truncation for these systems.
 
 \subsection{Ping system}
 
@@ -325,7 +325,7 @@ We also simulate the classic concurrency scenario of dining philosophers. Figure
 Our primary concerns in this work were determining a useful and generalizable syntax and semantics for runtime verification.
 We believe that our example domains exhibit a representative range of theory sizes and structures with examples of responsiveness, liveness, and safety properties. The LTL verifier itself is comprehensively unit tested and we have verified simulated and manually-constructed traces for each theory.
 
-Performance was a secondary concern, and we don't say much on the topic because there are many design decisions when integrating runtime verification that have contrasting effects on performance and verifiability. That said, we have found evalution passable with our naive LTL interpreter, but we highlight that real-world performance is going to depend on the size and structure of a theory and the efficiency of a bridge. In terms of pure interpreter optimizations, one may want to implement a safe-for-space machine, perform term graph deduplication, or perform predicate pushdown, none of which we have done in this work.
+Performance was a secondary concern, and we don't say much on the topic because there are many design decisions when integrating runtime verification that have contrasting effects on performance and verifiability. That said, we have found evaluation passable with our naive LTL interpreter, but we highlight that real-world performance is going to depend on the size and structure of a theory and the efficiency of a bridge. In terms of pure interpreter optimizations, one may want to implement a safe-for-space machine, perform term graph deduplication, or perform predicate pushdown, none of which we have done in this work.
 
 \section{Related Work}
 
