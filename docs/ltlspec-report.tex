@@ -39,10 +39,10 @@
 \begin{abstract}
   Specifying and proving properties about distributed systems is difficult enough that often it's not attempted even when it's needed!
   One tractable method is runtime verification, which settles for proofs of invariants over observed traces.
-  In this project, we develop \ltlspec, a runtime verification framework that allows users to model system properties in Linear Temporal Logic (LTL).
-  Given this, our framework provides a simple LTL verifier for use as an online monitor or offline trace analyzer.
-  To address the issue that LTL only has meaning on infinite traces, we introduce a simple mechanism called \textit{truncation} that allows users to exploit known interpretations of quantifiers and atomic propositions after traces end.
-  To evaluate \ltlspec, we implement three actor-based distributed systems with corresponding specifications. \ltlspec successfully verifies specified properties for all three systems.
+  In this project we develop \ltlspec, a runtime verification framework that allows users to model system properties in Linear Temporal Logic (LTL).
+  With this our framework implements a simple LTL verifier for use as an online monitor or offline trace analyzer.
+  To address the issue that LTL is only meaningful for infinite traces, we introduce a simple mechanism called \textit{truncation} that allows users to exploit known interpretations of quantifiers and atomic propositions after traces end.
+  To evaluate \ltlspec, we implement three actor-based distributed systems with corresponding specifications, and we successfully verify specified properties for all three systems.
 \end{abstract}
 
 \maketitle
@@ -64,11 +64,11 @@ However, in an effort to increase the usefulness and applicability of the logic,
 We have built a runtime verification framework with data variable quantification, decoupled from any particular domain one would verify.
 In this paper, we:
 \begin{itemize}
-  \item Define the \textit{theory} of a distributed system, based on the concept of a first-order logical \textit{theory} of a domain
-  \item Define \textit{bridge} interfaces related to each theory that allow the verifier to quantify over data variables and verify inhabitance of atomic propositions from the domain
-  \item Implement an LTL \textit{verifiers} to check axioms from the theory against monitored programs and traces
-  \item Introduce the \textit{truncation} mechanism to yield more meaningful results against finite traces
-  \item Evaluate the effectiveness of \ltlspec on both three distributed system examples
+  \item Define the \textit{theory} of a distributed system, based on the concept of a first-order logical theory of a domain
+  \item Define \textit{bridge} interfaces related to each theory that allow the verifier to quantify over data variables and interpret atomic propositions from the domain
+  \item Implement an LTL \textit{verifier} to check axioms from the theory against monitored programs and traces
+  \item Introduce the \textit{truncation} mechanism to yield more meaningful results from finite traces
+  \item Evaluate the effectiveness of \ltlspec on three distributed system examples
 \end{itemize}
 
 \section{Background}
@@ -77,7 +77,7 @@ Runtime verification (RV), sometimes also referred to as runtime monitoring, tra
 
 Several types of monitoring methodologies are found in the current literature, and these approaches vary significantly in terms of interaction with the system under verification. On one extreme we have offline monitors verifying the execution trace much later it is produced whereas some online monitors may verify the trace along with the system execution. Different approaches result in different concerns, while more intrusive strategies allow early detection and even repair at runtime, offline monitors do verification at almost no overhead for the system.
 
-Nowadays, distributed systems are ubiquitous and complex, and they suffer malfunctions for many reasons. It is desirable to monitor their correct behaviors at runtime, ensuring various safety and liveness guarantees. However, distributed systems pose new challenges to RV. The monitors need to be distributed and coordinate the distributed logs. An expressive enough specification language is also needed to describe the reactive and asynchronous nature of the system.
+Nowadays, distributed systems are ubiquitous and complex, and they suffer malfunctions for many reasons. It is desirable to monitor their correct behaviors at runtime, ensuring various safety and liveness guarantees. However, distributed systems pose new challenges to RV. The monitors need to themselves be distributed and must coordinate distribution of logs. An expressive enough specification language is also needed to describe the reactive and asynchronous nature of the system.
 
 \subsection{LTL and LTL-FO+}
 Linear Temporal Logic (LTL) is a commonly used specification language in formal methods to express properties in reactive and concurrent systems. The basic building blocks for LTL are called atomic propositions, which are opaque, domain-specific symbols (like $P$ or $Q$). Atomic propositions can then be connected or negate with standard boolean operators, including $\land$ (and), $\lor$ (or), $\lnot$ (not), and $\Rightarrow$ (implies), following their classical logic meaning. Most importantly, LTL introduces a set of temporal operators. For all propositions $\phi$ and $\psi$,
@@ -89,7 +89,7 @@ Linear Temporal Logic (LTL) is a commonly used specification language in formal 
   \item Operator $\mathcal{W}$ means ``Weak Until'', $\phi \mathcal{W}\psi$ means that $\phi$ holds for all time steps until at some step $\psi$ holds. If $\psi$ never holds, then $\phi$ must hold forever.
 \end{itemize}
 
-To achieve stronger expressiveness, different extensions of LTL are proposed. Early work by Emerson \cite{emerson1990temporal} extended LTL with standard first order quantifiers, where the variables are quantified over a fixed domain. A different approach, inspired by the database community, quantifies the variables over a dynamic domain, i.e., variables appear in the trace. The latter is more favorable for RV, since the dynamic domain is more tractable algorithmically. Hence, in our project, we decided to use an LTL extension called LTL-FO+.
+To achieve stronger expressiveness, different extensions of LTL are proposed. Early work by Emerson \cite{emerson1990temporal} extended LTL with standard first order quantifiers, where the variables are quantified over a fixed domain. A different approach, inspired by the database community, quantifies the variables over a dynamic domain, e.g. over variables that appear in a trace. The latter is more favorable for RV, since the dynamic domain is more tractable algorithmically. Hence, in our project, we decided to use an LTL extension called LTL-FO+.
 
 LTL-FO+ allows users to quantify over the values seen at the current time step. Given a parameter identifier $p$ and a proposition $\phi$, then $\exists_{p} x : \phi$ and $\forall_{p} x:\phi$ are also propositions. Assume $\rho$ is the trace of the system at the current time (i.e. a \textit{world} in the Kripke sense), then the semantics of the quantifiers can be formalized as below:
 
@@ -115,9 +115,9 @@ Subsection~\ref{subsec:theory} presents the syntax we use for LTL propositions.
   \label{fig:overview}
 \end{figure}
 
-\ltlspec is a verification framework aiming at providing a canonical way for specifying arbitrary first-order LTL properties in distributed system.
+\ltlspec is a verification framework that provides a canonical way to specify and verify first-order LTL properties in distributed system.
 Figure~\ref{fig:overview} shows the overview of the framework.
-At a high level, \ltlspec consists of three components.
+At a high level, \ltlspec consists of three components:
 The \textit{theory} is a user-defined domain for verification that includes the definitions of \textit{value types}, \textit{atomic propositions}, and \textit{axioms} about the system.
 The \textit{bridge} defines how to evaluate quantifiers over value types and atomic propositions in the axioms.
 The \textit{LTL verifier} is an interpreter over the LTL abstract syntax tree.
@@ -191,7 +191,7 @@ class Eq v => Bridge e v w | w -> e v where
 \end{figure}
 
 \texttt{bridgeEvalProp} evaluates an atomic proposition when given correct inputs. It takes the current world \texttt{w} and the atomic proposition \texttt{Atom v} of interest as arguments.
-For most bridge definitions, the value of the returned \texttt{Prop} will be either one of the constants between \texttt{PropTrue} and \texttt{PropFalse}.
+For most bridge definitions, the value of the returned \texttt{Prop} will be a boolean equivalent \texttt{PropTrue} or \texttt{PropFalse}.
 
 \texttt{bridgeQuantify} decides how to quantify over a specific type name regarding the current world.
 Similarly, it takes the current world \texttt{w} and a type name as arguments and will list of values \texttt{v} of the given type for quantification results.
@@ -266,10 +266,10 @@ class Bridge e v w => TruncBridge e v w where
 Similar to a bridge, users need to implement two functions that interpret quantifiers and atomic propositions in all reachable worlds (i.e. in all possible traces).
 \texttt{truncBridgeEmpty} takes the last world in the trace and decides which set of types now always have empty quantification.
 \texttt{truncBridgeOracle} also takes the last world and evaluates atomic propositions that are now constant in all future worlds.
-These operations are not arbitrary - they allow bottom up interpretation of a residual proposition in such a way that requires no evaluation under binders nor introduces any additional redexes.
+These operations are not arbitrary - they allow bottom up interpretation of a residual proposition a way that requires no evaluation under binders nor introduces any additional redexes.
 
 As a result, all propositions will be truncated into a ternary value, namely \textit{true}, \textit{false}, or \textit{unknown}.
-For example, propositions that are universally (existentially) quantified over these truncated types will be evaluated to be true (false) while the rest being unknown.
+For example, propositions that are universally (existentially) quantifying over these truncated types will be evaluated to be true (false). Those quantifying other other types will be evaluated to unknown.
 An unknown proposition preserves the original LTL semantics, meaning it has not been disproven up to the point the monitoring ends, but it is unknown whether the proposition will hold in the future.
 
 We believe that this technique is valid reasoning in a higher-order ternary metalogic. Loosely speaking, this shifts the infinite quantification over reachable worlds from the verifier to the bridge.
@@ -287,7 +287,7 @@ For each system, we defined actors, messages, and system configurations that ens
 We simulated a multi-node environment with multithreading and a centralized ``network'' coordinator.
 These components use software transactional memory (STM) \cite{harris2005composable} to preclude unobservable side effects and ensure causal trace collection.
 Though we have not implemented it, it is possible to replace the behavior of the network coordinator to inject faults into the system, allowing verification of the system under test in the presence of faults.
-We run a global monitor that is able to detect quiescence and terminate the simulation promptly, since knowing that our simulations go quiescent allows us to implement truncation for these systems.
+We run a global monitor that is able to detect quiescence and terminate the simulation promptly. Knowing that our simulations go quiescent allows us to implement truncation for types that represent messages.
 
 \subsection{Ping system}
 
@@ -339,12 +339,12 @@ The most relevant works we can find are \cite{cassar2015synchronous,cassar2015ru
 
 In our project, instead of focusing on the RV techniques specifically for actor-based systems, we emphasize how to provide an abstraction layer between the distributed application and the LTL verifiers.
 We provide an expressive specification language and simple bridge interface to help users model their application domains and specify the system's properties at the same time. This specification later acts as the contract between the real system and the verifier.
-We pick the actor-based system because it's a popular programming model and a clean abstraction for distributed systems.
+We focus on actor-based systems because actors are a popular programming model and a clean, observable abstraction for distributed systems.
 Previous work has also shown that interesting properties about actor-based systems can be specified using an LTL-like logic \cite{actorservice, parthasarathy2018modular}.
 
 \section{Conclusion}
 
-We have presented \ltlspec, an extensible system for runtime verification of actor-based distributed systems, and we have shown the applicability of our abstractions to several distinct problem domains. We believe that LTL with data variable quantification as we have implemented it is a useful and expressive language for modeling these systems, and we believe that describing systems with first-order theories with per-theory interpretations (bridges) gives rich enough structure to exploit in online or offline verification. As we have mentioned, future work may expand the space of supported theories, prove these assertions in the presence of injected faults, or attempt on deeper language-level integration of interpretations.
+We have presented \ltlspec, an extensible system for runtime verification of distributed systems, and we have shown the applicability of our abstractions to several distinct problem domains. We believe that LTL with data variable quantification as we have implemented it is a useful and expressive language for modeling these systems, and we believe that describing systems with first-order theories and per-theory interpretations (bridges) gives rich enough structure to exploit in online or offline verification. Additionally, we argue that our method of truncation deserves further consideration as a metalogical extension of LTL. As we have mentioned, future work may expand the space of supported theories, prove these assertions in the presence of injected faults, or attempt deeper language-level integration of interpretations.
 
 \bibliographystyle{ACM-Reference-Format}
 \bibliography{ltlspec-report}
